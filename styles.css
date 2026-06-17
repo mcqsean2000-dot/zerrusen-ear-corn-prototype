@@ -265,7 +265,7 @@ h3 {
 }
 
 .intro,
-.pickup {
+.delivery {
   display: grid;
   grid-template-columns: minmax(0, 0.8fr) minmax(280px, 1fr);
   gap: clamp(28px, 7vw, 86px);
@@ -273,7 +273,7 @@ h3 {
 }
 
 .intro p,
-.pickup p,
+.delivery p,
 .quality-band p {
   color: var(--muted);
   font-size: 1.05rem;
@@ -581,7 +581,7 @@ footer strong {
   .intro,
   .product-grid,
   .quality-band,
-  .pickup {
+  .delivery {
     grid-template-columns: 1fr;
   }
 
