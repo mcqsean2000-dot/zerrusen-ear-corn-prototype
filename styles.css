@@ -265,7 +265,8 @@ h3 {
 }
 
 .intro,
-.delivery {
+.delivery,
+.search-section {
   display: grid;
   grid-template-columns: minmax(0, 0.8fr) minmax(280px, 1fr);
   gap: clamp(28px, 7vw, 86px);
@@ -274,6 +275,7 @@ h3 {
 
 .intro p,
 .delivery p,
+.search-section p,
 .quality-band p {
   color: var(--muted);
   font-size: 1.05rem;
@@ -311,11 +313,13 @@ h3 {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center 58%;
   transition: transform 220ms ease;
 }
 
 .product-media-alt img {
   transform: scale(1.08);
+  object-position: center 66%;
 }
 
 .product-card:hover .product-media img {
@@ -579,6 +583,7 @@ footer strong {
 
   .trust-strip,
   .intro,
+  .search-section,
   .product-grid,
   .quality-band,
   .delivery {
