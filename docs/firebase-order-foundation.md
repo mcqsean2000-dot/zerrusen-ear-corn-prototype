@@ -6,7 +6,7 @@ This branch adds the static-site foundation for Firebase Hosting and Firestore o
 
 `firebase.json` serves the current static prototype from the repo root. It keeps HTML, CSS, and JavaScript uncached for quick iteration while caching product images for one week.
 
-Before production, create a real Firebase project and local `.firebaserc` file:
+Before production, create a real Firebase project and copy `.firebaserc.example` to a local `.firebaserc` file:
 
 ```json
 {
@@ -17,6 +17,8 @@ Before production, create a real Firebase project and local `.firebaserc` file:
 ```
 
 `.firebaserc` is intentionally ignored so each collaborator can point at their own Firebase project.
+
+See `docs/firebase-hosting-readiness.md` for first setup, local preview, preview channels, deploy commands, and the production verification checklist.
 
 ## Order Request Collection
 

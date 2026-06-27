@@ -55,8 +55,10 @@ Natural search phrases to keep in mind:
 - `package.json` - static validation script entry point
 - `tools/check-static.mjs` - no-dependency static prototype checks
 - `firebase.json` - Firebase Hosting and Firestore deploy targets
+- `.firebaserc.example` - safe Firebase project alias template for local setup
 - `firestore.rules` - initial Firestore rules for prototype order requests
 - `firestore.indexes.json` - Firestore index definition for order request queues
+- `docs/firebase-hosting-readiness.md` - first Firebase setup, preview, deploy, and production verification notes
 - `docs/firebase-order-foundation.md` - Firebase order request shape and payment boundary notes
 - `docs/admin-fulfillment-foundation.md` - admin queue and fulfillment planning notes
 - `assets/theos-20lb-bag.jpg` - client photo of 20 lb bag
@@ -88,3 +90,14 @@ Then open:
 ```text
 http://localhost:4173/
 ```
+
+## Firebase Hosting Preview
+
+Firebase Hosting is prepared for static preview/deploy only. Copy `.firebaserc.example` to `.firebaserc`, replace the placeholder with a real Firebase project ID, and keep `.firebaserc` uncommitted.
+
+```bash
+firebase emulators:start --only hosting
+firebase hosting:channel:deploy preview
+```
+
+See `docs/firebase-hosting-readiness.md` before the first production deploy.

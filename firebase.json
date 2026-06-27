@@ -5,6 +5,7 @@
       "firebase.json",
       ".firebaserc",
       "**/.*",
+      "**/*.md",
       "**/node_modules/**",
       "docs/**",
       "firestore.rules",
