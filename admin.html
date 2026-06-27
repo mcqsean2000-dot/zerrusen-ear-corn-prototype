@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Theo's Farm Admin Prototype</title>
+    <meta name="description" content="Static fulfillment admin prototype for Theo's Farm order requests.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="admin.css">
+  </head>
+  <body class="admin-page">
+    <header class="site-header admin-header">
+      <a class="brand" href="index.html" aria-label="Theo's Farm storefront">
+        <span class="brand-mark">TF</span>
+        <span>
+          <strong>Theo's Farm</strong>
+          <small>Admin prototype</small>
+        </span>
+      </a>
+      <nav aria-label="Admin navigation">
+        <a href="index.html">Storefront</a>
+        <a href="#orders">Orders</a>
+        <a href="#packing">Packing</a>
+      </nav>
+    </header>
+
+    <main class="admin-main">
+      <section class="admin-title" aria-labelledby="admin-title">
+        <p class="eyebrow">Fulfillment foundation</p>
+        <h1 id="admin-title">Order requests, packing counts, and follow-up cues.</h1>
+        <p>This static admin shell is a planning surface for the future authenticated dashboard. It uses sample data only and does not read or write Firebase.</p>
+      </section>
+
+      <section class="admin-metrics" aria-label="Fulfillment summary" data-admin-summary></section>
+
+      <section class="admin-layout" id="orders" aria-labelledby="orders-title">
+        <div class="admin-panel">
+          <div class="admin-panel-head">
+            <div>
+              <p class="eyebrow">Queue</p>
+              <h2 id="orders-title">Order requests</h2>
+            </div>
+            <label class="admin-filter">
+              Status
+              <select data-status-filter>
+                <option value="all">All</option>
+                <option value="needs_review">Needs review</option>
+                <option value="ready_to_pack">Ready to pack</option>
+                <option value="packed">Packed</option>
+              </select>
+            </label>
+          </div>
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th scope="col">Customer</th>
+                  <th scope="col">Items</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Contact</th>
+                  <th scope="col">Notes</th>
+                </tr>
+              </thead>
+              <tbody data-order-rows></tbody>
+            </table>
+          </div>
+        </div>
+
+        <aside class="admin-panel" id="packing" aria-labelledby="packing-title">
+          <p class="eyebrow">Daily plan</p>
+          <h2 id="packing-title">Packing list</h2>
+          <div class="packing-list" data-packing-list></div>
+          <p class="admin-note">Future build: replace sample data with authenticated Firestore reads from <code>orderRequests</code>.</p>
+        </aside>
+      </section>
+    </main>
+
+    <script src="admin.js"></script>
+  </body>
+</html>
