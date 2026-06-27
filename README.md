@@ -14,7 +14,8 @@ This repo currently contains a static prototype for the Theo's Farm direct-to-co
   - 40 lb Ear Corn Bag
 - Fulfillment: shipping/delivery only. No local pickup.
 - Payments direction: Stripe Checkout with Google Pay enabled through Stripe.
-- Long-term hosting direction: move from GitHub Pages prototype hosting to Firebase Hosting for production.
+- Storefront flow: cart selections feed a prototype order request form before the future Stripe Checkout handoff.
+- Long-term hosting direction: move from GitHub Pages prototype hosting to Cloudflare Pages for production.
 - Old Zerrusen Farms informational site should remain separate from Theo's Farm as a separate business/site.
 
 ## Client-Provided Business Notes

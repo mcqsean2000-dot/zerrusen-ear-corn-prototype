@@ -151,23 +151,43 @@
       <section class="section delivery" id="delivery" aria-labelledby="delivery-title">
         <div>
           <p class="eyebrow">Fulfillment concept</p>
-          <h2 id="delivery-title">Keep checkout simple while shipping rules are confirmed.</h2>
-          <p>This prototype uses an inquiry-style checkout CTA. That lets Theo's Farm collect buyer intent, delivery addresses, and order details while final shipping zones, local delivery rules, and freight rates are confirmed.</p>
+          <h2 id="delivery-title">Start an order request, then finish payment through Stripe.</h2>
+          <p>This prototype now collects buyer intent, delivery details, and the cart subtotal before handing payment off to Stripe Checkout. Theo's Farm should not collect or store raw card details on this static site.</p>
         </div>
-        <form class="quote-form">
+        <form class="quote-form" data-order-form novalidate>
+          <div class="order-summary" data-order-summary>
+            <strong>Cart summary</strong>
+            <p>Add a bag to the cart and it will appear here before checkout.</p>
+            <span>Estimated subtotal: <b data-order-subtotal>$0.00</b></span>
+          </div>
           <label>
             Name
-            <input type="text" name="name" placeholder="Customer name">
+            <input type="text" name="name" placeholder="Customer name" required>
           </label>
           <label>
             Email or phone
-            <input type="text" name="contact" placeholder="Best contact">
+            <input type="text" name="contact" placeholder="Best contact" required>
+          </label>
+          <label>
+            Shipping ZIP
+            <input type="text" name="zip" inputmode="numeric" autocomplete="postal-code" pattern="[0-9]{5}" placeholder="62401" required>
+          </label>
+          <label>
+            Preferred contact method
+            <select name="contactMethod" required>
+              <option value="">Select one</option>
+              <option>Email</option>
+              <option>Phone call</option>
+              <option>Text message</option>
+            </select>
           </label>
           <label>
             Order note
-            <textarea name="note" rows="4" placeholder="Shipping ZIP, delivery address, or bulk quantity"></textarea>
+            <textarea name="note" rows="4" placeholder="Delivery address, timing, or bulk quantity"></textarea>
           </label>
-          <button type="button">Request delivery options</button>
+          <p class="payment-note">Payment should be completed through Stripe Checkout after shipping or delivery details are confirmed.</p>
+          <button type="submit">Request checkout link</button>
+          <p class="form-status" data-order-status role="status" aria-live="polite"></p>
         </form>
       </section>
     </main>
@@ -185,7 +205,7 @@
           <span>Estimated subtotal</span>
           <strong data-cart-total>$0.00</strong>
         </div>
-        <button class="checkout-button" type="button">Continue to order request</button>
+        <button class="checkout-button" type="button" data-checkout-button>Continue to order request</button>
       </div>
     </aside>
 
