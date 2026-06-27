@@ -8,7 +8,9 @@
       "**/node_modules/**",
       "docs/**",
       "firestore.rules",
-      "firestore.indexes.json"
+      "firestore.indexes.json",
+      "package.json",
+      "tools/**"
     ],
     "headers": [
       {

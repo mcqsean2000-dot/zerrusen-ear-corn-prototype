@@ -145,6 +145,8 @@ Build order:
 5. Add order persistence.
 6. Add Stripe webhooks.
 7. Build admin fulfillment dashboard.
+   - Static admin planning shell now exists at `admin.html`.
+   - Next step is authenticated Firestore reads and status updates.
 8. Add email notifications.
 9. Deploy to Firebase Hosting.
 10. Point production domain.

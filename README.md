@@ -15,7 +15,7 @@ This repo currently contains a static prototype for the Theo's Farm direct-to-co
 - Fulfillment: shipping/delivery only. No local pickup.
 - Payments direction: Stripe Checkout with Google Pay enabled through Stripe.
 - Storefront flow: cart selections feed a prototype order request form before the future Stripe Checkout handoff.
-- Long-term hosting direction: move from GitHub Pages prototype hosting to Cloudflare Pages for production.
+- Long-term hosting direction: move from GitHub Pages prototype hosting to Firebase Hosting for production.
 - Old Zerrusen Farms informational site should remain separate from Theo's Farm as a separate business/site.
 
 ## Client-Provided Business Notes
@@ -49,10 +49,16 @@ Natural search phrases to keep in mind:
 - `index.html` - static page content and layout
 - `styles.css` - responsive styling
 - `script.js` - demo cart drawer behavior
+- `admin.html` - static admin fulfillment prototype
+- `admin.css` - admin shell styles
+- `admin.js` - sample admin queue behavior
+- `package.json` - static validation script entry point
+- `tools/check-static.mjs` - no-dependency static prototype checks
 - `firebase.json` - Firebase Hosting and Firestore deploy targets
 - `firestore.rules` - initial Firestore rules for prototype order requests
 - `firestore.indexes.json` - Firestore index definition for order request queues
 - `docs/firebase-order-foundation.md` - Firebase order request shape and payment boundary notes
+- `docs/admin-fulfillment-foundation.md` - admin queue and fulfillment planning notes
 - `assets/theos-20lb-bag.jpg` - client photo of 20 lb bag
 - `assets/theos-40lb-bag.jpg` - client photo of 40 lb bag
 - `assets/theos-both-bags.jpg` - client photo of both bags
@@ -64,6 +70,12 @@ Natural search phrases to keep in mind:
 - Do not store raw payment information in the app. Use Stripe-hosted payment collection and Stripe customer/payment method IDs.
 - Public Firestore writes are limited to validated order request creation. Payment status and Stripe IDs should be written only by trusted backend code.
 - Do not reintroduce local pickup unless the client changes direction.
+
+## Local Checks
+
+```bash
+npm run check
+```
 
 ## Local Preview
 

@@ -1,0 +1,6 @@
+{
+  "scripts": {
+    "check": "node tools/check-static.mjs"
+  },
+  "devDependencies": {}
+}
