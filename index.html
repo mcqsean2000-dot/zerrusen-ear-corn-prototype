@@ -91,7 +91,7 @@
               </div>
               <div class="buy-row">
                 <strong>$16.00</strong>
-                <button type="button" data-add-to-cart data-name="20 lb Ear Corn Bag" data-price="16">Add to cart</button>
+                <button type="button" data-add-to-cart data-sku="ear-corn-20lb" data-name="20 lb Ear Corn Bag" data-price-cents="1600">Add to cart</button>
               </div>
             </div>
           </article>
@@ -111,7 +111,7 @@
               </div>
               <div class="buy-row">
                 <strong>$28.00</strong>
-                <button type="button" data-add-to-cart data-name="40 lb Ear Corn Bag" data-price="28">Add to cart</button>
+                <button type="button" data-add-to-cart data-sku="ear-corn-40lb" data-name="40 lb Ear Corn Bag" data-price-cents="2800">Add to cart</button>
               </div>
             </div>
           </article>
@@ -185,7 +185,7 @@
             Order note
             <textarea name="note" rows="4" placeholder="Delivery address, timing, or bulk quantity"></textarea>
           </label>
-          <p class="payment-note">Payment should be completed through Stripe Checkout after shipping or delivery details are confirmed.</p>
+          <p class="payment-note">Payment should be completed through Stripe Checkout after shipping or delivery details are confirmed. This prototype prepares the order request only; live submission needs a trusted checkout endpoint.</p>
           <button type="submit">Request checkout link</button>
           <p class="form-status" data-order-status role="status" aria-live="polite"></p>
         </form>
@@ -214,6 +214,7 @@
       <span>Prototype copy and pricing for discussion only. Replace with verified farm details before launch.</span>
     </footer>
 
+    <script src="order-request.js"></script>
     <script src="script.js"></script>
   </body>
 </html>
