@@ -456,6 +456,7 @@ h3 {
 }
 
 .quote-form input,
+.quote-form select,
 .quote-form textarea {
   width: 100%;
   border: 1px solid var(--line);
@@ -463,6 +464,38 @@ h3 {
   padding: 12px 13px;
   color: var(--ink);
   background: #fbfaf6;
+}
+
+.order-summary {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  background: #fbfaf6;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.order-summary p,
+.payment-note,
+.form-status {
+  margin: 0;
+  color: var(--muted);
+}
+
+.order-summary span {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.payment-note,
+.form-status {
+  font-size: 0.94rem;
+  line-height: 1.5;
+}
+
+.checkout-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .cart-drawer {
