@@ -8,14 +8,14 @@ Decision so far:
 
 - Use a new domain for Theo's Farm.
 - Keep Theo's Farm separate from the old Zerrusen Farms site/business.
-- Use Cloudflare Pages for production hosting unless a later technical constraint changes that.
+- Use Firebase Hosting for production hosting.
 - Keep GitHub Pages only as the current prototype preview.
 
 Open tasks:
 
 - Choose/register the new Theo's Farm domain.
-- Decide whether DNS should stay at the registrar or move to Cloudflare.
-- Create a production Cloudflare Pages project for Theo's Farm.
+- Decide whether DNS should stay at the registrar or move to Firebase Hosting's assigned domain workflow.
+- Create a production Firebase project for Theo's Farm.
 - Create a separate project/repo for the old Zerrusen Farms site if that site is restored.
 
 ## Phase 2: Storefront
@@ -129,12 +129,12 @@ Later:
 Likely stack:
 
 - Frontend: Astro, Next.js, or another lightweight app framework
-- Hosting: Cloudflare Pages
-- Backend: Cloudflare Pages Functions or Workers
-- Database: Cloudflare D1, Supabase, or similar
+- Hosting: Firebase Hosting
+- Backend: Firebase Cloud Functions or another trusted server endpoint
+- Database: Firestore
 - Payments: Stripe Checkout
 - Email: Resend or Postmark
-- Admin auth: Cloudflare Access, Clerk, Supabase Auth, or similar
+- Admin auth: Firebase Auth with admin custom claims, Clerk, or similar
 
 Build order:
 
@@ -146,7 +146,7 @@ Build order:
 6. Add Stripe webhooks.
 7. Build admin fulfillment dashboard.
 8. Add email notifications.
-9. Deploy to Cloudflare Pages.
+9. Deploy to Firebase Hosting.
 10. Point production domain.
 11. Run test orders.
 12. Launch.

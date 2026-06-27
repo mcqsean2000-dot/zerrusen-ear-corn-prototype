@@ -1,0 +1,102 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.admin == true;
+    }
+
+    function hasOnlyOrderRequestFields() {
+      return request.resource.data.keys().hasOnly([
+        'createdAt',
+        'customer',
+        'items',
+        'source',
+        'status',
+        'stripeCheckoutSessionId',
+        'stripePaymentIntentId',
+        'subtotalCents'
+      ]);
+    }
+
+    function hasRequiredCustomerFields() {
+      return request.resource.data.customer.keys().hasAll([
+        'contact',
+        'name',
+        'preferredContact',
+        'shippingZip'
+      ]);
+    }
+
+    function hasValidCustomer() {
+      return request.resource.data.customer is map
+        && request.resource.data.customer.keys().hasOnly([
+          'contact',
+          'name',
+          'note',
+          'preferredContact',
+          'shippingZip'
+        ])
+        && hasRequiredCustomerFields()
+        && request.resource.data.customer.name is string
+        && request.resource.data.customer.name.size() >= 1
+        && request.resource.data.customer.name.size() <= 120
+        && request.resource.data.customer.contact is string
+        && request.resource.data.customer.contact.size() >= 3
+        && request.resource.data.customer.contact.size() <= 160
+        && request.resource.data.customer.shippingZip is string
+        && request.resource.data.customer.shippingZip.matches('^[0-9]{5}$')
+        && request.resource.data.customer.preferredContact in ['email', 'phone', 'text']
+        && (!('note' in request.resource.data.customer)
+          || (request.resource.data.customer.note is string
+            && request.resource.data.customer.note.size() <= 1000));
+    }
+
+    function hasValidItem(item) {
+      return item is map
+        && item.keys().hasOnly(['name', 'quantity', 'sku', 'unitPriceCents'])
+        && item.keys().hasAll(['name', 'quantity', 'sku', 'unitPriceCents'])
+        && item.sku in ['ear-corn-20lb', 'ear-corn-40lb']
+        && item.name in ['20 lb Ear Corn Bag', '40 lb Ear Corn Bag']
+        && item.quantity is int
+        && item.quantity >= 1
+        && item.quantity <= 50
+        && item.unitPriceCents is int
+        && item.unitPriceCents in [1600, 2800];
+    }
+
+    function hasValidItems() {
+      return request.resource.data.items is list
+        && request.resource.data.items.size() >= 1
+        && request.resource.data.items.size() <= 2
+        && hasValidItem(request.resource.data.items[0])
+        && (request.resource.data.items.size() == 1
+          || hasValidItem(request.resource.data.items[1]));
+    }
+
+    function hasValidOrderShape() {
+      return hasOnlyOrderRequestFields()
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.status == 'needs_review'
+        && request.resource.data.source == 'static-storefront'
+        && request.resource.data.subtotalCents is int
+        && request.resource.data.subtotalCents >= 1600
+        && request.resource.data.subtotalCents <= 84000
+        && !('stripeCheckoutSessionId' in request.resource.data)
+        && !('stripePaymentIntentId' in request.resource.data)
+        && hasValidCustomer()
+        && hasValidItems();
+    }
+
+    match /orderRequests/{orderRequestId} {
+      allow create: if hasValidOrderShape();
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
