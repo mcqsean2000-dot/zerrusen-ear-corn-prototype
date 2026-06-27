@@ -1,9 +1,14 @@
 import { access, readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const orderRequests = require("../order-request.js");
 
 const requiredFiles = [
   "index.html",
   "styles.css",
   "script.js",
+  "order-request.js",
   "admin.html",
   "admin.css",
   "admin.js",
@@ -29,6 +34,8 @@ const firebaseProjectExample = JSON.parse(await readFile(".firebaserc.example", 
 const indexes = JSON.parse(await readFile("firestore.indexes.json", "utf8"));
 const rules = await readFile("firestore.rules", "utf8");
 const storefront = await readFile("index.html", "utf8");
+const storefrontScript = await readFile("script.js", "utf8");
+const orderRequestScript = await readFile("order-request.js", "utf8");
 const admin = await readFile("admin.html", "utf8");
 const adminScript = await readFile("admin.js", "utf8");
 const gitignore = await readFile(".gitignore", "utf8");
@@ -57,8 +64,106 @@ assert(rules.includes("allow create: if hasValidOrderShape();"), "Public order r
 assert(rules.includes("allow read, update, delete: if isAdmin();"), "Admin-only read/update/delete rule is missing.");
 assert(!storefront.toLowerCase().includes("local pickup"), "Storefront must not reintroduce local pickup.");
 assert(storefront.includes("data-order-form"), "Storefront purchase request form is missing.");
+assert(storefront.includes("order-request.js"), "Storefront must load the order request integration layer.");
+assert(
+  storefront.indexOf("order-request.js") < storefront.indexOf("script.js"),
+  "Order request integration must load before storefront behavior.",
+);
+assert(storefront.includes('data-sku="ear-corn-20lb"'), "20 lb product must expose a stable order SKU.");
+assert(storefront.includes('data-sku="ear-corn-40lb"'), "40 lb product must expose a stable order SKU.");
+assert(storefrontScript.includes("buildOrderRequest"), "Storefront submit should use the order request builder.");
+assert(
+  !storefrontScript.toLowerCase().includes("firebase") && !orderRequestScript.toLowerCase().includes("firebase"),
+  "Storefront order request layer must not perform live Firebase writes in this slice.",
+);
+assert(
+  !storefrontScript.includes("card") && !orderRequestScript.includes("card"),
+  "Storefront must not collect or handle raw card details.",
+);
 assert(admin.includes("admin.js"), "Admin shell must load admin.js.");
 assert(adminScript.includes("sampleOrders"), "Admin shell should use sample data only in this slice.");
 assert(!adminScript.toLowerCase().includes("firebase"), "Admin shell must not connect to Firebase yet.");
+
+const validOrderRequest = orderRequests.buildOrderRequest({
+  cart: [
+    { sku: "ear-corn-20lb", quantity: 2 },
+    { sku: "ear-corn-40lb", quantity: 1 },
+  ],
+  customer: {
+    name: "Customer Name",
+    contact: "customer@example.com",
+    shippingZip: "62401",
+    preferredContact: "Email",
+    note: "Leave near the side door.",
+  },
+});
+
+assert(validOrderRequest.ok, "Valid storefront order request should build successfully.");
+assert(validOrderRequest.payload.source === "static-storefront", "Order request source should match Firestore rules.");
+assert(validOrderRequest.payload.status === "needs_review", "Order request should start in needs_review status.");
+assert(!("createdAt" in validOrderRequest.payload), "Static order request draft must not fake a Firestore server timestamp.");
+assert(validOrderRequest.firestoreWrite.collection === "orderRequests", "Order request should identify the Firestore collection for the backend.");
+assert(validOrderRequest.firestoreWrite.createdAt === "server_timestamp_required", "Order request should require backend server timestamp handling.");
+assert(validOrderRequest.firestoreWrite.trustedWriterRequired, "Order request should require a trusted writer before Firestore submission.");
+assert(validOrderRequest.payload.subtotalCents === 6000, "Order request subtotal should be calculated in cents.");
+assert(validOrderRequest.payload.items[0].sku === "ear-corn-20lb", "Order request should include the 20 lb SKU.");
+assert(validOrderRequest.payload.items[1].sku === "ear-corn-40lb", "Order request should include the 40 lb SKU.");
+assert(validOrderRequest.payload.customer.preferredContact === "email", "Order request should normalize preferred contact.");
+assert(validOrderRequest.handoff.mode === "backend_required", "Stripe Checkout handoff should require a trusted backend.");
+assert(!("stripeCheckoutSessionId" in validOrderRequest.payload), "Public order request must not include Stripe Checkout IDs.");
+assert(!("stripePaymentIntentId" in validOrderRequest.payload), "Public order request must not include Stripe payment intent IDs.");
+
+const invalidZip = orderRequests.buildOrderRequest({
+  cart: [{ sku: "ear-corn-20lb", quantity: 1 }],
+  customer: {
+    name: "Customer Name",
+    contact: "customer@example.com",
+    shippingZip: "bad",
+    preferredContact: "Email",
+  },
+});
+
+assert(!invalidZip.ok, "Invalid ZIP should fail order request validation.");
+
+const unknownProduct = orderRequests.buildOrderRequest({
+  cart: [{ sku: "unknown", quantity: 1 }],
+  customer: {
+    name: "Customer Name",
+    contact: "customer@example.com",
+    shippingZip: "62401",
+    preferredContact: "Email",
+  },
+});
+
+assert(!unknownProduct.ok, "Unknown products should fail order request validation.");
+
+const overlongNote = orderRequests.buildOrderRequest({
+  cart: [{ sku: "ear-corn-20lb", quantity: 1 }],
+  customer: {
+    name: "Customer Name",
+    contact: "customer@example.com",
+    shippingZip: "62401",
+    preferredContact: "Email",
+    note: "x".repeat(1001),
+  },
+});
+
+assert(!overlongNote.ok, "Overlong notes should fail order request validation.");
+
+const tooManyCartLines = orderRequests.buildOrderRequest({
+  cart: [
+    { sku: "ear-corn-20lb", quantity: 1 },
+    { sku: "ear-corn-40lb", quantity: 1 },
+    { sku: "ear-corn-20lb", quantity: 1 },
+  ],
+  customer: {
+    name: "Customer Name",
+    contact: "customer@example.com",
+    shippingZip: "62401",
+    preferredContact: "Email",
+  },
+});
+
+assert(!tooManyCartLines.ok, "More than two cart lines should fail order request validation.");
 
 console.log("Static prototype checks passed.");
