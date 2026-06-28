@@ -1,5 +1,7 @@
 zerrusen-ear-corn-prototype.zip
 .env
 .env.*
+!.env.example
+!**/.env.example
 .firebase/
 .firebaserc

@@ -222,6 +222,12 @@ Current `firestore.rules` already rejects public creates that include `stripeChe
 
 ## Webhook Expectations
 
+Future endpoint:
+
+```text
+POST /api/stripe/webhook
+```
+
 The webhook handler must verify Stripe signatures before reading event data. It should be idempotent by storing the latest processed Stripe event ID or maintaining a separate event log.
 
 Required events for version one:
