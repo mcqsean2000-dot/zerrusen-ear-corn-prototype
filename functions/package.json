@@ -1,0 +1,12 @@
+{
+  "name": "theos-farm-checkout-functions",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Host-neutral trusted checkout scaffold for Theo's Farm Stripe Checkout handoff.",
+  "main": "src/index.js",
+  "scripts": {
+    "check": "node --check src/index.js && node --check src/order-validation.js && node --check src/index.test.js && node --check src/order-validation.test.js && node --test src/index.test.js src/order-validation.test.js"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

@@ -53,6 +53,7 @@ Current recommendation:
 - Google Pay enabled through Stripe.
 - Also allow Apple Pay and Link if available through Stripe Checkout.
 - Skip Venmo for version one unless the client specifically requests it later.
+- Use the host-neutral `functions/` scaffold as the starting point for trusted checkout session and webhook code.
 
 Payment/data rules:
 

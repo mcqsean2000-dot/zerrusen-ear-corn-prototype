@@ -19,6 +19,14 @@ const requiredFiles = [
   "docs/firebase-hosting-readiness.md",
   "docs/firebase-order-foundation.md",
   "docs/admin-fulfillment-foundation.md",
+  "docs/stripe-checkout-handoff.md",
+  "docs/backend-checkout-scaffold.md",
+  "functions/.env.example",
+  "functions/package.json",
+  "functions/src/index.js",
+  "functions/src/index.test.js",
+  "functions/src/order-validation.js",
+  "functions/src/order-validation.test.js",
 ];
 
 function assert(condition, message) {
@@ -40,6 +48,12 @@ const admin = await readFile("admin.html", "utf8");
 const adminScript = await readFile("admin.js", "utf8");
 const gitignore = await readFile(".gitignore", "utf8");
 const hostingReadiness = await readFile("docs/firebase-hosting-readiness.md", "utf8");
+const stripeHandoff = await readFile("docs/stripe-checkout-handoff.md", "utf8");
+const backendScaffold = await readFile("docs/backend-checkout-scaffold.md", "utf8");
+const functionsPackage = JSON.parse(await readFile("functions/package.json", "utf8"));
+const functionsEnvExample = await readFile("functions/.env.example", "utf8");
+const functionsIndex = await readFile("functions/src/index.js", "utf8");
+const functionsValidation = await readFile("functions/src/order-validation.js", "utf8");
 
 assert(firebaseConfig.hosting?.public === ".", "Firebase Hosting should serve the static repo root.");
 assert(firebaseConfig.hosting?.ignore?.includes(".firebaserc"), "Firebase Hosting should ignore local .firebaserc.");
@@ -53,10 +67,25 @@ assert(
 );
 assert(gitignore.includes(".firebaserc"), ".gitignore must keep local .firebaserc out of git.");
 assert(gitignore.includes(".firebase/"), ".gitignore must keep Firebase local cache out of git.");
+assert(gitignore.includes("!**/.env.example"), ".gitignore must allow safe example env files.");
 assert(hostingReadiness.includes("firebase emulators:start --only hosting"), "Hosting readiness doc must include local Firebase preview.");
 assert(hostingReadiness.includes("firebase hosting:channel:deploy preview"), "Hosting readiness doc must include preview channel deploy.");
 assert(hostingReadiness.includes("firebase deploy --only hosting"), "Hosting readiness doc must include hosting deploy command.");
 assert(hostingReadiness.includes("Stripe Checkout"), "Hosting readiness doc must preserve Stripe Checkout payment boundary.");
+assert(stripeHandoff.includes("POST /api/checkout-sessions"), "Stripe handoff must document checkout session endpoint.");
+assert(stripeHandoff.includes("POST /api/stripe/webhook"), "Stripe handoff must document webhook endpoint.");
+assert(backendScaffold.includes("checkoutSessionsHandler"), "Backend scaffold doc must name the checkout session handler.");
+assert(backendScaffold.includes("stripeWebhookHandler"), "Backend scaffold doc must name the Stripe webhook handler.");
+assert(functionsPackage.scripts?.check?.includes("node --test"), "Backend package must include a local test check.");
+assert(functionsIndex.includes("checkoutSessionsHandler"), "Backend scaffold must export checkout session handling.");
+assert(functionsIndex.includes("stripeWebhookHandler"), "Backend scaffold must export Stripe webhook handling.");
+assert(functionsIndex.includes("CORS_ALLOWED_ORIGINS"), "Backend scaffold must include configurable CORS origin handling.");
+assert(functionsValidation.includes("validateOrderRequestDraft"), "Backend scaffold must include order request validation helpers.");
+assert(functionsValidation.includes("FIRESTORE_SERVER_TIMESTAMP_REQUIRED"), "Backend scaffold must preserve Firestore server timestamp boundary.");
+assert(!functionsEnvExample.includes("sk_live_"), "Example backend env file must not include live Stripe secret keys.");
+assert(!functionsEnvExample.includes("whsec_"), "Example backend env file must not include webhook signing secret-looking values.");
+assert(!functionsEnvExample.includes("https://example.com"), "Example backend env URLs should remain obvious placeholders.");
+assert(!functionsEnvExample.includes("-----BEGIN PRIVATE KEY-----"), "Example backend env file must not include service account private keys.");
 assert(indexes.indexes?.some((index) => index.collectionGroup === "orderRequests"), "Missing orderRequests Firestore index.");
 assert(rules.includes("match /orderRequests/{orderRequestId}"), "Firestore rules must define orderRequests access.");
 assert(rules.includes("createdAt == request.time"), "Firestore rules should require server request time for createdAt.");
