@@ -8,14 +8,15 @@ Decision so far:
 
 - Use a new domain for Theo's Farm.
 - Keep Theo's Farm separate from the old Zerrusen Farms site/business.
-- Use Firebase Hosting for production hosting.
+- Use GoDaddy or another approved static host for the public production storefront.
+- Keep Firebase/Firestore references scoped to order data, rules, indexes, and trusted backend storage if that foundation is selected.
 - Keep GitHub Pages only as the current prototype preview.
 
 Open tasks:
 
 - Choose/register the new Theo's Farm domain.
-- Decide whether DNS should stay at the registrar or move to Firebase Hosting's assigned domain workflow.
-- Create a production Firebase project for Theo's Farm.
+- Decide how the GoDaddy/static hosting setup should publish the storefront and manage DNS.
+- Create a production Firebase project for Theo's Farm only if Firestore remains the selected order storage foundation.
 - Create a separate project/repo for the old Zerrusen Farms site if that site is restored.
 
 ## Phase 2: Storefront
@@ -58,6 +59,7 @@ Payment/data rules:
 - Do not store full card numbers, CVV, or raw payment details.
 - Store only Stripe IDs needed for order/customer/payment reference.
 - Store customer/order data only when operationally useful.
+- Use `docs/stripe-checkout-handoff.md` as the contract for the future trusted backend checkout session and webhook implementation.
 
 Future recurring order approach:
 
@@ -129,7 +131,7 @@ Later:
 Likely stack:
 
 - Frontend: Astro, Next.js, or another lightweight app framework
-- Hosting: Firebase Hosting
+- Hosting: GoDaddy or another approved static host for the public storefront
 - Backend: Firebase Cloud Functions or another trusted server endpoint
 - Database: Firestore
 - Payments: Stripe Checkout
@@ -148,7 +150,7 @@ Build order:
    - Static admin planning shell now exists at `admin.html`.
    - Next step is authenticated Firestore reads and status updates.
 8. Add email notifications.
-9. Deploy to Firebase Hosting.
+9. Deploy the public storefront to GoDaddy or the selected static host.
 10. Point production domain.
 11. Run test orders.
 12. Launch.

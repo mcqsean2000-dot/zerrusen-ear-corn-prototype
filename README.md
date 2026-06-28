@@ -15,7 +15,8 @@ This repo currently contains a static prototype for the Theo's Farm direct-to-co
 - Fulfillment: shipping/delivery only. No local pickup.
 - Payments direction: Stripe Checkout with Google Pay enabled through Stripe.
 - Storefront flow: cart selections feed a prototype order request form before the future Stripe Checkout handoff.
-- Long-term hosting direction: move from GitHub Pages prototype hosting to Firebase Hosting for production.
+- Public hosting direction: host the static storefront on GoDaddy or another approved static host.
+- Firebase/Firestore may still be used for backend order storage, rules, and indexes if selected.
 - Old Zerrusen Farms informational site should remain separate from Theo's Farm as a separate business/site.
 
 ## Client-Provided Business Notes
@@ -54,13 +55,14 @@ Natural search phrases to keep in mind:
 - `admin.js` - sample admin queue behavior
 - `package.json` - static validation script entry point
 - `tools/check-static.mjs` - no-dependency static prototype checks
-- `firebase.json` - Firebase Hosting and Firestore deploy targets
+- `firebase.json` - existing Firebase Hosting config and Firestore deploy targets; public hosting direction is now GoDaddy/static host
 - `.firebaserc.example` - safe Firebase project alias template for local setup
 - `firestore.rules` - initial Firestore rules for prototype order requests
 - `firestore.indexes.json` - Firestore index definition for order request queues
 - `docs/firebase-hosting-readiness.md` - first Firebase setup, preview, deploy, and production verification notes
 - `docs/firebase-order-foundation.md` - Firebase order request shape and payment boundary notes
 - `docs/admin-fulfillment-foundation.md` - admin queue and fulfillment planning notes
+- `docs/stripe-checkout-handoff.md` - trusted backend contract for future Stripe Checkout session creation and webhook updates
 - `assets/theos-20lb-bag.jpg` - client photo of 20 lb bag
 - `assets/theos-40lb-bag.jpg` - client photo of 40 lb bag
 - `assets/theos-both-bags.jpg` - client photo of both bags
