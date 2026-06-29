@@ -1,5 +1,6 @@
 import { access, readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
+import { createContext, Script } from "node:vm";
 
 const require = createRequire(import.meta.url);
 const orderRequests = require("../order-request.js");
@@ -9,6 +10,7 @@ const requiredFiles = [
   "styles.css",
   "script.js",
   "order-request.js",
+  "checkout-config.js",
   "admin.html",
   "admin.css",
   "admin.js",
@@ -44,6 +46,7 @@ const rules = await readFile("firestore.rules", "utf8");
 const storefront = await readFile("index.html", "utf8");
 const storefrontScript = await readFile("script.js", "utf8");
 const orderRequestScript = await readFile("order-request.js", "utf8");
+const checkoutConfigScript = await readFile("checkout-config.js", "utf8");
 const admin = await readFile("admin.html", "utf8");
 const adminScript = await readFile("admin.js", "utf8");
 const gitignore = await readFile(".gitignore", "utf8");
@@ -94,20 +97,38 @@ assert(rules.includes("allow read, update, delete: if isAdmin();"), "Admin-only 
 assert(!storefront.toLowerCase().includes("local pickup"), "Storefront must not reintroduce local pickup.");
 assert(storefront.includes("data-order-form"), "Storefront purchase request form is missing.");
 assert(storefront.includes("order-request.js"), "Storefront must load the order request integration layer.");
+assert(storefront.includes("checkout-config.js"), "Storefront must load the public checkout config placeholder.");
 assert(
   storefront.indexOf("order-request.js") < storefront.indexOf("script.js"),
   "Order request integration must load before storefront behavior.",
 );
+assert(
+  storefront.indexOf("checkout-config.js") < storefront.indexOf("script.js"),
+  "Checkout config must load before storefront behavior.",
+);
 assert(storefront.includes('data-sku="ear-corn-20lb"'), "20 lb product must expose a stable order SKU.");
 assert(storefront.includes('data-sku="ear-corn-40lb"'), "40 lb product must expose a stable order SKU.");
 assert(storefrontScript.includes("buildOrderRequest"), "Storefront submit should use the order request builder.");
+assert(checkoutConfigScript.includes("TheosCheckoutConfig"), "Checkout config must expose the public storefront config object.");
+assert(checkoutConfigScript.includes("checkoutEndpoint"), "Checkout config must include a public checkout endpoint placeholder.");
+assert(checkoutConfigScript.includes('checkoutEndpoint: ""'), "Checkout endpoint should remain disabled until a trusted API URL is configured.");
+assert(!checkoutConfigScript.includes("sk_"), "Checkout config must not include Stripe secret-looking values.");
+assert(!checkoutConfigScript.includes("whsec_"), "Checkout config must not include webhook secret-looking values.");
+assert(storefrontScript.includes("fetch(endpoint"), "Configured storefront checkout should call the trusted backend endpoint.");
+assert(storefrontScript.includes("JSON.stringify({ orderRequest })"), "Configured storefront checkout should submit only the validated order request draft.");
+assert(storefrontScript.includes("checkout.stripe.com"), "Storefront should only redirect to Stripe Checkout URLs.");
+assert(storefrontScript.includes("checkoutFailureMessage"), "Storefront should show a safe checkout failure message.");
 assert(
-  !storefrontScript.toLowerCase().includes("firebase") && !orderRequestScript.toLowerCase().includes("firebase"),
+  !storefrontScript.toLowerCase().includes("firebase") &&
+    !orderRequestScript.toLowerCase().includes("firebase") &&
+    !checkoutConfigScript.toLowerCase().includes("firebase"),
   "Storefront order request layer must not perform live Firebase writes in this slice.",
 );
 assert(
-  !storefrontScript.includes("card") && !orderRequestScript.includes("card"),
-  "Storefront must not collect or handle raw card details.",
+  !storefrontScript.includes("card") &&
+    !orderRequestScript.includes("card") &&
+    !checkoutConfigScript.includes("card"),
+  "Storefront must not collect or handle raw payment details.",
 );
 assert(admin.includes("admin.js"), "Admin shell must load admin.js.");
 assert(adminScript.includes("sampleOrders"), "Admin shell should use sample data only in this slice.");
@@ -194,5 +215,252 @@ const tooManyCartLines = orderRequests.buildOrderRequest({
 });
 
 assert(!tooManyCartLines.ok, "More than two cart lines should fail order request validation.");
+
+function createFakeElement(name) {
+  return {
+    name,
+    dataset: {},
+    disabled: false,
+    innerHTML: "",
+    textContent: "",
+    attributes: {},
+    listeners: {},
+    classList: {
+      values: new Set(),
+      add(value) {
+        this.values.add(value);
+      },
+      remove(value) {
+        this.values.delete(value);
+      },
+    },
+    addEventListener(type, handler) {
+      this.listeners[type] = this.listeners[type] || [];
+      this.listeners[type].push(handler);
+    },
+    focus() {
+      this.focused = true;
+    },
+    querySelector(selector) {
+      return this.children?.[selector] || null;
+    },
+    scrollIntoView() {
+      this.scrolled = true;
+    },
+    setAttribute(attribute, value) {
+      this.attributes[attribute] = value;
+    },
+  };
+}
+
+function createStorefrontHarness({ checkoutEndpoint = "", fetchImpl } = {}) {
+  const elements = {
+    cartDrawer: createFakeElement("cartDrawer"),
+    cartItems: createFakeElement("cartItems"),
+    cartCount: createFakeElement("cartCount"),
+    cartTotal: createFakeElement("cartTotal"),
+    openCartButton: createFakeElement("openCartButton"),
+    closeCartButton: createFakeElement("closeCartButton"),
+    checkoutButton: createFakeElement("checkoutButton"),
+    orderForm: createFakeElement("orderForm"),
+    orderSummary: createFakeElement("orderSummary"),
+    orderStatus: createFakeElement("orderStatus"),
+    orderSubmitButton: createFakeElement("orderSubmitButton"),
+    orderInput: createFakeElement("orderInput"),
+    delivery: createFakeElement("delivery"),
+  };
+
+  elements.orderForm.children = {
+    'button[type="submit"]': elements.orderSubmitButton,
+    input: elements.orderInput,
+  };
+
+  const addButtons = [
+    createFakeElement("add20lb"),
+    createFakeElement("add40lb"),
+  ];
+  addButtons[0].dataset = {
+    sku: "ear-corn-20lb",
+    name: "20 lb Ear Corn Bag",
+    priceCents: "1600",
+  };
+  addButtons[1].dataset = {
+    sku: "ear-corn-40lb",
+    name: "40 lb Ear Corn Bag",
+    priceCents: "2800",
+  };
+
+  const document = {
+    listeners: {},
+    addEventListener(type, handler) {
+      this.listeners[type] = this.listeners[type] || [];
+      this.listeners[type].push(handler);
+    },
+    querySelector(selector) {
+      return {
+        "[data-cart]": elements.cartDrawer,
+        "[data-cart-items]": elements.cartItems,
+        "[data-cart-count]": elements.cartCount,
+        "[data-cart-total]": elements.cartTotal,
+        "[data-open-cart]": elements.openCartButton,
+        "[data-close-cart]": elements.closeCartButton,
+        "[data-checkout-button]": elements.checkoutButton,
+        "[data-order-form]": elements.orderForm,
+        "[data-order-summary]": elements.orderSummary,
+        "[data-order-status]": elements.orderStatus,
+        "#delivery": elements.delivery,
+      }[selector] || null;
+    },
+    querySelectorAll(selector) {
+      return selector === "[data-add-to-cart]" ? addButtons : [];
+    },
+  };
+
+  const location = {
+    href: "https://theos.example/",
+    assignedUrl: "",
+    assign(url) {
+      this.assignedUrl = url;
+    },
+  };
+
+  const window = {
+    TheosCheckoutConfig: { checkoutEndpoint },
+    TheosOrderRequests: orderRequests,
+    location,
+  };
+
+  class FakeFormData {
+    constructor(form) {
+      this.values = form.values || {};
+    }
+
+    get(name) {
+      return this.values[name] || "";
+    }
+  }
+
+  const sandbox = {
+    FormData: FakeFormData,
+    Intl,
+    URL,
+    console,
+    document,
+    fetch: fetchImpl || (() => {
+      throw new Error("Unexpected checkout fetch");
+    }),
+    window,
+  };
+
+  new Script(storefrontScript, { filename: "script.js" }).runInContext(createContext(sandbox));
+
+  return {
+    addButtons,
+    elements,
+    location,
+    async addFirstProductAndSubmit(values = {}) {
+      addButtons[0].listeners.click[0]();
+      elements.orderForm.values = {
+        name: "Customer Name",
+        contact: "customer@example.com",
+        zip: "62401",
+        contactMethod: "Email",
+        note: "",
+        ...values,
+      };
+
+      await elements.orderForm.listeners.submit[0]({
+        preventDefault() {},
+      });
+    },
+  };
+}
+
+{
+  let fetchCalled = false;
+  const harness = createStorefrontHarness({
+    fetchImpl() {
+      fetchCalled = true;
+      throw new Error("Blank checkout config should not call fetch.");
+    },
+  });
+
+  await harness.addFirstProductAndSubmit();
+
+  assert(!fetchCalled, "Blank checkout config should preserve prototype behavior without calling the backend.");
+  assert(harness.elements.orderStatus.textContent.includes("Live submission is disabled"), "Blank checkout config should show disabled prototype messaging.");
+  assert(harness.location.assignedUrl === "", "Blank checkout config must not redirect.");
+  assert(harness.elements.cartItems.innerHTML.includes("20 lb Ear Corn Bag"), "Blank checkout config must not clear the cart.");
+}
+
+{
+  let requestUrl = "";
+  let requestBody = {};
+  const checkoutUrl = "https://checkout.stripe.com/c/pay/cs_test_valid";
+  const harness = createStorefrontHarness({
+    checkoutEndpoint: "https://api.theos.example/api/checkout-sessions",
+    async fetchImpl(url, options) {
+      requestUrl = url;
+      requestBody = JSON.parse(options.body);
+      assert(options.method === "POST", "Configured checkout should use POST.");
+      assert(options.headers["content-type"] === "application/json", "Configured checkout should send JSON.");
+      return {
+        ok: true,
+        async json() {
+          return {
+            orderRequestId: "order_123",
+            checkoutSessionId: "cs_test_valid",
+            checkoutUrl,
+          };
+        },
+      };
+    },
+  });
+
+  await harness.addFirstProductAndSubmit();
+
+  assert(requestUrl === "https://api.theos.example/api/checkout-sessions", "Configured checkout should call the public trusted backend URL.");
+  assert(requestBody.orderRequest.source === "static-storefront", "Configured checkout should post the validated order request draft.");
+  assert(requestBody.orderRequest.items[0].sku === "ear-corn-20lb", "Configured checkout should include cart items in the order request.");
+  assert(harness.location.assignedUrl === checkoutUrl, "Valid Stripe Checkout handoff should redirect.");
+}
+
+for (const response of [
+  {
+    ok: false,
+    async json() {
+      return {
+        error: {
+          code: "checkout_disabled",
+          message: "Checkout session creation is not enabled yet.",
+        },
+      };
+    },
+  },
+  {
+    ok: true,
+    async json() {
+      return {
+        orderRequestId: "order_123",
+        checkoutSessionId: "cs_test_valid",
+        checkoutUrl: "https://example.com/not-stripe-checkout",
+      };
+    },
+  },
+]) {
+  const harness = createStorefrontHarness({
+    checkoutEndpoint: "https://api.theos.example/api/checkout-sessions",
+    async fetchImpl() {
+      return response;
+    },
+  });
+
+  await harness.addFirstProductAndSubmit();
+
+  assert(harness.location.assignedUrl === "", "Failed or invalid checkout handoffs must not redirect.");
+  assert(harness.elements.orderStatus.textContent === "Checkout could not be started. Please try again or contact Theo's Farm.", "Failed checkout should show a safe customer-facing message.");
+  assert(harness.elements.orderSubmitButton.disabled === false, "Failed checkout should re-enable order submission.");
+  assert(harness.elements.cartItems.innerHTML.includes("20 lb Ear Corn Bag"), "Failed checkout must not clear the cart.");
+}
 
 console.log("Static prototype checks passed.");

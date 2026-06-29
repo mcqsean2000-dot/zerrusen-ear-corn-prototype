@@ -11,6 +11,9 @@ const orderForm = document.querySelector("[data-order-form]");
 const orderSummary = document.querySelector("[data-order-summary]");
 const orderStatus = document.querySelector("[data-order-status]");
 const orderRequests = window.TheosOrderRequests;
+const checkoutConfig = window.TheosCheckoutConfig || {};
+const orderSubmitButton = orderForm.querySelector('button[type="submit"]');
+const checkoutFailureMessage = "Checkout could not be started. Please try again or contact Theo's Farm.";
 
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -81,6 +84,78 @@ function renderCart() {
     .join("");
 }
 
+function isLocalCheckoutEndpoint(url) {
+  return url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname);
+}
+
+function getCheckoutEndpoint() {
+  const rawEndpoint = String(checkoutConfig.checkoutEndpoint || "").trim();
+
+  if (!rawEndpoint || /^replace-with-/i.test(rawEndpoint)) {
+    return "";
+  }
+
+  try {
+    const endpoint = new URL(rawEndpoint, window.location.href);
+    if (endpoint.protocol === "https:" || isLocalCheckoutEndpoint(endpoint)) {
+      return endpoint.href;
+    }
+  } catch (error) {
+    return "";
+  }
+
+  return "";
+}
+
+function isValidCheckoutHandoff(payload) {
+  if (!payload || typeof payload !== "object") {
+    return false;
+  }
+
+  const orderRequestId = String(payload.orderRequestId || "").trim();
+  const checkoutSessionId = String(payload.checkoutSessionId || "").trim();
+  const checkoutUrl = String(payload.checkoutUrl || "").trim();
+
+  if (!orderRequestId || !/^cs_/.test(checkoutSessionId) || !checkoutUrl) {
+    return false;
+  }
+
+  try {
+    const url = new URL(checkoutUrl);
+    return (
+      url.protocol === "https:" &&
+      url.hostname === "checkout.stripe.com" &&
+      url.pathname.startsWith("/c/pay/") &&
+      url.href.includes(checkoutSessionId)
+    );
+  } catch (error) {
+    return false;
+  }
+}
+
+async function requestCheckoutSession(endpoint, orderRequest) {
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ orderRequest }),
+  });
+
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch (error) {
+    payload = null;
+  }
+
+  if (!response.ok || !isValidCheckoutHandoff(payload)) {
+    throw new Error("checkout_unavailable");
+  }
+
+  return payload;
+}
+
 document.querySelectorAll("[data-add-to-cart]").forEach((button) => {
   button.addEventListener("click", () => {
     const sku = button.dataset.sku;
@@ -108,7 +183,7 @@ checkoutButton.addEventListener("click", () => {
   orderForm.querySelector("input").focus();
 });
 
-orderForm.addEventListener("submit", (event) => {
+orderForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   const formData = new FormData(orderForm);
@@ -123,7 +198,27 @@ orderForm.addEventListener("submit", (event) => {
     },
   });
 
-  orderStatus.textContent = result.message;
+  if (!result.ok) {
+    orderStatus.textContent = result.message;
+    return;
+  }
+
+  const checkoutEndpoint = getCheckoutEndpoint();
+  if (!checkoutEndpoint) {
+    orderStatus.textContent = result.message;
+    return;
+  }
+
+  orderSubmitButton.disabled = true;
+  orderStatus.textContent = "Starting secure checkout...";
+
+  try {
+    const handoff = await requestCheckoutSession(checkoutEndpoint, result.payload);
+    window.location.assign(handoff.checkoutUrl);
+  } catch (error) {
+    orderStatus.textContent = checkoutFailureMessage;
+    orderSubmitButton.disabled = false;
+  }
 });
 
 cartDrawer.addEventListener("click", (event) => {

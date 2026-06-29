@@ -50,6 +50,7 @@ Natural search phrases to keep in mind:
 - `index.html` - static page content and layout
 - `styles.css` - responsive styling
 - `script.js` - demo cart drawer behavior
+- `checkout-config.js` - public static-host checkout endpoint placeholder, disabled by default
 - `admin.html` - static admin fulfillment prototype
 - `admin.css` - admin shell styles
 - `admin.js` - sample admin queue behavior
@@ -73,6 +74,7 @@ Natural search phrases to keep in mind:
 
 - Current prices are placeholders and should be confirmed before launch.
 - Current cart is only a prototype interaction. It is not connected to payment processing, inventory, orders, email, or shipping.
+- Keep `checkout-config.js` blank until a trusted backend endpoint is ready. For GoDaddy or another static host, set only the public checkout session URL there, never secrets.
 - Do not store raw payment information in the app. Use Stripe-hosted payment collection and Stripe customer/payment method IDs.
 - Public Firestore writes are limited to validated order request creation. Payment status and Stripe IDs should be written only by trusted backend code.
 - Do not reintroduce local pickup unless the client changes direction.
