@@ -56,6 +56,7 @@ Natural search phrases to keep in mind:
 - `admin.js` - sample admin queue behavior
 - `package.json` - static validation script entry point
 - `tools/check-static.mjs` - no-dependency static prototype checks
+- `tools/package-static.mjs` - allowlist-based GoDaddy/static host package generator
 - `functions/` - host-neutral trusted checkout and Stripe webhook scaffold, disabled by default
 - `firebase.json` - existing Firebase Hosting config and Firestore deploy targets; public hosting direction is now GoDaddy/static host
 - `.firebaserc.example` - safe Firebase project alias template for local setup
@@ -66,6 +67,7 @@ Natural search phrases to keep in mind:
 - `docs/admin-fulfillment-foundation.md` - admin queue and fulfillment planning notes
 - `docs/stripe-checkout-handoff.md` - trusted backend contract for future Stripe Checkout session creation and webhook updates
 - `docs/backend-checkout-scaffold.md` - local backend scaffold notes, validation helpers, and webhook boundary
+- `docs/godaddy-static-deploy.md` - safe static upload checklist for GoDaddy or another approved static host
 - `assets/theos-20lb-bag.jpg` - client photo of 20 lb bag
 - `assets/theos-40lb-bag.jpg` - client photo of 40 lb bag
 - `assets/theos-both-bags.jpg` - client photo of both bags
@@ -83,8 +85,11 @@ Natural search phrases to keep in mind:
 
 ```bash
 npm run check
+npm run package:static
 npm --prefix functions run check
 ```
+
+Upload only the contents of `dist/godaddy-static/` for GoDaddy/static hosting. Do not upload the repo root.
 
 ## Local Preview
 
