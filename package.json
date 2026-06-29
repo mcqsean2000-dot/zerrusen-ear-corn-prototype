@@ -1,6 +1,8 @@
 {
   "scripts": {
-    "check": "node tools/check-static.mjs"
+    "check": "node tools/check-static.mjs && npm run package:static:check",
+    "package:static": "node tools/package-static.mjs",
+    "package:static:check": "node tools/package-static.mjs --check"
   },
   "devDependencies": {}
 }

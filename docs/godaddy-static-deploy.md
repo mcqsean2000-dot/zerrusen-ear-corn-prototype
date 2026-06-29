@@ -1,0 +1,78 @@
+# GoDaddy Static Deploy Package
+
+This checklist prepares the public Theo's Farm storefront for GoDaddy or another approved static host. It does not deploy anything, use GoDaddy credentials, configure DNS, call Stripe, or publish backend code.
+
+## Hosting Boundary
+
+- Upload only the generated static storefront package.
+- Keep the old Zerrusen Farms site separate from Theo's Farm.
+- Keep checkout secrets, Stripe webhook secrets, Firebase service accounts, Firestore rules, and backend code out of the static host.
+- Keep `checkout-config.js` blank until the trusted checkout API exists.
+
+The public storefront can run from static hosting. Stripe Checkout session creation and webhooks must run on a trusted backend that can safely hold secrets.
+
+## Build The Upload Folder
+
+Run these commands from the repo root:
+
+```bash
+npm run check
+npm run package:static
+```
+
+The package script writes:
+
+```text
+dist/godaddy-static/
+```
+
+Upload the contents of that folder, not the repo root.
+
+## Included Public Files
+
+The package is allowlist-based and includes only:
+
+- `index.html`
+- `styles.css`
+- `order-request.js`
+- `checkout-config.js`
+- `script.js`
+- `assets/`
+
+The package intentionally excludes `docs/`, `functions/`, Firebase config, Firestore rules and indexes, repo metadata, local env files, package tooling, and the unauthenticated admin prototype files.
+
+## Checkout Endpoint Setup
+
+Leave `checkout-config.js` as:
+
+```js
+checkoutEndpoint: ""
+```
+
+After the trusted backend is live, set only the public HTTPS checkout session URL, for example:
+
+```js
+checkoutEndpoint: "https://api.theos-farm.example/api/checkout-sessions"
+```
+
+The current package checks intentionally require a blank endpoint for the pre-backend static package. In the backend go-live slice, update those checks deliberately when the trusted API URL is approved.
+
+Do not put Stripe secret keys, webhook signing secrets, Firebase service account values, or private API tokens in this file. Google Pay, Apple Pay, and Link should be enabled through Stripe Checkout where available, not through static storefront secrets.
+
+## GoDaddy Upload Checklist
+
+1. Confirm product pricing, copy, and domain choice are approved.
+2. Run `npm run check`.
+3. Run `npm run package:static`.
+4. In GoDaddy file manager or the selected static host, upload the contents of `dist/godaddy-static/`.
+5. Do not upload the repository folder, zip of the full repo, `functions/`, `docs/`, Firebase files, `.env` files, or `.git`.
+6. Visit the production domain and verify product photos, cart behavior, order request validation, and mobile layout.
+7. If `checkout-config.js` is still blank, verify the form shows the disabled live submission message instead of attempting payment.
+8. After a trusted backend exists, verify the endpoint uses HTTPS and redirects only to Stripe Checkout.
+
+## Post-Upload Checks
+
+- The page should show Theo's Farm and Farm to Feeder branding.
+- Products should remain only the 20 lb Ear Corn Bag and 40 lb Ear Corn Bag.
+- Fulfillment copy should remain shipping/delivery only with no local pickup.
+- The static host should not expose backend docs, source maps with secrets, Firebase rules, Firestore indexes, `.env` files, or repository metadata.

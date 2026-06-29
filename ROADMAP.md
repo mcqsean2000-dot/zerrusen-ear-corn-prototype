@@ -16,6 +16,7 @@ Open tasks:
 
 - Choose/register the new Theo's Farm domain.
 - Decide how the GoDaddy/static hosting setup should publish the storefront and manage DNS.
+- Use `docs/godaddy-static-deploy.md` and `npm run package:static` when preparing the static upload package.
 - Create a production Firebase project for Theo's Farm only if Firestore remains the selected order storage foundation.
 - Create a separate project/repo for the old Zerrusen Farms site if that site is restored.
 

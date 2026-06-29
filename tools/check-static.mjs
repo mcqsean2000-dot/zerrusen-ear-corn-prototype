@@ -23,6 +23,8 @@ const requiredFiles = [
   "docs/admin-fulfillment-foundation.md",
   "docs/stripe-checkout-handoff.md",
   "docs/backend-checkout-scaffold.md",
+  "docs/godaddy-static-deploy.md",
+  "tools/package-static.mjs",
   "functions/.env.example",
   "functions/package.json",
   "functions/src/index.js",
@@ -50,9 +52,12 @@ const checkoutConfigScript = await readFile("checkout-config.js", "utf8");
 const admin = await readFile("admin.html", "utf8");
 const adminScript = await readFile("admin.js", "utf8");
 const gitignore = await readFile(".gitignore", "utf8");
+const packageJson = JSON.parse(await readFile("package.json", "utf8"));
 const hostingReadiness = await readFile("docs/firebase-hosting-readiness.md", "utf8");
 const stripeHandoff = await readFile("docs/stripe-checkout-handoff.md", "utf8");
 const backendScaffold = await readFile("docs/backend-checkout-scaffold.md", "utf8");
+const godaddyDeploy = await readFile("docs/godaddy-static-deploy.md", "utf8");
+const packageStaticScript = await readFile("tools/package-static.mjs", "utf8");
 const functionsPackage = JSON.parse(await readFile("functions/package.json", "utf8"));
 const functionsEnvExample = await readFile("functions/.env.example", "utf8");
 const functionsIndex = await readFile("functions/src/index.js", "utf8");
@@ -71,6 +76,10 @@ assert(
 assert(gitignore.includes(".firebaserc"), ".gitignore must keep local .firebaserc out of git.");
 assert(gitignore.includes(".firebase/"), ".gitignore must keep Firebase local cache out of git.");
 assert(gitignore.includes("!**/.env.example"), ".gitignore must allow safe example env files.");
+assert(gitignore.includes("dist/"), ".gitignore must keep generated static deploy packages out of git.");
+assert(packageJson.scripts?.["package:static"] === "node tools/package-static.mjs", "Root package must include the static package script.");
+assert(packageJson.scripts?.["package:static:check"] === "node tools/package-static.mjs --check", "Root package must include the static package safety check.");
+assert(packageJson.scripts?.check?.includes("package:static:check"), "Root check must include the static package safety check.");
 assert(hostingReadiness.includes("firebase emulators:start --only hosting"), "Hosting readiness doc must include local Firebase preview.");
 assert(hostingReadiness.includes("firebase hosting:channel:deploy preview"), "Hosting readiness doc must include preview channel deploy.");
 assert(hostingReadiness.includes("firebase deploy --only hosting"), "Hosting readiness doc must include hosting deploy command.");
@@ -79,6 +88,21 @@ assert(stripeHandoff.includes("POST /api/checkout-sessions"), "Stripe handoff mu
 assert(stripeHandoff.includes("POST /api/stripe/webhook"), "Stripe handoff must document webhook endpoint.");
 assert(backendScaffold.includes("checkoutSessionsHandler"), "Backend scaffold doc must name the checkout session handler.");
 assert(backendScaffold.includes("stripeWebhookHandler"), "Backend scaffold doc must name the Stripe webhook handler.");
+assert(godaddyDeploy.includes("dist/godaddy-static/"), "GoDaddy deploy doc must point to the generated static package folder.");
+assert(godaddyDeploy.includes("checkoutEndpoint: \"\""), "GoDaddy deploy doc must keep checkout config blank by default.");
+assert(godaddyDeploy.includes("pre-backend static package"), "GoDaddy deploy doc must explain the current blank endpoint gate.");
+assert(godaddyDeploy.includes("Upload the contents of that folder, not the repo root."), "GoDaddy deploy doc must warn against uploading the repo root.");
+assert(godaddyDeploy.includes("functions/"), "GoDaddy deploy doc must exclude backend functions from static hosting.");
+assert(godaddyDeploy.includes("docs/"), "GoDaddy deploy doc must exclude planning docs from static hosting.");
+assert(godaddyDeploy.includes(".env"), "GoDaddy deploy doc must exclude environment files from static hosting.");
+assert(packageStaticScript.includes("storefrontFiles"), "Static package script must use an explicit storefront file allowlist.");
+assert(packageStaticScript.includes("allowedAssetExtensions"), "Static package script must use an explicit asset type allowlist.");
+assert(packageStaticScript.includes("dist\", \"godaddy-static"), "Static package script must write to dist/godaddy-static.");
+assert(packageStaticScript.includes("TheosCheckoutConfig?.checkoutEndpoint === \"\""), "Static package script must evaluate and enforce blank checkout config by default.");
+assert(packageStaticScript.includes("mkdtemp"), "Static package safety check must validate a generated package artifact.");
+assert(packageStaticScript.includes("functions"), "Static package script must prevent backend functions from entering the deploy package.");
+assert(packageStaticScript.includes("docs"), "Static package script must prevent docs from entering the deploy package.");
+assert(packageStaticScript.includes("STRIPE_SECRET_KEY"), "Static package script must scan for Stripe secret-looking values.");
 assert(functionsPackage.scripts?.check?.includes("node --test"), "Backend package must include a local test check.");
 assert(functionsIndex.includes("checkoutSessionsHandler"), "Backend scaffold must export checkout session handling.");
 assert(functionsIndex.includes("stripeWebhookHandler"), "Backend scaffold must export Stripe webhook handling.");
@@ -111,7 +135,11 @@ assert(storefront.includes('data-sku="ear-corn-40lb"'), "40 lb product must expo
 assert(storefrontScript.includes("buildOrderRequest"), "Storefront submit should use the order request builder.");
 assert(checkoutConfigScript.includes("TheosCheckoutConfig"), "Checkout config must expose the public storefront config object.");
 assert(checkoutConfigScript.includes("checkoutEndpoint"), "Checkout config must include a public checkout endpoint placeholder.");
-assert(checkoutConfigScript.includes('checkoutEndpoint: ""'), "Checkout endpoint should remain disabled until a trusted API URL is configured.");
+{
+  const sandbox = {};
+  new Script(checkoutConfigScript, { filename: "checkout-config.js" }).runInContext(createContext(sandbox));
+  assert(sandbox.TheosCheckoutConfig?.checkoutEndpoint === "", "Checkout endpoint should remain disabled until a trusted API URL is configured.");
+}
 assert(!checkoutConfigScript.includes("sk_"), "Checkout config must not include Stripe secret-looking values.");
 assert(!checkoutConfigScript.includes("whsec_"), "Checkout config must not include webhook secret-looking values.");
 assert(storefrontScript.includes("fetch(endpoint"), "Configured storefront checkout should call the trusted backend endpoint.");
