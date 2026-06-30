@@ -28,6 +28,7 @@ POST /api/stripe/webhook
 - `functions/src/index.js` exports lightweight route handlers for checkout sessions and Stripe webhooks. They are disabled by default unless environment configuration and future trusted adapters are provided.
 - `functions/src/checkout-adapter.js` builds the production-adjacent Stripe Checkout handoff using injected trusted storage and Stripe functions only. It does not import Stripe, Firebase, or make network calls by itself.
 - `functions/src/stripe-webhook-adapter.js` maps already-verified Stripe webhook events to trusted order update fields using injected order lookup, update, and event idempotency functions only. It does not import Stripe, Firebase, or make network calls by itself.
+- `functions/src/firestore-adapter.js` provides an SDK-free Firestore adapter boundary for the injected checkout and webhook dependencies. It expects a Firestore-like backend object to be passed in and does not import Firebase Admin, load credentials, or make network calls by itself.
 - `functions/src/order-validation.test.js` checks catalog alignment, validation, trusted field rejection, subtotal recalculation, and metadata safety.
 - `functions/.env.example` documents local placeholders only. Do not commit real `.env` files, Stripe secrets, webhook signing secrets, or Firebase service-account JSON.
 
