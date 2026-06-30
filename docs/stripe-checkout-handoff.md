@@ -243,6 +243,8 @@ Optional later events:
 
 Webhook updates must never trust a customer-supplied order ID alone. Reconcile using Stripe object IDs plus the metadata written by the backend when it created the Checkout Session.
 
+The local scaffold now includes an SDK-free verified-event adapter boundary for these three version-one events. `stripeWebhookHandler` still verifies the Stripe signature before handing an event to the adapter; the adapter receives only the verified event plus injected trusted lookup, update, and event-idempotency functions.
+
 ## Admin And Fulfillment Boundary
 
 The admin queue should use trusted payment fields as read-only payment facts. Admin users may update fulfillment statuses and notes after authentication exists, but they should not manually set Stripe IDs or payment facts from the browser.

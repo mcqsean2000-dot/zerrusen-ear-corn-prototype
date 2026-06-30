@@ -27,6 +27,7 @@ POST /api/stripe/webhook
 - `functions/src/order-validation.js` keeps the server-owned product catalog, validates storefront drafts, recalculates subtotals, rejects client-supplied trusted fields, and builds safe Stripe metadata.
 - `functions/src/index.js` exports lightweight route handlers for checkout sessions and Stripe webhooks. They are disabled by default unless environment configuration and future trusted adapters are provided.
 - `functions/src/checkout-adapter.js` builds the production-adjacent Stripe Checkout handoff using injected trusted storage and Stripe functions only. It does not import Stripe, Firebase, or make network calls by itself.
+- `functions/src/stripe-webhook-adapter.js` maps already-verified Stripe webhook events to trusted order update fields using injected order lookup, update, and event idempotency functions only. It does not import Stripe, Firebase, or make network calls by itself.
 - `functions/src/order-validation.test.js` checks catalog alignment, validation, trusted field rejection, subtotal recalculation, and metadata safety.
 - `functions/.env.example` documents local placeholders only. Do not commit real `.env` files, Stripe secrets, webhook signing secrets, or Firebase service-account JSON.
 
@@ -120,7 +121,9 @@ Version-one events to handle:
 - `checkout.session.expired`
 - `payment_intent.payment_failed`
 
-Webhook updates should be idempotent. Store the latest processed Stripe event ID on the order document or maintain a separate event log.
+After verification, `stripeWebhookHandler` can receive `stripeWebhookAdapterDependencies` and build the SDK-free verified event adapter locally. The adapter requires injected `claimStripeEventProcessing`, `markStripeEventProcessed`, `findOrderByCheckoutSessionId`, `findOrderByPaymentIntentId`, and `updateOrderRequest` functions. `claimStripeEventProcessing` should atomically reserve an event ID before order mutation so concurrent deliveries cannot both update an order. Without those functions, the route remains disabled or returns `stripe_webhook_adapter_dependency_missing` instead of attempting trusted storage work.
+
+Webhook updates should be idempotent. Store processed Stripe event IDs through a separate event log or an equivalent trusted backend mechanism. The adapter records no-op outcomes for unsupported events so replays do not repeatedly touch order records. Supported events that cannot yet map to a known order remain retryable instead of being marked processed.
 
 ## Trusted Firestore Ownership
 
