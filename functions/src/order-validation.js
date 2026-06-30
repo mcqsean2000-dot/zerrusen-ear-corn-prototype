@@ -54,6 +54,7 @@ const ITEM_FIELDS = Object.freeze([
 const TRUSTED_ORDER_FIELDS = Object.freeze([
   "checkoutCompletedAt",
   "checkoutCreatedAt",
+  "checkoutErrorCode",
   "checkoutStatus",
   "createdAt",
   "deliveredAt",

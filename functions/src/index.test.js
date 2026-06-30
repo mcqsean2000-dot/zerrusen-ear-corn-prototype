@@ -118,6 +118,28 @@ test("checkout handler requires a trusted adapter after env is configured", asyn
   assert.equal(parseJson(res).error.code, "checkout_adapter_missing");
 });
 
+test("checkout handler reports incomplete injected adapter setup", async () => {
+  const req = mockReq({ body: { orderRequest: validOrderRequest } });
+  const res = mockRes();
+
+  await checkoutSessionsHandler(req, res, {
+    env: {
+      ...configuredEnv,
+      NODE_ENV: "development",
+    },
+    checkoutAdapterDependencies: {
+      createOrderRequest() {},
+    },
+  });
+
+  assert.equal(res.statusCode, 501);
+  assert.equal(parseJson(res).error.code, "checkout_adapter_dependency_missing");
+  assert.deepEqual(parseJson(res).setupRequired, [
+    "createStripeCheckoutSession",
+    "updateOrderRequest",
+  ]);
+});
+
 test("checkout handler passes Firestore timestamp sentinel to future adapter by default", async () => {
   const req = mockReq({ body: { orderRequest: validOrderRequest } });
   const res = mockRes();
@@ -138,6 +160,40 @@ test("checkout handler passes Firestore timestamp sentinel to future adapter by 
   assert.equal(res.statusCode, 200);
   assert.equal(parseJson(res).orderRequestId, "order_123");
   assert.equal(parseJson(res).checkoutSessionId, "cs_test_123");
+});
+
+test("checkout handler can use injected checkout adapter dependencies", async () => {
+  const req = mockReq({ body: { orderRequest: validOrderRequest } });
+  const res = mockRes();
+
+  await checkoutSessionsHandler(req, res, {
+    env: configuredEnv,
+    serverTimestamp() {
+      return "SERVER_TIMESTAMP";
+    },
+    checkoutAdapterDependencies: {
+      createOrderRequest({ orderRequest }) {
+        assert.equal(orderRequest.createdAt, "SERVER_TIMESTAMP");
+        return { id: "order_123" };
+      },
+      createStripeCheckoutSession({ params }) {
+        assert.equal(params.metadata.orderRequestId, "order_123");
+        return {
+          id: "cs_test_123",
+          url: "https://checkout.stripe.com/c/pay/cs_test_123",
+        };
+      },
+      updateOrderRequest({ fields }) {
+        assert.deepEqual(fields, {
+          stripeCheckoutSessionId: "cs_test_123",
+          trustedUpdatedAt: "SERVER_TIMESTAMP",
+        });
+      },
+    },
+  });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(parseJson(res).checkoutUrl, "https://checkout.stripe.com/c/pay/cs_test_123");
 });
 
 test("webhook handler returns disabled mock response when signing secret is missing", async () => {

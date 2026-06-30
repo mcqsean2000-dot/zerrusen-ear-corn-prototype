@@ -63,6 +63,7 @@ test("validates and canonicalizes a storefront order draft", () => {
 
 test("rejects client-supplied trusted payment and timestamp fields", () => {
   const result = validateOrderRequestDraft(validDraft({
+    checkoutErrorCode: "stripe_checkout_session_failed",
     createdAt: "2026-06-28T00:00:00.000Z",
     stripeCheckoutSessionId: "cs_test_client_supplied",
     paymentStatus: "paid",

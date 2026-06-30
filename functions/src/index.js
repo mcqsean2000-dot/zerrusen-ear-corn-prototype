@@ -2,6 +2,10 @@
 
 const http = require("node:http");
 const {
+  createCheckoutSessionAdapter,
+  getMissingCheckoutAdapterDependencies,
+} = require("./checkout-adapter");
+const {
   buildStripeMetadata,
   buildTrustedOrderRequestForCreate,
   validateOrderRequestDraft,
@@ -171,6 +175,18 @@ function safeSetupDetails(env, missingEnv) {
   };
 }
 
+function resolveCheckoutSessionCreator(options) {
+  if (typeof options.createCheckoutSession === "function") {
+    return options.createCheckoutSession;
+  }
+
+  if (options.checkoutAdapterDependencies) {
+    return createCheckoutSessionAdapter(options.checkoutAdapterDependencies);
+  }
+
+  return null;
+}
+
 async function checkoutSessionsHandler(req, res, options = {}) {
   const env = options.env || process.env;
   const corsHeaders = buildCorsHeaders(req, env);
@@ -222,7 +238,22 @@ async function checkoutSessionsHandler(req, res, options = {}) {
     }, corsHeaders);
   }
 
-  if (typeof options.createCheckoutSession !== "function") {
+  if (options.checkoutAdapterDependencies) {
+    const missingAdapterDependencies = getMissingCheckoutAdapterDependencies(options.checkoutAdapterDependencies);
+    if (missingAdapterDependencies.length) {
+      return sendJson(res, 501, {
+        error: {
+          code: "checkout_adapter_dependency_missing",
+          message: "Checkout session creation requires trusted Stripe and Firestore adapters.",
+        },
+        mock: true,
+        ...safeSetupDetails(env, missingAdapterDependencies),
+      }, corsHeaders);
+    }
+  }
+
+  const createCheckoutSession = resolveCheckoutSessionCreator(options);
+  if (typeof createCheckoutSession !== "function") {
     return sendJson(res, 501, {
       error: {
         code: "checkout_adapter_missing",
@@ -240,7 +271,7 @@ async function checkoutSessionsHandler(req, res, options = {}) {
       serverTimestamp,
     });
 
-    const result = await options.createCheckoutSession({
+    const result = await createCheckoutSession({
       env,
       orderRequest: trustedOrderRequest,
       buildStripeMetadata,
@@ -375,6 +406,7 @@ if (require.main === module) {
 module.exports = {
   buildCorsHeaders,
   checkoutSessionsHandler,
+  resolveCheckoutSessionCreator,
   readJsonBody,
   readRawBody,
   routeRequest,
