@@ -26,6 +26,7 @@ POST /api/stripe/webhook
 
 - `functions/src/order-validation.js` keeps the server-owned product catalog, validates storefront drafts, recalculates subtotals, rejects client-supplied trusted fields, and builds safe Stripe metadata.
 - `functions/src/index.js` exports lightweight route handlers for checkout sessions and Stripe webhooks. They are disabled by default unless environment configuration and future trusted adapters are provided.
+- `functions/src/checkout-adapter.js` builds the production-adjacent Stripe Checkout handoff using injected trusted storage and Stripe functions only. It does not import Stripe, Firebase, or make network calls by itself.
 - `functions/src/order-validation.test.js` checks catalog alignment, validation, trusted field rejection, subtotal recalculation, and metadata safety.
 - `functions/.env.example` documents local placeholders only. Do not commit real `.env` files, Stripe secrets, webhook signing secrets, or Firebase service-account JSON.
 
@@ -74,7 +75,7 @@ When configuration is missing, the route returns a disabled response instead of 
 }
 ```
 
-When configuration exists, the scaffold still requires a future trusted adapter to create the Firestore document, create the Stripe Checkout Session, persist trusted Stripe IDs, and return:
+When configuration exists, the scaffold still requires injected trusted dependencies to create the Firestore document, create the Stripe Checkout Session, persist trusted Stripe IDs, and return:
 
 ```json
 {
@@ -85,6 +86,23 @@ When configuration exists, the scaffold still requires a future trusted adapter 
 ```
 
 The scaffold uses a `FIRESTORE_SERVER_TIMESTAMP_REQUIRED` sentinel unless a future adapter provides the platform's real Firestore server timestamp value, such as `FieldValue.serverTimestamp()`. Do not replace this with a browser timestamp or local clock value for production writes.
+
+The adapter boundary is:
+
+```js
+const { createCheckoutSessionAdapter } = require("./src/checkout-adapter");
+
+const createCheckoutSession = createCheckoutSessionAdapter({
+  createOrderRequest,
+  createStripeCheckoutSession,
+  updateOrderRequest,
+  markCheckoutSessionFailed,
+});
+```
+
+`createOrderRequest` receives the trusted order request with backend-owned timestamp and checkout fields. `createStripeCheckoutSession` receives server-generated `params` containing Checkout line items, redirect URLs, `client_reference_id`, and safe metadata. `updateOrderRequest` stores trusted Stripe identifiers such as `stripeCheckoutSessionId`. `markCheckoutSessionFailed` is optional and can record backend-owned failure state if Stripe session creation fails after the trusted order document was created. If session creation succeeds but the trusted order update fails, the adapter preserves the Checkout Session ID in the failure marker and leaves `checkoutStatus` open for reconciliation.
+
+The handler can also receive `checkoutAdapterDependencies` and will build the adapter locally. If these dependencies are absent, the route remains disabled or returns `checkout_adapter_missing` instead of attempting Stripe or Firestore work.
 
 ## Webhook Handler
 
@@ -120,6 +138,7 @@ Trusted backend and webhook code own:
 - `paidAt`
 - `checkoutCreatedAt`
 - `checkoutCompletedAt`
+- `checkoutErrorCode`
 - `lastStripeEventId`
 - `lastStripeEventAt`
 - `trustedUpdatedAt`
