@@ -6,6 +6,10 @@ const {
   getMissingCheckoutAdapterDependencies,
 } = require("./checkout-adapter");
 const {
+  createStripeWebhookEventAdapter,
+  getMissingStripeWebhookAdapterDependencies,
+} = require("./stripe-webhook-adapter");
+const {
   buildStripeMetadata,
   buildTrustedOrderRequestForCreate,
   validateOrderRequestDraft,
@@ -187,6 +191,18 @@ function resolveCheckoutSessionCreator(options) {
   return null;
 }
 
+function resolveStripeEventHandler(options) {
+  if (typeof options.handleStripeEvent === "function") {
+    return options.handleStripeEvent;
+  }
+
+  if (options.stripeWebhookAdapterDependencies) {
+    return createStripeWebhookEventAdapter(options.stripeWebhookAdapterDependencies);
+  }
+
+  return null;
+}
+
 async function checkoutSessionsHandler(req, res, options = {}) {
   const env = options.env || process.env;
   const corsHeaders = buildCorsHeaders(req, env);
@@ -341,6 +357,31 @@ async function stripeWebhookHandler(req, res, options = {}) {
     }, corsHeaders);
   }
 
+  if (options.stripeWebhookAdapterDependencies) {
+    const missingAdapterDependencies = getMissingStripeWebhookAdapterDependencies(options.stripeWebhookAdapterDependencies);
+    if (missingAdapterDependencies.length) {
+      return sendJson(res, 501, {
+        error: {
+          code: "stripe_webhook_adapter_dependency_missing",
+          message: "Webhook processing requires trusted order lookup, update, and event idempotency adapters.",
+        },
+        mock: true,
+        ...safeSetupDetails(env, missingAdapterDependencies),
+      }, corsHeaders);
+    }
+  }
+
+  const handleVerifiedStripeEvent = resolveStripeEventHandler(options);
+  if (typeof handleVerifiedStripeEvent !== "function") {
+    return sendJson(res, 501, {
+      error: {
+        code: "stripe_webhook_adapter_missing",
+        message: "Webhook processing requires a trusted adapter for verified Stripe events.",
+      },
+      mock: true,
+    }, corsHeaders);
+  }
+
   try {
     const rawBody = await readRawBody(req);
     const event = await options.verifyStripeWebhookEvent({
@@ -349,9 +390,10 @@ async function stripeWebhookHandler(req, res, options = {}) {
       signingSecret: env.STRIPE_WEBHOOK_SIGNING_SECRET,
     });
 
-    if (typeof options.handleStripeEvent === "function") {
-      await options.handleStripeEvent({ event, env });
-    }
+    const serverTimestamp = typeof options.serverTimestamp === "function"
+      ? options.serverTimestamp()
+      : "FIRESTORE_SERVER_TIMESTAMP_REQUIRED";
+    await handleVerifiedStripeEvent({ event, env, serverTimestamp });
 
     return sendJson(res, 200, {
       received: true,
@@ -406,6 +448,7 @@ if (require.main === module) {
 module.exports = {
   buildCorsHeaders,
   checkoutSessionsHandler,
+  resolveStripeEventHandler,
   resolveCheckoutSessionCreator,
   readJsonBody,
   readRawBody,

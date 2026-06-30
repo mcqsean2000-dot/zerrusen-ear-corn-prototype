@@ -229,6 +229,54 @@ test("webhook handler requires a verifier before reading Stripe event data", asy
   assert.equal(parseJson(res).error.code, "webhook_verifier_missing");
 });
 
+test("webhook handler requires a trusted adapter after verifier is configured", async () => {
+  const req = mockReq({
+    headers: { "stripe-signature": "t=123,v1=test" },
+    body: Buffer.from("{\"id\":\"evt_123\",\"type\":\"checkout.session.completed\"}"),
+  });
+  const res = mockRes();
+
+  await stripeWebhookHandler(req, res, {
+    env: configuredEnv,
+    verifyStripeWebhookEvent() {
+      throw new Error("verifier should not run without adapter");
+    },
+  });
+
+  assert.equal(res.statusCode, 501);
+  assert.equal(parseJson(res).error.code, "stripe_webhook_adapter_missing");
+});
+
+test("webhook handler reports incomplete injected webhook adapter setup", async () => {
+  const req = mockReq({
+    headers: { "stripe-signature": "t=123,v1=test" },
+    body: Buffer.from("{\"id\":\"evt_123\",\"type\":\"checkout.session.completed\"}"),
+  });
+  const res = mockRes();
+
+  await stripeWebhookHandler(req, res, {
+    env: {
+      ...configuredEnv,
+      NODE_ENV: "development",
+    },
+    verifyStripeWebhookEvent() {
+      throw new Error("verifier should not run without complete adapter dependencies");
+    },
+    stripeWebhookAdapterDependencies: {
+      claimStripeEventProcessing() {},
+    },
+  });
+
+  assert.equal(res.statusCode, 501);
+  assert.equal(parseJson(res).error.code, "stripe_webhook_adapter_dependency_missing");
+  assert.deepEqual(parseJson(res).setupRequired, [
+    "markStripeEventProcessed",
+    "findOrderByCheckoutSessionId",
+    "findOrderByPaymentIntentId",
+    "updateOrderRequest",
+  ]);
+});
+
 test("webhook handler verifies signature before handling event", async () => {
   const req = mockReq({
     headers: { "stripe-signature": "t=123,v1=test" },
@@ -256,4 +304,57 @@ test("webhook handler verifies signature before handling event", async () => {
   assert.equal(res.statusCode, 200);
   assert.equal(parseJson(res).received, true);
   assert.equal(handledEventId, "evt_123");
+});
+
+test("webhook handler can use injected webhook adapter dependencies", async () => {
+  const req = mockReq({
+    headers: { "stripe-signature": "t=123,v1=test" },
+    body: Buffer.from("{\"id\":\"evt_123\",\"type\":\"checkout.session.completed\"}"),
+  });
+  const res = mockRes();
+  let updateFields;
+
+  await stripeWebhookHandler(req, res, {
+    env: configuredEnv,
+    serverTimestamp() {
+      return "SERVER_TIMESTAMP";
+    },
+    verifyStripeWebhookEvent() {
+      return {
+        id: "evt_123",
+        type: "checkout.session.completed",
+        data: {
+          object: {
+            id: "cs_test_123",
+            payment_intent: "pi_test_123",
+            payment_status: "paid",
+            client_reference_id: "order_123",
+            metadata: {
+              orderRequestId: "order_123",
+            },
+          },
+        },
+      };
+    },
+    stripeWebhookAdapterDependencies: {
+      claimStripeEventProcessing() {
+        return true;
+      },
+      markStripeEventProcessed() {},
+      findOrderByCheckoutSessionId() {
+        return { id: "order_123" };
+      },
+      findOrderByPaymentIntentId() {
+        throw new Error("payment intent lookup should not be used");
+      },
+      updateOrderRequest({ fields }) {
+        updateFields = fields;
+      },
+    },
+  });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(parseJson(res).received, true);
+  assert.equal(updateFields.paymentStatus, "paid");
+  assert.equal(updateFields.trustedUpdatedAt, "SERVER_TIMESTAMP");
 });
