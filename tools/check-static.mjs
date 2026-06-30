@@ -25,6 +25,7 @@ const requiredFiles = [
   "docs/backend-checkout-scaffold.md",
   "docs/godaddy-static-deploy.md",
   "tools/package-static.mjs",
+  "tools/smoke-static-package.mjs",
   "functions/.env.example",
   "functions/package.json",
   "functions/src/index.js",
@@ -58,6 +59,7 @@ const stripeHandoff = await readFile("docs/stripe-checkout-handoff.md", "utf8");
 const backendScaffold = await readFile("docs/backend-checkout-scaffold.md", "utf8");
 const godaddyDeploy = await readFile("docs/godaddy-static-deploy.md", "utf8");
 const packageStaticScript = await readFile("tools/package-static.mjs", "utf8");
+const smokeStaticPackageScript = await readFile("tools/smoke-static-package.mjs", "utf8");
 const functionsPackage = JSON.parse(await readFile("functions/package.json", "utf8"));
 const functionsEnvExample = await readFile("functions/.env.example", "utf8");
 const functionsIndex = await readFile("functions/src/index.js", "utf8");
@@ -79,6 +81,7 @@ assert(gitignore.includes("!**/.env.example"), ".gitignore must allow safe examp
 assert(gitignore.includes("dist/"), ".gitignore must keep generated static deploy packages out of git.");
 assert(packageJson.scripts?.["package:static"] === "node tools/package-static.mjs", "Root package must include the static package script.");
 assert(packageJson.scripts?.["package:static:check"] === "node tools/package-static.mjs --check", "Root package must include the static package safety check.");
+assert(packageJson.scripts?.["smoke:static"] === "node tools/smoke-static-package.mjs", "Root package must include the static package smoke check.");
 assert(packageJson.scripts?.check?.includes("package:static:check"), "Root check must include the static package safety check.");
 assert(hostingReadiness.includes("firebase emulators:start --only hosting"), "Hosting readiness doc must include local Firebase preview.");
 assert(hostingReadiness.includes("firebase hosting:channel:deploy preview"), "Hosting readiness doc must include preview channel deploy.");
@@ -91,6 +94,8 @@ assert(backendScaffold.includes("stripeWebhookHandler"), "Backend scaffold doc m
 assert(godaddyDeploy.includes("dist/godaddy-static/"), "GoDaddy deploy doc must point to the generated static package folder.");
 assert(godaddyDeploy.includes("checkoutEndpoint: \"\""), "GoDaddy deploy doc must keep checkout config blank by default.");
 assert(godaddyDeploy.includes("pre-backend static package"), "GoDaddy deploy doc must explain the current blank endpoint gate.");
+assert(godaddyDeploy.includes("npm run smoke:static"), "GoDaddy deploy doc must include the local package smoke check.");
+assert(godaddyDeploy.includes("temporary local-only server"), "GoDaddy deploy doc must describe the smoke check hosting boundary.");
 assert(godaddyDeploy.includes("Upload the contents of that folder, not the repo root."), "GoDaddy deploy doc must warn against uploading the repo root.");
 assert(godaddyDeploy.includes("functions/"), "GoDaddy deploy doc must exclude backend functions from static hosting.");
 assert(godaddyDeploy.includes("docs/"), "GoDaddy deploy doc must exclude planning docs from static hosting.");
@@ -103,6 +108,12 @@ assert(packageStaticScript.includes("mkdtemp"), "Static package safety check mus
 assert(packageStaticScript.includes("functions"), "Static package script must prevent backend functions from entering the deploy package.");
 assert(packageStaticScript.includes("docs"), "Static package script must prevent docs from entering the deploy package.");
 assert(packageStaticScript.includes("STRIPE_SECRET_KEY"), "Static package script must scan for Stripe secret-looking values.");
+assert(smokeStaticPackageScript.includes("dist\", \"godaddy-static"), "Static smoke check must target dist/godaddy-static by default.");
+assert(smokeStaticPackageScript.includes("createServer"), "Static smoke check must run against a local static server.");
+assert(smokeStaticPackageScript.includes("checkoutEndpoint === \"\""), "Static smoke check must enforce blank checkout config by default.");
+assert(smokeStaticPackageScript.includes("functions"), "Static smoke check must verify backend functions are not exposed.");
+assert(smokeStaticPackageScript.includes("docs"), "Static smoke check must verify docs are not exposed.");
+assert(smokeStaticPackageScript.includes("STRIPE_SECRET_KEY"), "Static smoke check must scan for Stripe secret-looking values.");
 assert(functionsPackage.scripts?.check?.includes("node --test"), "Backend package must include a local test check.");
 assert(functionsIndex.includes("checkoutSessionsHandler"), "Backend scaffold must export checkout session handling.");
 assert(functionsIndex.includes("stripeWebhookHandler"), "Backend scaffold must export Stripe webhook handling.");

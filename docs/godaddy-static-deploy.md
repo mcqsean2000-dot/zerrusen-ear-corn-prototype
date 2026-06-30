@@ -18,6 +18,7 @@ Run these commands from the repo root:
 ```bash
 npm run check
 npm run package:static
+npm run smoke:static
 ```
 
 The package script writes:
@@ -40,6 +41,16 @@ The package is allowlist-based and includes only:
 - `assets/`
 
 The package intentionally excludes `docs/`, `functions/`, Firebase config, Firestore rules and indexes, repo metadata, local env files, package tooling, and the unauthenticated admin prototype files.
+
+## Local Package Smoke Check
+
+After `npm run package:static`, run:
+
+```bash
+npm run smoke:static
+```
+
+The smoke check serves `dist/godaddy-static/` from a temporary local-only server, fetches the packaged page and referenced assets, verifies the packaged checkout config still has a blank `checkoutEndpoint`, and confirms forbidden paths such as `docs/`, `functions/`, admin files, Firebase files, repo metadata, and package tooling are not exposed. It does not contact GoDaddy, Stripe, Firebase, or any live backend.
 
 ## Checkout Endpoint Setup
 
@@ -64,11 +75,12 @@ Do not put Stripe secret keys, webhook signing secrets, Firebase service account
 1. Confirm product pricing, copy, and domain choice are approved.
 2. Run `npm run check`.
 3. Run `npm run package:static`.
-4. In GoDaddy file manager or the selected static host, upload the contents of `dist/godaddy-static/`.
-5. Do not upload the repository folder, zip of the full repo, `functions/`, `docs/`, Firebase files, `.env` files, or `.git`.
-6. Visit the production domain and verify product photos, cart behavior, order request validation, and mobile layout.
-7. If `checkout-config.js` is still blank, verify the form shows the disabled live submission message instead of attempting payment.
-8. After a trusted backend exists, verify the endpoint uses HTTPS and redirects only to Stripe Checkout.
+4. Run `npm run smoke:static`.
+5. In GoDaddy file manager or the selected static host, upload the contents of `dist/godaddy-static/`.
+6. Do not upload the repository folder, zip of the full repo, `functions/`, `docs/`, Firebase files, `.env` files, or `.git`.
+7. Visit the production domain and verify product photos, cart behavior, order request validation, and mobile layout.
+8. If `checkout-config.js` is still blank, verify the form shows the disabled live submission message instead of attempting payment.
+9. After a trusted backend exists, verify the endpoint uses HTTPS and redirects only to Stripe Checkout.
 
 ## Post-Upload Checks
 
