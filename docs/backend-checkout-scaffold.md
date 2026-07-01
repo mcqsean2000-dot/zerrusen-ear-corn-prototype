@@ -27,8 +27,10 @@ POST /api/stripe/webhook
 - `functions/src/order-validation.js` keeps the server-owned product catalog, validates storefront drafts, recalculates subtotals, rejects client-supplied trusted fields, and builds safe Stripe metadata.
 - `functions/src/index.js` exports lightweight route handlers for checkout sessions and Stripe webhooks. They are disabled by default unless environment configuration and future trusted adapters are provided.
 - `functions/src/checkout-adapter.js` builds the production-adjacent Stripe Checkout handoff using injected trusted storage and Stripe functions only. It does not import Stripe, Firebase, or make network calls by itself.
+- `functions/src/stripe-api-adapter.js` provides the SDK-agnostic Stripe API boundary for future injection. It wraps a Stripe-like client passed in by trusted runtime code, forwards hosted Checkout Session params to `checkout.sessions.create`, and forwards raw webhook payloads to `webhooks.constructEvent` without importing Stripe or storing secrets.
 - `functions/src/stripe-webhook-adapter.js` maps already-verified Stripe webhook events to trusted order update fields using injected order lookup, update, and event idempotency functions only. It does not import Stripe, Firebase, or make network calls by itself.
 - `functions/src/firestore-adapter.js` provides an SDK-free Firestore adapter boundary for the injected checkout and webhook dependencies. It expects a Firestore-like backend object to be passed in and does not import Firebase Admin, load credentials, or make network calls by itself.
+- `functions/src/stripe-api-adapter.test.js` checks the Stripe API boundary with in-memory fake Stripe clients only. These tests do not import Stripe, call the network, or require secrets.
 - `functions/src/order-validation.test.js` checks catalog alignment, validation, trusted field rejection, subtotal recalculation, and metadata safety.
 - `functions/.env.example` documents local placeholders only. Do not commit real `.env` files, Stripe secrets, webhook signing secrets, or Firebase service-account JSON.
 
