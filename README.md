@@ -15,8 +15,8 @@ This repo currently contains a static prototype for the Theo's Farm direct-to-co
 - Fulfillment: shipping/delivery only. No local pickup.
 - Payments direction: Stripe Checkout with Google Pay enabled through Stripe.
 - Storefront flow: cart selections feed a prototype order request form before the future Stripe Checkout handoff.
-- Public hosting direction: host the static storefront on GoDaddy or another approved static host.
-- Firebase/Firestore may still be used for backend order storage, rules, and indexes if selected.
+- Public hosting direction: Firebase Hosting.
+- Firebase/Firestore/Functions are the selected production foundation because the same Firebase ecosystem is already used for EasiTask and Debris Locator.
 - Old Zerrusen Farms informational site should remain separate from Theo's Farm as a separate business/site.
 
 ## Client-Provided Business Notes
@@ -56,9 +56,9 @@ Natural search phrases to keep in mind:
 - `admin.js` - sample admin queue behavior
 - `package.json` - static validation script entry point
 - `tools/check-static.mjs` - no-dependency static prototype checks
-- `tools/package-static.mjs` - allowlist-based GoDaddy/static host package generator
+- `tools/package-static.mjs` - allowlist-based static host package generator kept as a fallback/export path
 - `functions/` - host-neutral trusted checkout and Stripe webhook scaffold, disabled by default
-- `firebase.json` - existing Firebase Hosting config and Firestore deploy targets; public hosting direction is now GoDaddy/static host
+- `firebase.json` - Firebase Hosting config and Firestore deploy targets for the chosen production path
 - `.firebaserc.example` - safe Firebase project alias template for local setup
 - `firestore.rules` - initial Firestore rules for prototype order requests
 - `firestore.indexes.json` - Firestore index definition for order request queues
@@ -67,7 +67,7 @@ Natural search phrases to keep in mind:
 - `docs/admin-fulfillment-foundation.md` - admin queue and fulfillment planning notes
 - `docs/stripe-checkout-handoff.md` - trusted backend contract for future Stripe Checkout session creation and webhook updates
 - `docs/backend-checkout-scaffold.md` - local backend scaffold notes, validation helpers, and webhook boundary
-- `docs/godaddy-static-deploy.md` - safe static upload checklist for GoDaddy or another approved static host
+- `docs/godaddy-static-deploy.md` - legacy/fallback static upload checklist; not the preferred production path
 - `assets/theos-20lb-bag.jpg` - client photo of 20 lb bag
 - `assets/theos-40lb-bag.jpg` - client photo of 40 lb bag
 - `assets/theos-both-bags.jpg` - client photo of both bags
@@ -76,7 +76,7 @@ Natural search phrases to keep in mind:
 
 - Current prices are placeholders and should be confirmed before launch.
 - Current cart is only a prototype interaction. It is not connected to payment processing, inventory, orders, email, or shipping.
-- Keep `checkout-config.js` blank until a trusted backend endpoint is ready. For GoDaddy or another static host, set only the public checkout session URL there, never secrets.
+- Keep `checkout-config.js` blank until a trusted backend endpoint is ready. For Firebase Hosting, set only the public checkout session URL there, never secrets.
 - Do not store raw payment information in the app. Use Stripe-hosted payment collection and Stripe customer/payment method IDs.
 - Public Firestore writes are limited to validated order request creation. Payment status and Stripe IDs should be written only by trusted backend code.
 - Do not reintroduce local pickup unless the client changes direction.
@@ -89,7 +89,7 @@ npm run package:static
 npm --prefix functions run check
 ```
 
-Upload only the contents of `dist/godaddy-static/` for GoDaddy/static hosting. Do not upload the repo root.
+The static package scripts remain useful for smoke checks and emergency static export, but Firebase Hosting is now the production target.
 
 ## Local Preview
 
@@ -105,7 +105,7 @@ http://localhost:4173/
 
 ## Firebase Hosting Preview
 
-Firebase Hosting is prepared for static preview/deploy only. Copy `.firebaserc.example` to `.firebaserc`, replace the placeholder with a real Firebase project ID, and keep `.firebaserc` uncommitted.
+Firebase Hosting is the chosen production direction. Copy `.firebaserc.example` to `.firebaserc`, replace the placeholder with the real Theo's Farm Firebase project ID, and keep `.firebaserc` uncommitted.
 
 ```bash
 firebase emulators:start --only hosting

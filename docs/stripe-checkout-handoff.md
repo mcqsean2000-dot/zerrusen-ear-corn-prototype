@@ -4,9 +4,9 @@ This contract defines the future trusted backend boundary between the static The
 
 ## Hosting Boundary
 
-The public static storefront may be hosted on GoDaddy or another static host. This contract does not require Firebase Hosting and should not assume the public site is served by Firebase.
+The public static storefront production direction is Firebase Hosting. This contract still keeps the checkout boundary host-neutral enough that the trusted endpoint could move later, but current implementation planning should assume Firebase Hosting plus Firebase Cloud Functions.
 
-The trusted checkout endpoint and Stripe webhook can run on any approved backend platform. Firestore/Firebase references in this document describe the order data model, rules, and backend storage foundation only.
+The trusted checkout endpoint and Stripe webhook should run through Firebase Cloud Functions unless a later requirement changes that. Firestore/Firebase references in this document describe the selected order data model, rules, and backend storage foundation.
 
 ## Scope
 

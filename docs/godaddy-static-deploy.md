@@ -1,6 +1,6 @@
-# GoDaddy Static Deploy Package
+# Legacy GoDaddy Static Deploy Package
 
-This checklist prepares the public Theo's Farm storefront for GoDaddy or another approved static host. It does not deploy anything, use GoDaddy credentials, configure DNS, call Stripe, or publish backend code.
+Firebase Hosting is now the selected production hosting path for Theo's Farm. This checklist is kept only as a fallback/export path for GoDaddy or another approved static host. It does not deploy anything, use GoDaddy credentials, configure DNS, call Stripe, or publish backend code.
 
 ## Hosting Boundary
 

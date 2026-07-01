@@ -4,9 +4,9 @@ This slice adds a local, host-neutral scaffold for the future trusted Theo's Far
 
 ## Boundary
 
-Theo's Farm is the Farm to Feeder ear corn storefront for the 20 lb Ear Corn Bag and 40 lb Ear Corn Bag. Fulfillment is shipping/delivery only, with no local pickup. The public storefront can stay on GoDaddy or another static host, and the old Zerrusen Farms informational site should remain separate as its own business/site.
+Theo's Farm is the Farm to Feeder ear corn storefront for the 20 lb Ear Corn Bag and 40 lb Ear Corn Bag. Fulfillment is shipping/delivery only, with no local pickup. The public storefront production direction is Firebase Hosting, and the old Zerrusen Farms informational site should remain separate as its own business/site.
 
-The checkout backend must run somewhere that can safely hold Stripe and Firebase credentials, such as Cloud Functions, Cloud Run, Render, Railway, Fly.io, or another approved trusted API host.
+The checkout backend must run somewhere that can safely hold Stripe and Firebase credentials. The selected direction is Firebase Cloud Functions, with Cloud Run or another approved trusted API host as a fallback if Firebase Functions does not fit a later requirement.
 
 Because the storefront and trusted API may be on different origins, the backend scaffold includes `OPTIONS` preflight handling and origin-based CORS headers. Production should set `CORS_ALLOWED_ORIGINS` to the approved storefront origin, for example the Theo's Farm production domain.
 

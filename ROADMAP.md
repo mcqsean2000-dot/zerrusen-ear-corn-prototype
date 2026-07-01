@@ -8,16 +8,19 @@ Decision so far:
 
 - Use a new domain for Theo's Farm.
 - Keep Theo's Farm separate from the old Zerrusen Farms site/business.
-- Use GoDaddy or another approved static host for the public production storefront.
-- Keep Firebase/Firestore references scoped to order data, rules, indexes, and trusted backend storage if that foundation is selected.
+- Use Firebase Hosting for the public production storefront.
+- Use Firebase/Firestore/Functions as the production foundation because the same Firebase ecosystem is already used for EasiTask and Debris Locator.
 - Keep GitHub Pages only as the current prototype preview.
 
 Open tasks:
 
 - Choose/register the new Theo's Farm domain.
-- Decide how the GoDaddy/static hosting setup should publish the storefront and manage DNS.
-- Use `docs/godaddy-static-deploy.md` and `npm run package:static` when preparing the static upload package.
-- Create a production Firebase project for Theo's Farm only if Firestore remains the selected order storage foundation.
+- Create or select the production Firebase project for Theo's Farm.
+- Copy `.firebaserc.example` to a local `.firebaserc` and point it at the Theo's Farm Firebase project ID.
+- Configure Firebase Hosting preview and production deploy flow.
+- Decide whether the new domain's DNS remains at the registrar or points through Firebase's custom-domain setup.
+- Use `docs/firebase-hosting-readiness.md` for first deploy checks.
+- Keep `docs/godaddy-static-deploy.md` only as a fallback/static export checklist.
 - Create a separate project/repo for the old Zerrusen Farms site if that site is restored.
 
 ## Phase 2: Storefront
@@ -133,8 +136,8 @@ Later:
 Likely stack:
 
 - Frontend: Astro, Next.js, or another lightweight app framework
-- Hosting: GoDaddy or another approved static host for the public storefront
-- Backend: Firebase Cloud Functions or another trusted server endpoint
+- Hosting: Firebase Hosting
+- Backend: Firebase Cloud Functions
 - Database: Firestore
 - Payments: Stripe Checkout
 - Email: Resend or Postmark
@@ -152,7 +155,7 @@ Build order:
    - Static admin planning shell now exists at `admin.html`.
    - Next step is authenticated Firestore reads and status updates.
 8. Add email notifications.
-9. Deploy the public storefront to GoDaddy or the selected static host.
+9. Deploy the public storefront to Firebase Hosting.
 10. Point production domain.
 11. Run test orders.
 12. Launch.

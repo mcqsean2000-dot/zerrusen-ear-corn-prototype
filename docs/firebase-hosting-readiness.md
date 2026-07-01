@@ -1,6 +1,13 @@
 # Firebase Hosting Readiness
 
-This slice prepares the static Theo's Farm prototype for Firebase Hosting. It does not deploy, connect the storefront/admin shell to live Firebase, collect payment details, or replace the future Stripe Checkout handoff.
+Firebase Hosting is the selected production hosting path for Theo's Farm. This document prepares the static prototype for Firebase Hosting preview and deploy. It does not deploy, connect the storefront/admin shell to live Firebase, collect payment details, or replace the future Stripe Checkout handoff.
+
+The current Firebase direction is:
+
+- Firebase Hosting for the public storefront.
+- Firebase Cloud Functions for trusted Stripe Checkout session creation and Stripe webhook handling.
+- Firestore for order request and fulfillment state.
+- GitHub Pages remains only a temporary public prototype preview.
 
 ## First Firebase Setup
 
