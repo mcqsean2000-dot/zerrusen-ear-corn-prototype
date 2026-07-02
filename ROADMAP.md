@@ -124,6 +124,8 @@ Minimum:
 - Admin new order notification
 - Admin daily fulfillment summary
 
+Use `docs/notification-boundary-plan.md` for the first notification event and payload boundary before choosing a provider or adding live email sends.
+
 Later:
 
 - Shipping confirmation
