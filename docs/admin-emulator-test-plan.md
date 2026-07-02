@@ -32,6 +32,8 @@ In a second terminal, run the future rules test command once test files exist:
 npm run test:rules
 ```
 
+Current scaffold note: until executable emulator tests are added, `npm run test:rules` runs an offline validation that this plan and the current Firestore rules still reference the expected order security boundary.
+
 Recommended final local verification before launch on PowerShell:
 
 ```powershell
