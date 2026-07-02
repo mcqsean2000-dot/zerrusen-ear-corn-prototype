@@ -128,7 +128,36 @@ assert(indexes.indexes?.some((index) => index.collectionGroup === "orderRequests
 assert(rules.includes("match /orderRequests/{orderRequestId}"), "Firestore rules must define orderRequests access.");
 assert(rules.includes("createdAt == request.time"), "Firestore rules should require server request time for createdAt.");
 assert(rules.includes("allow create: if hasValidOrderShape();"), "Public order request create rule is missing.");
-assert(rules.includes("allow read, update, delete: if isAdmin();"), "Admin-only read/update/delete rule is missing.");
+const orderRequestRulesBlock = rules.match(/match \/orderRequests\/\{orderRequestId\} \{[\s\S]*?\n    \}/)?.[0] || "";
+assert(orderRequestRulesBlock, "Could not inspect orderRequests Firestore rule block.");
+assert(!rules.includes("allow read, update, delete: if isAdmin();"), "Admin order access must not use a blanket read/update/delete grant.");
+assert(
+  !/allow\s+(read,\s*)?update(,\s*delete)?\s*:\s*if\s+isAdmin\(\);/.test(orderRequestRulesBlock),
+  "Admin order updates must not have an additive broad isAdmin update grant.",
+);
+assert(
+  !/allow\s+(write|read,\s*write)\s*:\s*if\s+isAdmin\(\);/.test(orderRequestRulesBlock),
+  "Admin order writes must not have an additive broad isAdmin write grant.",
+);
+assert(rules.includes("allow read: if isAdmin();"), "Admin order read rule is missing.");
+assert(rules.includes("allow update: if hasValidAdminOrderUpdate();"), "Admin order update rule must use the constrained update helper.");
+assert(rules.includes("allow delete: if false;"), "Admin order deletes should remain disabled until a deletion policy exists.");
+assert(rules.includes("function hasOnlyAdminEditableOrderChanges()"), "Admin editable order field boundary helper is missing.");
+assert(
+  /hasOnlyAdminEditableOrderChanges\(\)[\s\S]*?hasOnly\(\[\s*'audit',\s*'internalNotes',\s*'status'\s*\]\);/.test(rules),
+  "Admin order updates must be limited to status, audit, and internalNotes.",
+);
+assert(
+  /hasValidAdminStatusChange\(\)[\s\S]*?'needs_review'[\s\S]*?'packed'[\s\S]*?'ready_to_pack'/.test(rules),
+  "Admin status updates must stay limited to the initial fulfillment statuses.",
+);
+assert(rules.includes("request.resource.data.audit.updatedAt == request.time"), "Admin audit updates should require server request time.");
+assert(rules.includes("request.resource.data.audit.updatedByUid == request.auth.uid"), "Admin audit updates should bind updatedByUid to the signed-in admin.");
+assert(rules.includes("request.resource.data.internalNotes is list"), "Admin internal notes updates should preserve a list shape.");
+assert(
+  !/hasOnlyAdminEditableOrderChanges\(\)[\s\S]*?hasOnly\(\[[\s\S]*?(paymentStatus|stripeCheckoutSessionId|stripePaymentIntentId|stripeCustomerId|paidAt|refundedAt|refundId)[\s\S]*?\]\);/.test(rules),
+  "Admin-client editable fields must not include backend-only payment or Stripe fields.",
+);
 assert(!storefront.toLowerCase().includes("local pickup"), "Storefront must not reintroduce local pickup.");
 assert(storefront.includes("data-order-form"), "Storefront purchase request form is missing.");
 assert(storefront.includes("order-request.js"), "Storefront must load the order request integration layer.");

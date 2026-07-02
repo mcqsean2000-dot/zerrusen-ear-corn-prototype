@@ -89,9 +89,61 @@ service cloud.firestore {
         && hasValidItems();
     }
 
+    function hasOnlyAdminEditableOrderChanges() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'audit',
+        'internalNotes',
+        'status'
+      ]);
+    }
+
+    function hasValidAdminStatusChange() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status'])
+        || request.resource.data.status in [
+          'needs_review',
+          'packed',
+          'ready_to_pack'
+        ];
+    }
+
+    function hasValidAdminAuditChange() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['audit'])
+        || (request.resource.data.audit is map
+          && request.resource.data.audit.keys().hasOnly([
+            'lastAction',
+            'updatedAt',
+            'updatedByEmail',
+            'updatedByUid'
+          ])
+          && request.resource.data.audit.updatedAt == request.time
+          && request.resource.data.audit.updatedByUid == request.auth.uid
+          && request.resource.data.audit.updatedByEmail is string
+          && request.resource.data.audit.updatedByEmail.size() >= 3
+          && request.resource.data.audit.updatedByEmail.size() <= 160
+          && request.resource.data.audit.lastAction is string
+          && request.resource.data.audit.lastAction.size() >= 1
+          && request.resource.data.audit.lastAction.size() <= 80);
+    }
+
+    function hasValidAdminInternalNotesChange() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['internalNotes'])
+        || (request.resource.data.internalNotes is list
+          && request.resource.data.internalNotes.size() <= 100);
+    }
+
+    function hasValidAdminOrderUpdate() {
+      return isAdmin()
+        && hasOnlyAdminEditableOrderChanges()
+        && hasValidAdminStatusChange()
+        && hasValidAdminAuditChange()
+        && hasValidAdminInternalNotesChange();
+    }
+
     match /orderRequests/{orderRequestId} {
       allow create: if hasValidOrderShape();
-      allow read, update, delete: if isAdmin();
+      allow read: if isAdmin();
+      allow update: if hasValidAdminOrderUpdate();
+      allow delete: if false;
     }
 
     match /{document=**} {
