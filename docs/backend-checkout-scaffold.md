@@ -31,8 +31,10 @@ POST /api/stripe/webhook
 - `functions/src/stripe-webhook-adapter.js` maps already-verified Stripe webhook events to trusted order update fields using injected order lookup, update, and event idempotency functions only. It does not import Stripe, Firebase, or make network calls by itself.
 - `functions/src/firestore-adapter.js` provides an SDK-free Firestore adapter boundary for the injected checkout and webhook dependencies. It expects a Firestore-like backend object to be passed in and does not import Firebase Admin, load credentials, or make network calls by itself.
 - `functions/src/trusted-backend-composition.js` composes the Firestore adapter and Stripe API adapter into the exact dependency shapes expected by the checkout and webhook handlers. It accepts injected Firestore-like and Stripe-like clients plus optional collection names and server timestamp provider; it does not import Firebase Admin, Firebase Functions, Stripe SDK, read secrets, initialize clients, deploy, or call the network by itself.
+- `functions/src/firebase-functions-runtime-guard.js` is the SDK-free guard for the future Firebase Functions entrypoint. It checks that runtime wiring provided the required environment keys, Firestore-like client, Stripe-like client, and server timestamp provider before handing those injected pieces to `createTrustedBackendComposition`.
 - `functions/src/stripe-api-adapter.test.js` checks the Stripe API boundary with in-memory fake Stripe clients only. These tests do not import Stripe, call the network, or require secrets.
 - `functions/src/trusted-backend-composition.test.js` checks the composition boundary with in-memory fake Firestore and Stripe clients only, including handler-level checkout and webhook flows.
+- `functions/src/firebase-functions-runtime-guard.test.js` checks missing runtime/env reporting and proves the guard can compose the existing checkout and webhook handlers with in-memory fake clients only.
 - `functions/src/order-validation.test.js` checks catalog alignment, validation, trusted field rejection, subtotal recalculation, and metadata safety.
 - `functions/.env.example` documents local placeholders only. Do not commit real `.env` files, Stripe secrets, webhook signing secrets, or Firebase service-account JSON.
 
@@ -109,6 +111,25 @@ const createCheckoutSession = createCheckoutSessionAdapter({
 `createOrderRequest` receives the trusted order request with backend-owned timestamp and checkout fields. `createStripeCheckoutSession` receives server-generated `params` containing Checkout line items, redirect URLs, `client_reference_id`, and safe metadata. `updateOrderRequest` stores trusted Stripe identifiers such as `stripeCheckoutSessionId`. `markCheckoutSessionFailed` is optional and can record backend-owned failure state if Stripe session creation fails after the trusted order document was created. If session creation succeeds but the trusted order update fails, the adapter preserves the Checkout Session ID in the failure marker and leaves `checkoutStatus` open for reconciliation.
 
 The handler can also receive `checkoutAdapterDependencies` and will build the adapter locally. If these dependencies are absent, the route remains disabled or returns `checkout_adapter_missing` instead of attempting Stripe or Firestore work.
+
+## Future Firebase Functions Runtime Wiring
+
+The runtime guard is not a deployable Firebase Function by itself. When real dependencies are intentionally installed later, the Firebase Functions entrypoint should initialize Firebase Admin/Firestore and Stripe in trusted runtime code, then pass only those initialized clients and `FieldValue.serverTimestamp` into:
+
+```js
+const {
+  createFirebaseFunctionsRuntime,
+} = require("./src/firebase-functions-runtime-guard");
+
+const runtime = createFirebaseFunctionsRuntime({
+  env: process.env,
+  firestore,
+  stripe,
+  serverTimestamp: FieldValue.serverTimestamp,
+});
+```
+
+The guard expects the future runtime to provide `CORS_ALLOWED_ORIGINS`, `FIREBASE_PROJECT_ID`, `STRIPE_CANCEL_URL`, `STRIPE_SECRET_KEY`, `STRIPE_SUCCESS_URL`, and `STRIPE_WEBHOOK_SIGNING_SECRET` from backend configuration. It reports missing key names and client capabilities only; it must not log secret values. Keep real secret loading, Firebase Admin initialization, Stripe SDK initialization, and `firebase-functions` exports outside this SDK-free scaffold until the live Functions integration is reviewed.
 
 ## Webhook Handler
 
