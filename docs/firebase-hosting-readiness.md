@@ -45,6 +45,8 @@ firebase emulators:start --only hosting
 
 Firebase serves the repo root from `firebase.json`. HTML, CSS, and JavaScript are intentionally uncached for iteration, while product images can be cached for one week.
 
+For the production deploy checklist that includes Hosting, Functions, Firestore, Stripe webhook setup, rollback, and post-deploy smoke checks, see `docs/firebase-production-deploy-checklist.md`.
+
 ## Preview And Deploy Commands
 
 Use a preview channel before production:
