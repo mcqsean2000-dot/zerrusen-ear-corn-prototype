@@ -38,6 +38,8 @@ Later statuses can follow the roadmap: paid, needs shipping quote, shipped, deli
 
 The static admin shell is not a secure admin surface. It must not be connected to live Firestore data until admin authentication is selected and implemented.
 
+See `docs/admin-auth-firestore-plan.md` for the proposed Firebase Auth custom-claim model, admin-editable fields, Firestore rule implications, and emulator test plan.
+
 Expected production boundary:
 
 1. Admin signs in through Firebase Auth or another selected provider.
