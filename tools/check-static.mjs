@@ -200,7 +200,141 @@ assert(
 );
 assert(admin.includes("admin.js"), "Admin shell must load admin.js.");
 assert(adminScript.includes("sampleOrders"), "Admin shell should use sample data only in this slice.");
+assert(adminScript.includes("normalizeAdminOrder"), "Admin shell must centralize order normalization for future authenticated reads.");
+assert(adminScript.includes("buildAdminOrderViewModel"), "Admin shell must centralize order view-model building.");
+assert(adminScript.includes("calculateAdminBagCounts"), "Admin shell must centralize bag-count calculations.");
+assert(adminScript.includes("adminStatusTransitions"), "Admin shell must define constrained status transitions before live status updates.");
 assert(!adminScript.toLowerCase().includes("firebase"), "Admin shell must not connect to Firebase yet.");
+
+function createAdminFakeElement(name, value = "") {
+  return {
+    name,
+    value,
+    innerHTML: "",
+    listeners: {},
+    addEventListener(type, handler) {
+      this.listeners[type] = this.listeners[type] || [];
+      this.listeners[type].push(handler);
+    },
+  };
+}
+
+function createAdminHarness() {
+  const elements = {
+    summary: createAdminFakeElement("summary"),
+    rows: createAdminFakeElement("rows"),
+    packingList: createAdminFakeElement("packingList"),
+    statusFilter: createAdminFakeElement("statusFilter", "all"),
+  };
+  const document = {
+    querySelector(selector) {
+      return {
+        "[data-admin-summary]": elements.summary,
+        "[data-order-rows]": elements.rows,
+        "[data-packing-list]": elements.packingList,
+        "[data-status-filter]": elements.statusFilter,
+      }[selector] || null;
+    },
+  };
+  const sandbox = {
+    Intl,
+    Number,
+    Object,
+    console,
+    document,
+    window: {},
+  };
+
+  new Script(adminScript, { filename: "admin.js" }).runInContext(createContext(sandbox));
+
+  return {
+    elements,
+    helpers: sandbox.window.TheosAdminOrders,
+  };
+}
+
+{
+  const { elements, helpers } = createAdminHarness();
+
+  assert(helpers, "Admin helper boundary must be exposed for offline checks.");
+  assert(helpers.allowedStatuses.join(",") === "needs_review,ready_to_pack,packed", "Admin statuses should stay limited to the initial fulfillment statuses.");
+  assert(helpers.statusLabels.needs_review === "Needs review", "Admin status labels should expose a human-readable needs_review label.");
+  assert(helpers.canTransitionStatus("needs_review", "ready_to_pack"), "Admin status transition should allow needs_review to ready_to_pack.");
+  assert(helpers.canTransitionStatus("ready_to_pack", "packed"), "Admin status transition should allow ready_to_pack to packed.");
+  assert(helpers.canTransitionStatus("packed", "ready_to_pack"), "Admin status transition should allow packed correction back to ready_to_pack.");
+  assert(!helpers.canTransitionStatus("needs_review", "packed"), "Admin status transition should block skipping from needs_review to packed.");
+  assert(!helpers.canTransitionStatus("ready_to_pack", "refunded"), "Admin status transition should block statuses outside the current boundary.");
+  assert(Object.isFrozen(helpers.allowedStatuses), "Admin allowed status list should be immutable from the exported helper surface.");
+  assert(Object.isFrozen(helpers.statusLabels), "Admin status labels should be immutable from the exported helper surface.");
+  assert(Object.isFrozen(helpers.statusTransitions), "Admin status transitions should be immutable from the exported helper surface.");
+  assert(Object.isFrozen(helpers.statusTransitions.needs_review), "Admin status transition arrays should be immutable from the exported helper surface.");
+  try {
+    helpers.allowedStatuses.push("refunded");
+    helpers.statusLabels.refunded = "Refunded";
+    helpers.statusTransitions.needs_review.push("refunded");
+  } catch {
+    // Frozen objects may throw in strict contexts; either way, the boundary must remain unchanged.
+  }
+  assert(!helpers.allowedStatuses.includes("refunded"), "Admin exported status list should not be expandable by mutating helper objects.");
+  assert(!helpers.canTransitionStatus("needs_review", "refunded"), "Admin transitions should not be expandable by mutating helper objects.");
+
+  const normalized = helpers.normalizeOrder({
+    id: " firestore-doc-id ",
+    status: "paid",
+    subtotalCents: 0,
+    customer: {
+      name: " Future Customer ",
+      contact: "future@example.com",
+      preferredContact: "Text",
+      shippingZip: "62401",
+      note: "<script>alert(1)</script>",
+    },
+    items: [
+      { sku: "ear-corn-20lb", name: "20 lb Ear Corn Bag", quantity: "2", unitPriceCents: "1600" },
+      { sku: "unknown", name: "Ignored count product", quantity: 1, unitPriceCents: 999 },
+      { sku: "ear-corn-40lb", name: "40 lb Ear Corn Bag", quantity: 0, unitPriceCents: 2800 },
+    ],
+  });
+
+  assert(normalized.id === "firestore-doc-id", "Admin order normalization should trim document IDs.");
+  assert(normalized.status === "needs_review", "Unknown admin order statuses should normalize back to needs_review.");
+  assert(normalized.customer.preferredContact === "text", "Admin order normalization should lower-case contact preference.");
+  assert(normalized.items.length === 2, "Admin order normalization should keep positive quantity line items.");
+  assert(normalized.subtotalCents === 4199, "Admin order normalization should calculate subtotal when the source subtotal is absent.");
+
+  const viewModel = helpers.buildOrderViewModel(normalized);
+  assert(viewModel.statusLabel === "Needs review", "Admin view model should include status labels.");
+  assert(viewModel.itemSummary.includes("2 x 20 lb Ear Corn Bag"), "Admin view model should include item summaries.");
+  assert(viewModel.subtotalLabel === "$41.99", "Admin view model should format subtotal labels.");
+
+  const counts = helpers.calculateBagCounts([
+    normalized,
+    {
+      status: "ready_to_pack",
+      items: [{ sku: "ear-corn-40lb", name: "40 lb Ear Corn Bag", quantity: 3, unitPriceCents: 2800 }],
+    },
+  ]);
+
+  assert(counts.twenty === 2, "Admin bag counts should sum 20 lb bag quantities by SKU.");
+  assert(counts.forty === 3, "Admin bag counts should sum 40 lb bag quantities by SKU.");
+  assert(counts.total === 5, "Admin bag counts should include total bag quantities.");
+
+  const fulfillmentSummary = helpers.buildFulfillmentSummary([
+    normalized,
+    { status: "ready_to_pack", items: [{ sku: "ear-corn-40lb", quantity: 2 }] },
+    { status: "packed", items: [{ sku: "ear-corn-20lb", quantity: 1 }] },
+  ]);
+
+  assert(fulfillmentSummary.orderCount === 3, "Admin fulfillment summary should count normalized orders.");
+  assert(fulfillmentSummary.needsReviewCount === 1, "Admin fulfillment summary should count needs_review orders.");
+  assert(fulfillmentSummary.readyToPackCount === 1, "Admin fulfillment summary should count ready_to_pack orders.");
+  assert(fulfillmentSummary.packedCount === 1, "Admin fulfillment summary should count packed orders.");
+  assert(helpers.getPackableOrders([{ status: "needs_review" }, { status: "packed" }]).length === 1, "Admin packing list should exclude needs_review orders.");
+
+  assert(elements.summary.innerHTML.includes("Order requests"), "Admin script should render the offline summary.");
+  assert(elements.rows.innerHTML.includes("REQ-1001"), "Admin script should render sample order rows.");
+  assert(!elements.rows.innerHTML.includes("Â·"), "Admin rows should avoid mojibake separators.");
+}
 
 const validOrderRequest = orderRequests.buildOrderRequest({
   cart: [
