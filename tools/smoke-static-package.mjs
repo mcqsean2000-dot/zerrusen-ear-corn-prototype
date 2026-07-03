@@ -10,6 +10,8 @@ const requiredFiles = [
   "order-request.js",
   "checkout-config.js",
   "script.js",
+  "robots.txt",
+  "sitemap.xml",
 ];
 const requiredAssets = [
   "assets/theos-20lb-bag.jpg",
@@ -46,6 +48,8 @@ const allowedExternalUrlHosts = new Set([
   "checkout.stripe.com",
   "fonts.googleapis.com",
   "fonts.gstatic.com",
+  "schema.org",
+  "theosfarm.com",
 ]);
 
 function assert(condition, message) {
@@ -225,8 +229,10 @@ function contentTypeFor(filePath) {
     ".jpg": "image/jpeg",
     ".js": "text/javascript",
     ".png": "image/png",
+    ".txt": "text/plain",
     ".svg": "image/svg+xml",
     ".webp": "image/webp",
+    ".xml": "application/xml",
   }[extension] || "application/octet-stream";
 }
 

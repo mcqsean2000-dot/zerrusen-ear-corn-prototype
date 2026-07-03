@@ -14,6 +14,8 @@ const requiredFiles = [
   "admin.html",
   "admin.css",
   "admin.js",
+  "robots.txt",
+  "sitemap.xml",
   ".firebaserc.example",
   "firebase.json",
   "firestore.rules",
@@ -47,6 +49,8 @@ const firebaseProjectExample = JSON.parse(await readFile(".firebaserc.example", 
 const indexes = JSON.parse(await readFile("firestore.indexes.json", "utf8"));
 const rules = await readFile("firestore.rules", "utf8");
 const storefront = await readFile("index.html", "utf8");
+const robots = await readFile("robots.txt", "utf8");
+const sitemap = await readFile("sitemap.xml", "utf8");
 const storefrontScript = await readFile("script.js", "utf8");
 const orderRequestScript = await readFile("order-request.js", "utf8");
 const checkoutConfigScript = await readFile("checkout-config.js", "utf8");
@@ -164,6 +168,15 @@ assert(
   "Admin-client editable fields must not include backend-only payment or Stripe fields.",
 );
 assert(!storefront.toLowerCase().includes("local pickup"), "Storefront must not reintroduce local pickup.");
+assert(storefront.includes('<link rel="canonical" href="https://theosfarm.com/">'), "Storefront must define the production canonical URL.");
+assert(storefront.includes('property="og:image" content="https://theosfarm.com/assets/theos-both-bags.jpg"'), "Storefront must define a product photo Open Graph image.");
+assert(storefront.includes('type="application/ld+json"'), "Storefront must include structured data.");
+assert(storefront.includes('"@type": "Organization"'), "Structured data must describe Theo's Farm as an organization.");
+assert(storefront.includes('"@type": "Product"'), "Structured data must describe the two ear corn products.");
+assert(storefront.includes('"sku": "ear-corn-20lb"'), "Structured data must include the 20 lb SKU.");
+assert(storefront.includes('"sku": "ear-corn-40lb"'), "Structured data must include the 40 lb SKU.");
+assert(robots.includes("Sitemap: https://theosfarm.com/sitemap.xml"), "robots.txt must point crawlers at the production sitemap.");
+assert(sitemap.includes("<loc>https://theosfarm.com/</loc>"), "sitemap.xml must list the production storefront URL.");
 assert(storefront.includes("data-order-form"), "Storefront purchase request form is missing.");
 assert(storefront.includes("order-request.js"), "Storefront must load the order request integration layer.");
 assert(storefront.includes("checkout-config.js"), "Storefront must load the public checkout config placeholder.");

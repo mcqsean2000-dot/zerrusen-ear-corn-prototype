@@ -51,6 +51,8 @@ Natural search phrases to keep in mind:
 - `styles.css` - responsive styling
 - `script.js` - demo cart drawer behavior
 - `checkout-config.js` - public static-host checkout endpoint placeholder, disabled by default
+- `robots.txt` - crawl policy pointing search engines to the production sitemap
+- `sitemap.xml` - one-page production sitemap for the canonical Theo's Farm domain
 - `admin.html` - static admin fulfillment prototype
 - `admin.css` - admin shell styles
 - `admin.js` - sample admin queue behavior

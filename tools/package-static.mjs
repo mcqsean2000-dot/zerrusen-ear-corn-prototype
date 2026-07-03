@@ -10,6 +10,8 @@ const storefrontFiles = [
   "order-request.js",
   "checkout-config.js",
   "script.js",
+  "robots.txt",
+  "sitemap.xml",
 ];
 const assetDir = "assets";
 const allowedAssetExtensions = new Set([".gif", ".jpeg", ".jpg", ".png", ".svg", ".webp"]);
