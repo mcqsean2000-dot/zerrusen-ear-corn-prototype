@@ -20,7 +20,7 @@ const adminBagSkus = Object.freeze({
 const sampleOrders = [
   {
     id: "REQ-1001",
-    customer: { name: "M. Keller", contact: "mkeller@example.com", preferredContact: "email", shippingZip: "62401", note: "Confirm shipping quote before checkout link." },
+    customer: { name: "M. Keller", contact: "mkeller@example.com", preferredContact: "email", shippingZip: "62401", note: "Confirm shipping rate before checkout link." },
     status: "needs_review",
     subtotalCents: 4790,
     items: [

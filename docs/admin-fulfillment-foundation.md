@@ -32,7 +32,7 @@ Initial admin statuses:
 - `ready_to_pack`
 - `packed`
 
-Later statuses can follow the roadmap: paid, needs shipping quote, shipped, delivered, canceled, and refunded.
+Later statuses can follow the roadmap: paid, needs shipping rate, shipped, delivered, canceled, and refunded.
 
 ## Security Boundary
 

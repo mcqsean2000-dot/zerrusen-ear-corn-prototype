@@ -4,7 +4,7 @@ This slice adds a local, host-neutral scaffold for the future trusted Theo's Far
 
 ## Boundary
 
-Theo's Farm is the Farm to Feeder ear corn storefront for the 20 lb Ear Corn Bag and 40 lb Ear Corn Bag. Fulfillment is shipping/delivery only, with no local pickup. The public storefront production direction is Firebase Hosting, and the old Zerrusen Farms informational site should remain separate as its own business/site.
+Theo's Farm is the Farm to Feeder ear corn storefront for the 20 lb Ear Corn Bag and 40 lb Ear Corn Bag. Fulfillment is shipping only, with no local pickup. The public storefront production direction is Firebase Hosting, and the old Zerrusen Farms informational site should remain separate as its own business/site.
 
 The checkout backend must run somewhere that can safely hold Stripe and Firebase credentials. The selected direction is Firebase Cloud Functions, with Cloud Run or another approved trusted API host as a fallback if Firebase Functions does not fit a later requirement.
 

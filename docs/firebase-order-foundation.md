@@ -75,7 +75,7 @@ Do not collect card numbers, CVV, bank data, or raw payment details in Firestore
 The intended sequence is:
 
 1. Customer submits an order request with products, contact details, and shipping ZIP.
-2. Backend code validates shipping/delivery needs and creates a Stripe Checkout session.
+2. Backend code validates shipping needs, retrieves Shippo rates, and creates a Stripe Checkout session.
 3. Customer pays on Stripe-hosted Checkout.
 4. Stripe webhook updates the order request with trusted Stripe IDs and payment status.
 5. Admin fulfillment tools read the paid order queue.

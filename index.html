@@ -248,7 +248,7 @@
         <div>
           <p class="eyebrow">Fulfillment concept</p>
           <h2 id="delivery-title">Start an order request, then finish payment through Stripe.</h2>
-          <p>This prototype now collects buyer intent, delivery details, and the cart subtotal before handing payment off to Stripe Checkout. Theo's Farm should not collect or store raw card details on this static site.</p>
+          <p>This prototype now collects buyer intent, shipping details, and the cart subtotal before handing payment off to Stripe Checkout. Theo's Farm should not collect or store raw card details on this static site.</p>
         </div>
         <form class="quote-form" data-order-form novalidate>
           <div class="order-summary" data-order-summary>
@@ -281,7 +281,7 @@
             Order note
             <textarea name="note" rows="4" placeholder="Delivery address, timing, or bulk quantity"></textarea>
           </label>
-          <p class="payment-note">Payment should be completed through Stripe Checkout after shipping or delivery details are confirmed. This prototype prepares the order request only; live submission needs a trusted checkout endpoint.</p>
+          <p class="payment-note">Payment should be completed through Stripe Checkout after shipping details are confirmed. This prototype prepares the order request only; live submission needs trusted Shippo and checkout endpoints.</p>
           <button type="submit">Request checkout link</button>
           <p class="form-status" data-order-status role="status" aria-live="polite"></p>
         </form>

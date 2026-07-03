@@ -86,5 +86,5 @@ Do not put Stripe secret keys, webhook signing secrets, Firebase service account
 
 - The page should show Theo's Farm and Farm to Feeder branding.
 - Products should remain only the 20 lb Ear Corn Bag and 40 lb Ear Corn Bag.
-- Fulfillment copy should remain shipping/delivery only with no local pickup.
+- Fulfillment copy should remain shipping only with no local pickup.
 - The static host should not expose backend docs, source maps with secrets, Firebase rules, Firestore indexes, `.env` files, or repository metadata.

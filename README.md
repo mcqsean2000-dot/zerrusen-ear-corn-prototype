@@ -12,7 +12,8 @@ This repo currently contains a static prototype for the Theo's Farm direct-to-co
 - Products:
   - 20 lb Ear Corn Bag
   - 40 lb Ear Corn Bag
-- Fulfillment: shipping/delivery only. No local pickup.
+- Fulfillment: shipping only. No local pickup.
+- Shipping direction: Shippo for live rates, address validation, labels, and tracking.
 - Payments direction: Stripe Checkout with Google Pay enabled through Stripe.
 - Storefront flow: cart selections feed a prototype order request form before the future Stripe Checkout handoff.
 - Public hosting direction: Firebase Hosting.
@@ -30,6 +31,12 @@ This repo currently contains a static prototype for the Theo's Farm direct-to-co
 - No old inventory is shipped.
 - Corn is treated with an Insect Growth Regulator before bulk storage, and each bag is treated again when filled to help ensure a bug-free product.
 - Corn is packed in a durable, heavy-duty woven poly bag with a white paper overlay, then boxed for added protection during shipping.
+
+## Shipping Package Assumptions
+
+- 20 lb Ear Corn Bag: $17.95 plus shipping, 29 in x 17 in x 5 in, 22 lb packed weight.
+- 40 lb Ear Corn Bag: $29.95 plus shipping, 32 in x 18 in x 8 in, 42 lb packed weight.
+- Multiple-bag orders should be rated as separate packages until the client confirms a combined-package workflow.
 
 ## Search / SEO Terms
 
@@ -68,6 +75,7 @@ Natural search phrases to keep in mind:
 - `docs/firebase-order-foundation.md` - Firebase order request shape and payment boundary notes
 - `docs/admin-fulfillment-foundation.md` - admin queue and fulfillment planning notes
 - `docs/stripe-checkout-handoff.md` - trusted backend contract for future Stripe Checkout session creation and webhook updates
+- `docs/shippo-shipping-plan.md` - Shippo rate, package, label, and tracking implementation plan
 - `docs/backend-checkout-scaffold.md` - local backend scaffold notes, validation helpers, and webhook boundary
 - `docs/godaddy-static-deploy.md` - legacy/fallback static upload checklist; not the preferred production path
 - `assets/theos-20lb-bag.jpg` - client photo of 20 lb bag

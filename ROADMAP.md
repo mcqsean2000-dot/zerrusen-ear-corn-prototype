@@ -29,16 +29,23 @@ Customer experience should stay very simple:
 
 1. Select 20 lb or 40 lb bag.
 2. Choose quantity.
-3. Enter shipping/delivery information.
-4. Pay through Stripe Checkout.
-5. Receive confirmation.
+3. Enter shipping information.
+4. Review live shipping options from Shippo.
+5. Pay product plus shipping through Stripe Checkout.
+6. Receive confirmation.
 
 Current product assumptions:
 
-- 20 lb Ear Corn Bag
-- 40 lb Ear Corn Bag
-- Shipping/delivery only
+- 20 lb Ear Corn Bag: $17.95 plus shipping
+- 40 lb Ear Corn Bag: $29.95 plus shipping
+- Shipping only
 - No local pickup
+
+Shipping package assumptions:
+
+- 20 lb bag ships as 29 in x 17 in x 5 in, 22 lb packed weight.
+- 40 lb bag ships as 32 in x 18 in x 8 in, 42 lb packed weight.
+- Multiple-bag orders should be rated as separate packages unless the client later confirms a combined-box workflow.
 
 Content priorities:
 
@@ -49,7 +56,32 @@ Content priorities:
 - Cleaned and inspected before packaging.
 - Treated and boxed for shipping protection.
 
-## Phase 3: Payments
+## Phase 3: Shipping
+
+Current recommendation:
+
+- Use Shippo for live shipping rates, address validation, labels, tracking, and future admin label purchase.
+- Start with customer-selected live rates at checkout, then let the admin buy labels after reviewing paid orders.
+- Do not automatically buy labels immediately after payment until real fulfillment patterns are proven.
+
+Checkout shipping flow:
+
+1. Customer enters full shipping address.
+2. Backend validates the cart and maps each product line to package dimensions and packed weight.
+3. Backend asks Shippo for available shipping rates.
+4. Storefront shows clear shipping options.
+5. Customer chooses a rate.
+6. Stripe Checkout charges product subtotal plus selected shipping.
+7. Paid order appears in admin as ready for label review.
+
+Admin shipping flow:
+
+1. Admin opens paid order.
+2. Admin confirms address, package count, and package specs.
+3. Admin clicks to create/buy the Shippo label.
+4. System stores carrier, service, shipping cost, label URL, tracking number, and fulfillment status.
+
+## Phase 4: Payments
 
 Current recommendation:
 
@@ -65,6 +97,7 @@ Payment/data rules:
 - Store only Stripe IDs needed for order/customer/payment reference.
 - Store customer/order data only when operationally useful.
 - Use `docs/stripe-checkout-handoff.md` as the contract for the future trusted backend checkout session and webhook implementation.
+- Pass only server-validated product subtotal and the customer-selected Shippo shipping amount into Stripe Checkout.
 
 Future recurring order approach:
 
@@ -72,7 +105,7 @@ Future recurring order approach:
 - Do not launch automatic recurring billing until fulfillment rules and inventory handling are proven.
 - Later option: Stripe Billing for true subscriptions.
 
-## Phase 4: Order and Fulfillment Admin
+## Phase 5: Order and Fulfillment Admin
 
 The admin side should make fulfillment easy for the farm.
 
@@ -81,7 +114,7 @@ Core admin features:
 - Order list
 - Order detail
 - Payment status
-- Shipping/delivery status
+- Shipping status
 - Customer contact info
 - Product quantities
 - Internal notes
@@ -92,7 +125,7 @@ Suggested statuses:
 
 - New
 - Paid
-- Needs shipping quote
+- Needs shipping rate
 - Ready to pack
 - Packed
 - Shipped
@@ -104,7 +137,7 @@ Daily fulfillment summary should show:
 
 - Total 20 lb bags
 - Total 40 lb bags
-- Orders needing shipping quote
+- Orders needing shipping rate
 - Orders ready to pack
 - Orders needing follow-up
 
@@ -116,7 +149,7 @@ Recurring order queue should show:
 - Next reminder/order date
 - Status: requested, confirmed, paused, canceled
 
-## Phase 5: Notifications
+## Phase 6: Notifications
 
 Minimum:
 
@@ -133,7 +166,7 @@ Later:
 - Recurring order reminder
 - Low inventory alert
 
-## Phase 6: Production Build
+## Phase 7: Production Build
 
 Likely stack:
 
@@ -141,6 +174,7 @@ Likely stack:
 - Hosting: Firebase Hosting
 - Backend: Firebase Cloud Functions
 - Database: Firestore
+- Shipping: Shippo
 - Payments: Stripe Checkout
 - Email: Resend or Postmark
 - Admin auth: Firebase Auth with admin custom claims, Clerk, or similar
@@ -150,17 +184,19 @@ Build order:
 1. Confirm domain.
 2. Move static prototype into production app structure.
 3. Build product catalog and checkout flow.
-4. Add Stripe Checkout.
-5. Add order persistence.
-6. Add Stripe webhooks.
-7. Build admin fulfillment dashboard.
+4. Add Shippo rate quoting from server-owned package specs.
+5. Add Stripe Checkout with selected shipping.
+6. Add order persistence.
+7. Add Stripe webhooks.
+8. Build admin fulfillment dashboard.
    - Static admin planning shell now exists at `admin.html`.
    - Next step is authenticated Firestore reads and status updates.
-8. Add email notifications.
-9. Deploy the public storefront to Firebase Hosting.
-10. Point production domain.
-11. Run test orders.
-12. Launch.
+9. Add Shippo label purchase and tracking updates in admin.
+10. Add email notifications.
+11. Deploy the public storefront to Firebase Hosting.
+12. Point production domain.
+13. Run test orders.
+14. Launch.
 
 ## Maintenance Plan
 

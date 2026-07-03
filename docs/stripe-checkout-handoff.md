@@ -259,7 +259,7 @@ Suggested first paid-order flow:
 ## Implementation Notes For Future Slice
 
 - Keep Stripe secret keys and webhook signing secrets in backend environment configuration only.
-- Use Stripe test mode until product prices, shipping/delivery handling, taxes, and receipt language are approved.
-- Confirm whether shipping price is known before Checkout or requires a quote workflow.
+- Use Stripe test mode until product prices, Shippo shipping handling, taxes, and receipt language are approved.
+- Shipping should be calculated through Shippo before Checkout, then passed into Stripe Checkout as the selected shipping amount.
 - Add backend tests for subtotal recalculation, unsupported SKU rejection, client-supplied trusted-field rejection, Stripe metadata creation, and webhook idempotency.
 - Update Firestore rules only when the backend/admin field model is finalized.

@@ -17,7 +17,7 @@ Do not use this checklist to rotate secrets, delete data, migrate order records,
 
 1. Confirm the production Firebase project exists and is the intended Theo's Farm project.
 2. Confirm the production domain decision is approved and the old Zerrusen Farms site remains separate.
-3. Confirm product names, prices, fulfillment copy, shipping/delivery-only language, tax/shipping handling, and receipt language are approved.
+3. Confirm product names, prices, fulfillment copy, shipping-only language, tax/shipping handling, and receipt language are approved.
 4. Confirm Stripe is in the intended mode for launch. Use test mode until the owner approves live Checkout.
 5. Confirm Google Pay, Apple Pay, and Link settings are managed in Stripe Checkout, not in storefront JavaScript.
 6. Confirm the trusted checkout endpoint and webhook are implemented, reviewed, and intentionally enabled before taking payments.
