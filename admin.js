@@ -22,25 +22,25 @@ const sampleOrders = [
     id: "REQ-1001",
     customer: { name: "M. Keller", contact: "mkeller@example.com", preferredContact: "email", shippingZip: "62401", note: "Confirm shipping quote before checkout link." },
     status: "needs_review",
-    subtotalCents: 4400,
+    subtotalCents: 4790,
     items: [
-      { sku: "ear-corn-20lb", name: "20 lb Ear Corn Bag", quantity: 1, unitPriceCents: 1600 },
-      { sku: "ear-corn-40lb", name: "40 lb Ear Corn Bag", quantity: 1, unitPriceCents: 2800 },
+      { sku: "ear-corn-20lb", name: "20 lb Ear Corn Bag", quantity: 1, unitPriceCents: 1795 },
+      { sku: "ear-corn-40lb", name: "40 lb Ear Corn Bag", quantity: 1, unitPriceCents: 2995 },
     ],
   },
   {
     id: "REQ-1002",
     customer: { name: "J. Smith", contact: "217-555-0148", preferredContact: "text", shippingZip: "62462", note: "Repeat buyer. Wants two large bags this week." },
     status: "ready_to_pack",
-    subtotalCents: 5600,
-    items: [{ sku: "ear-corn-40lb", name: "40 lb Ear Corn Bag", quantity: 2, unitPriceCents: 2800 }],
+    subtotalCents: 5990,
+    items: [{ sku: "ear-corn-40lb", name: "40 lb Ear Corn Bag", quantity: 2, unitPriceCents: 2995 }],
   },
   {
     id: "REQ-1003",
     customer: { name: "A. Martin", contact: "amartin@example.com", preferredContact: "phone", shippingZip: "62565", note: "Packing complete; waiting on shipping confirmation." },
     status: "packed",
-    subtotalCents: 4800,
-    items: [{ sku: "ear-corn-20lb", name: "20 lb Ear Corn Bag", quantity: 3, unitPriceCents: 1600 }],
+    subtotalCents: 5385,
+    items: [{ sku: "ear-corn-20lb", name: "20 lb Ear Corn Bag", quantity: 3, unitPriceCents: 1795 }],
   },
 ];
 

@@ -16,7 +16,7 @@ const env = {
 const trustedOrderRequest = {
   source: "static-storefront",
   status: "needs_review",
-  subtotalCents: 4400,
+  subtotalCents: 4790,
   createdAt: "SERVER_TIMESTAMP",
   paymentStatus: "unpaid",
   checkoutStatus: "open",
@@ -27,13 +27,13 @@ const trustedOrderRequest = {
       name: "20 lb Ear Corn Bag",
       sku: "ear-corn-20lb",
       quantity: 1,
-      unitPriceCents: 1600,
+      unitPriceCents: 1795,
     },
     {
       name: "40 lb Ear Corn Bag",
       sku: "ear-corn-40lb",
       quantity: 1,
-      unitPriceCents: 2800,
+      unitPriceCents: 2995,
     },
   ],
   customer: {
@@ -66,13 +66,13 @@ test("checkout session params use server-owned line items and safe metadata", ()
     {
       quantity: 1,
       name: "20 lb Ear Corn Bag",
-      unitAmount: 1600,
+      unitAmount: 1795,
       sku: "ear-corn-20lb",
     },
     {
       quantity: 1,
       name: "40 lb Ear Corn Bag",
-      unitAmount: 2800,
+      unitAmount: 2995,
       sku: "ear-corn-40lb",
     },
   ]);

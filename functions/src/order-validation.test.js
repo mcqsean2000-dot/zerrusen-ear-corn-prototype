@@ -14,19 +14,19 @@ function validDraft(overrides = {}) {
   return {
     source: "static-storefront",
     status: "needs_review",
-    subtotalCents: 4400,
+    subtotalCents: 4790,
     items: [
       {
         name: "20 lb Ear Corn Bag",
         sku: "ear-corn-20lb",
         quantity: 1,
-        unitPriceCents: 1600,
+        unitPriceCents: 1795,
       },
       {
         name: "40 lb Ear Corn Bag",
         sku: "ear-corn-40lb",
         quantity: 1,
-        unitPriceCents: 2800,
+        unitPriceCents: 2995,
       },
     ],
     customer: {
@@ -56,7 +56,7 @@ test("validates and canonicalizes a storefront order draft", () => {
   }));
 
   assert.equal(result.ok, true);
-  assert.equal(result.orderRequest.subtotalCents, 4400);
+  assert.equal(result.orderRequest.subtotalCents, 4790);
   assert.equal(result.orderRequest.customer.preferredContact, "email");
   assert.equal(result.orderRequest.customer.note, "Leave near the side door.");
 });
@@ -108,22 +108,22 @@ test("rejects unsupported customer and cart shapes", () => {
         name: "20 lb Ear Corn Bag",
         sku: "ear-corn-20lb",
         quantity: 1,
-        unitPriceCents: 1600,
+        unitPriceCents: 1795,
       },
       {
         name: "40 lb Ear Corn Bag",
         sku: "ear-corn-40lb",
         quantity: 1,
-        unitPriceCents: 2800,
+        unitPriceCents: 2995,
       },
       {
         name: "20 lb Ear Corn Bag",
         sku: "ear-corn-20lb",
         quantity: 1,
-        unitPriceCents: 1600,
+        unitPriceCents: 1795,
       },
     ],
-    subtotalCents: 6000,
+    subtotalCents: 6585,
   }));
 
   assert.equal(badZip.ok, false);
@@ -137,16 +137,16 @@ test("allows duplicate supported SKU lines when the storefront draft subtotal is
         name: "20 lb Ear Corn Bag",
         sku: "ear-corn-20lb",
         quantity: 1,
-        unitPriceCents: 1600,
+        unitPriceCents: 1795,
       },
       {
         name: "20 lb Ear Corn Bag",
         sku: "ear-corn-20lb",
         quantity: 2,
-        unitPriceCents: 1600,
+        unitPriceCents: 1795,
       },
     ],
-    subtotalCents: 4800,
+    subtotalCents: 5385,
   }));
 
   assert.equal(result.ok, true);

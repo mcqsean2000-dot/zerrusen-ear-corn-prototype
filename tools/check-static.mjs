@@ -308,9 +308,9 @@ function createAdminHarness() {
       note: "<script>alert(1)</script>",
     },
     items: [
-      { sku: "ear-corn-20lb", name: "20 lb Ear Corn Bag", quantity: "2", unitPriceCents: "1600" },
+      { sku: "ear-corn-20lb", name: "20 lb Ear Corn Bag", quantity: "2", unitPriceCents: "1795" },
       { sku: "unknown", name: "Ignored count product", quantity: 1, unitPriceCents: 999 },
-      { sku: "ear-corn-40lb", name: "40 lb Ear Corn Bag", quantity: 0, unitPriceCents: 2800 },
+      { sku: "ear-corn-40lb", name: "40 lb Ear Corn Bag", quantity: 0, unitPriceCents: 2995 },
     ],
   });
 
@@ -318,18 +318,18 @@ function createAdminHarness() {
   assert(normalized.status === "needs_review", "Unknown admin order statuses should normalize back to needs_review.");
   assert(normalized.customer.preferredContact === "text", "Admin order normalization should lower-case contact preference.");
   assert(normalized.items.length === 2, "Admin order normalization should keep positive quantity line items.");
-  assert(normalized.subtotalCents === 4199, "Admin order normalization should calculate subtotal when the source subtotal is absent.");
+  assert(normalized.subtotalCents === 4589, "Admin order normalization should calculate subtotal when the source subtotal is absent.");
 
   const viewModel = helpers.buildOrderViewModel(normalized);
   assert(viewModel.statusLabel === "Needs review", "Admin view model should include status labels.");
   assert(viewModel.itemSummary.includes("2 x 20 lb Ear Corn Bag"), "Admin view model should include item summaries.");
-  assert(viewModel.subtotalLabel === "$41.99", "Admin view model should format subtotal labels.");
+  assert(viewModel.subtotalLabel === "$45.89", "Admin view model should format subtotal labels.");
 
   const counts = helpers.calculateBagCounts([
     normalized,
     {
       status: "ready_to_pack",
-      items: [{ sku: "ear-corn-40lb", name: "40 lb Ear Corn Bag", quantity: 3, unitPriceCents: 2800 }],
+      items: [{ sku: "ear-corn-40lb", name: "40 lb Ear Corn Bag", quantity: 3, unitPriceCents: 2995 }],
     },
   ]);
 
@@ -375,7 +375,7 @@ assert(!("createdAt" in validOrderRequest.payload), "Static order request draft 
 assert(validOrderRequest.firestoreWrite.collection === "orderRequests", "Order request should identify the Firestore collection for the backend.");
 assert(validOrderRequest.firestoreWrite.createdAt === "server_timestamp_required", "Order request should require backend server timestamp handling.");
 assert(validOrderRequest.firestoreWrite.trustedWriterRequired, "Order request should require a trusted writer before Firestore submission.");
-assert(validOrderRequest.payload.subtotalCents === 6000, "Order request subtotal should be calculated in cents.");
+assert(validOrderRequest.payload.subtotalCents === 6585, "Order request subtotal should be calculated in cents.");
 assert(validOrderRequest.payload.items[0].sku === "ear-corn-20lb", "Order request should include the 20 lb SKU.");
 assert(validOrderRequest.payload.items[1].sku === "ear-corn-40lb", "Order request should include the 40 lb SKU.");
 assert(validOrderRequest.payload.customer.preferredContact === "email", "Order request should normalize preferred contact.");
@@ -502,12 +502,12 @@ function createStorefrontHarness({ checkoutEndpoint = "", fetchImpl } = {}) {
   addButtons[0].dataset = {
     sku: "ear-corn-20lb",
     name: "20 lb Ear Corn Bag",
-    priceCents: "1600",
+    priceCents: "1795",
   };
   addButtons[1].dataset = {
     sku: "ear-corn-40lb",
     name: "40 lb Ear Corn Bag",
-    priceCents: "2800",
+    priceCents: "2995",
   };
 
   const document = {

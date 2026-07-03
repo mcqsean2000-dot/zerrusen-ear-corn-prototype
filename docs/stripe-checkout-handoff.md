@@ -37,19 +37,19 @@ The current draft shape is:
 {
   "source": "static-storefront",
   "status": "needs_review",
-  "subtotalCents": 4400,
+  "subtotalCents": 4790,
   "items": [
     {
       "name": "20 lb Ear Corn Bag",
       "sku": "ear-corn-20lb",
       "quantity": 1,
-      "unitPriceCents": 1600
+      "unitPriceCents": 1795
     },
     {
       "name": "40 lb Ear Corn Bag",
       "sku": "ear-corn-40lb",
       "quantity": 1,
-      "unitPriceCents": 2800
+      "unitPriceCents": 2995
     }
   ],
   "customer": {
@@ -93,13 +93,13 @@ Request body:
   "orderRequest": {
     "source": "static-storefront",
     "status": "needs_review",
-    "subtotalCents": 4400,
+    "subtotalCents": 4790,
     "items": [
       {
         "name": "20 lb Ear Corn Bag",
         "sku": "ear-corn-20lb",
         "quantity": 1,
-        "unitPriceCents": 1600
+        "unitPriceCents": 1795
       }
     ],
     "customer": {
@@ -188,7 +188,7 @@ Every Checkout Session should include stable metadata for webhook reconciliation
   "source": "static-storefront",
   "storefront": "theos-farm",
   "schemaVersion": "2026-06-28",
-  "subtotalCents": "4400",
+  "subtotalCents": "4790",
   "itemsSummary": "ear-corn-20lb:1,ear-corn-40lb:1",
   "shippingZip": "62401"
 }

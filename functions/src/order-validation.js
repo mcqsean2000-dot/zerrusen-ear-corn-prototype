@@ -3,7 +3,7 @@
 const SOURCE = "static-storefront";
 const INITIAL_STATUS = "needs_review";
 const MAX_ITEM_QUANTITY = 50;
-const MIN_SUBTOTAL_CENTS = 1600;
+const MIN_SUBTOTAL_CENTS = 1795;
 const MAX_SUBTOTAL_CENTS = 84000;
 const SCHEMA_VERSION = "2026-06-28";
 
@@ -11,12 +11,12 @@ const PRODUCT_CATALOG = Object.freeze({
   "ear-corn-20lb": Object.freeze({
     name: "20 lb Ear Corn Bag",
     sku: "ear-corn-20lb",
-    unitPriceCents: 1600,
+    unitPriceCents: 1795,
   }),
   "ear-corn-40lb": Object.freeze({
     name: "40 lb Ear Corn Bag",
     sku: "ear-corn-40lb",
-    unitPriceCents: 2800,
+    unitPriceCents: 2995,
   }),
 });
 

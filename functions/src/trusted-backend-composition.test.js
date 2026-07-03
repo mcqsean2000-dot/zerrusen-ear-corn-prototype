@@ -16,13 +16,13 @@ const {
 const validOrderRequest = {
   source: "static-storefront",
   status: "needs_review",
-  subtotalCents: 1600,
+  subtotalCents: 1795,
   items: [
     {
       name: "20 lb Ear Corn Bag",
       sku: "ear-corn-20lb",
       quantity: 1,
-      unitPriceCents: 1600,
+      unitPriceCents: 1795,
     },
   ],
   customer: {

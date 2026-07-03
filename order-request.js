@@ -11,12 +11,12 @@
     "ear-corn-20lb": {
       name: "20 lb Ear Corn Bag",
       sku: "ear-corn-20lb",
-      unitPriceCents: 1600,
+      unitPriceCents: 1795,
     },
     "ear-corn-40lb": {
       name: "40 lb Ear Corn Bag",
       sku: "ear-corn-40lb",
-      unitPriceCents: 2800,
+      unitPriceCents: 2995,
     },
   };
 
@@ -146,7 +146,7 @@
       0
     );
 
-    if (subtotalCents < 1600 || subtotalCents > MAX_SUBTOTAL_CENTS) {
+    if (subtotalCents < 1795 || subtotalCents > MAX_SUBTOTAL_CENTS) {
       return {
         ok: false,
         message: "Adjust the cart quantity before requesting checkout.",

@@ -63,7 +63,7 @@ service cloud.firestore {
         && item.quantity >= 1
         && item.quantity <= 50
         && item.unitPriceCents is int
-        && item.unitPriceCents in [1600, 2800];
+        && item.unitPriceCents in [1795, 2995];
     }
 
     function hasValidItems() {
@@ -81,7 +81,7 @@ service cloud.firestore {
         && request.resource.data.status == 'needs_review'
         && request.resource.data.source == 'static-storefront'
         && request.resource.data.subtotalCents is int
-        && request.resource.data.subtotalCents >= 1600
+        && request.resource.data.subtotalCents >= 1795
         && request.resource.data.subtotalCents <= 84000
         && !('stripeCheckoutSessionId' in request.resource.data)
         && !('stripePaymentIntentId' in request.resource.data)

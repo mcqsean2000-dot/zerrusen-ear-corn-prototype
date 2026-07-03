@@ -19,7 +19,7 @@ const lineItems = [
     quantity: 2,
     price_data: {
       currency: "usd",
-      unit_amount: 1600,
+      unit_amount: 1795,
       product_data: {
         name: "20 lb Ear Corn Bag",
         metadata: {

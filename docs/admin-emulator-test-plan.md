@@ -63,19 +63,19 @@ Baseline valid order:
   "createdAt": "request.time",
   "source": "static-storefront",
   "status": "needs_review",
-  "subtotalCents": 4400,
+  "subtotalCents": 4790,
   "items": [
     {
       "name": "20 lb Ear Corn Bag",
       "sku": "ear-corn-20lb",
       "quantity": 1,
-      "unitPriceCents": 1600
+      "unitPriceCents": 1795
     },
     {
       "name": "40 lb Ear Corn Bag",
       "sku": "ear-corn-40lb",
       "quantity": 1,
-      "unitPriceCents": 2800
+      "unitPriceCents": 2995
     }
   ],
   "customer": {

@@ -388,6 +388,18 @@ h3 {
   font-size: 1.55rem;
 }
 
+.price-stack {
+  display: grid;
+  gap: 2px;
+}
+
+.price-stack span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .buy-row button,
 .quote-form button,
 .checkout-button {

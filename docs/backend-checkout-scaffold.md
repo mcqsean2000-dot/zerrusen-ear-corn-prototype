@@ -49,13 +49,13 @@ Stripe Checkout owns payment collection. Google Pay, Apple Pay, and Link availab
   "orderRequest": {
     "source": "static-storefront",
     "status": "needs_review",
-    "subtotalCents": 4400,
+    "subtotalCents": 4790,
     "items": [
       {
         "name": "20 lb Ear Corn Bag",
         "sku": "ear-corn-20lb",
         "quantity": 1,
-        "unitPriceCents": 1600
+        "unitPriceCents": 1795
       }
     ],
     "customer": {
