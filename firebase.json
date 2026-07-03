@@ -8,10 +8,16 @@
       "**/*.md",
       "**/node_modules/**",
       "docs/**",
+      "functions/**",
+      "admin.html",
+      "admin.css",
+      "admin.js",
       "firestore.rules",
       "firestore.indexes.json",
       "package.json",
-      "tools/**"
+      "tools/**",
+      "dist/**",
+      "**/*.zip"
     ],
     "headers": [
       {
