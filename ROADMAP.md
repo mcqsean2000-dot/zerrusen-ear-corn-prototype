@@ -46,6 +46,10 @@ Shipping package assumptions:
 - 20 lb bag ships as 29 in x 17 in x 5 in, 22 lb packed weight.
 - 40 lb bag ships as 32 in x 18 in x 8 in, 42 lb packed weight.
 - Multiple-bag orders should be rated as separate packages unless the client later confirms a combined-box workflow.
+- Ship-from ZIP is 62467.
+- Return address is the same as the ship-from address.
+- Use Shippo's USPS and UPS rates first.
+- Let customers choose from available shipping options.
 
 Content priorities:
 

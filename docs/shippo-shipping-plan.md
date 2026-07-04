@@ -7,6 +7,18 @@ This plan captures the approved Shippo direction for Theo's Farm. It does not ad
 - Use Shippo for live shipping rates, address validation, label purchase, tracking, and future admin fulfillment workflow.
 - Use Stripe Checkout for payment after the customer selects a shipping rate.
 - Keep shipping package dimensions server-owned. The storefront can display product prices and collect address/cart information, but it should not be trusted to choose package weight, dimensions, or shipping price.
+- Let customers choose from available shipping options instead of forcing cheapest-ground-only shipping.
+
+## Confirmed Shippo Setup
+
+- Ship-from ZIP: `62467`
+- Return address: same as ship-from address
+- Shippo account payment method: added
+- Package templates: created
+- Carrier direction: use Shippo's built-in U.S. Domestic rates for USPS and UPS first
+- Customer-facing rate display: customer chooses from returned shipping options
+
+The Shippo carrier screen shows USPS and UPS enabled with green toggles. If UPS still prompts for one-time activation during the first label purchase, complete that activation inside Shippo before launch testing.
 
 ## Product Package Specs
 
@@ -23,8 +35,8 @@ Initial assumption: multiple-bag orders should be rated as separate packages unl
 2. Customer enters full shipping address.
 3. Firebase Function validates cart items against the server catalog.
 4. Firebase Function maps each item quantity to package specs.
-5. Firebase Function calls Shippo for available rates.
-6. Storefront shows carrier/service/rate options.
+5. Firebase Function calls Shippo for available USPS/UPS rates.
+6. Storefront shows customer-safe carrier/service/rate options.
 7. Customer selects a rate.
 8. Firebase Function creates a Stripe Checkout Session for product subtotal plus selected shipping.
 9. Stripe webhook marks the order paid after checkout completes.
@@ -66,13 +78,12 @@ Package fields:
 
 ## Implementation Steps
 
-1. Confirm ship-from address and Shippo account owner.
-2. Create Shippo test/live API key under the client-controlled account.
-3. Add Firebase Function endpoint for shipping rate quotes.
-4. Add server-owned package specs and tests.
-5. Update storefront order form from ZIP-only to full shipping address.
-6. Show live Shippo rates before Stripe Checkout.
-7. Create Stripe Checkout Session using product subtotal plus selected shipping.
-8. Add admin label purchase endpoint.
-9. Add tracking and label fields to Firestore/admin views.
-10. Run test orders across nearby, regional, and far shipping ZIP codes before launch.
+1. Create Shippo test/live API key under the client-controlled account.
+2. Add Firebase Function endpoint for shipping rate quotes.
+3. Add server-owned package specs and tests.
+4. Update storefront order form from ZIP-only to full shipping address.
+5. Show customer-selectable live Shippo rates before Stripe Checkout.
+6. Create Stripe Checkout Session using product subtotal plus selected shipping.
+7. Add admin label purchase endpoint.
+8. Add tracking and label fields to Firestore/admin views.
+9. Run test orders across nearby, regional, and far shipping ZIP codes before launch.

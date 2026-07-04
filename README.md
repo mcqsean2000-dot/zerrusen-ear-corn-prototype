@@ -36,6 +36,10 @@ This repo currently contains a static prototype for the Theo's Farm direct-to-co
 
 - 20 lb Ear Corn Bag: $17.95 plus shipping, 29 in x 17 in x 5 in, 22 lb packed weight.
 - 40 lb Ear Corn Bag: $29.95 plus shipping, 32 in x 18 in x 8 in, 42 lb packed weight.
+- Ship-from ZIP: 62467.
+- Return address: same as ship-from address.
+- Initial carriers: Shippo USPS and UPS rates.
+- Shipping selection: customer chooses from available shipping options.
 - Multiple-bag orders should be rated as separate packages until the client confirms a combined-package workflow.
 
 ## Search / SEO Terms
