@@ -231,6 +231,14 @@ function resolveShippingRateCreator(options) {
 
 function buildDefaultShippingRateDependencies(env, options = {}) {
   return {
+    shipFromAddress: {
+      name: env.SHIP_FROM_NAME,
+      street1: env.SHIP_FROM_STREET1,
+      street2: env.SHIP_FROM_STREET2,
+      city: env.SHIP_FROM_CITY,
+      state: env.SHIP_FROM_STATE,
+      zip: env.SHIP_FROM_ZIP,
+    },
     createShippoShipment({ payload }) {
       return createShippoShipmentWithFetch({
         payload,
@@ -409,6 +417,7 @@ async function shippingRatesHandler(req, res, options = {}) {
     const result = await createRates({
       orderRequestDraft: body.orderRequest,
       shippingAddress: body.shippingAddress,
+      shipFromAddress: dependencies.shipFromAddress,
     });
 
     return sendJson(res, 200, result, corsHeaders);

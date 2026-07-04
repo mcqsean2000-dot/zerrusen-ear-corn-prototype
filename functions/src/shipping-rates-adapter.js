@@ -6,6 +6,7 @@ const {
 } = require("./order-validation");
 
 const SHIP_FROM_ZIP = "62467";
+const SHIP_FROM_STATE = "IL";
 const RATE_CURRENCY = "USD";
 const MAX_RATE_OPTIONS = 8;
 
@@ -160,11 +161,30 @@ function buildParcels(items) {
   return parcels;
 }
 
-function buildShippoShipmentPayload({ orderRequest, shippingAddress, parcels }) {
+function normalizeShipFromAddress(address = {}) {
+  return {
+    name: cleanText(address.name) || "Theo's Farm",
+    street1: cleanText(address.street1),
+    street2: cleanText(address.street2),
+    city: cleanText(address.city),
+    state: normalizeState(address.state) || SHIP_FROM_STATE,
+    zip: cleanText(address.zip) || SHIP_FROM_ZIP,
+    country: "US",
+  };
+}
+
+function buildShippoShipmentPayload({ orderRequest, shippingAddress, parcels, shipFromAddress }) {
+  const normalizedShipFrom = normalizeShipFromAddress(shipFromAddress);
+
   return {
     address_from: {
-      zip: SHIP_FROM_ZIP,
-      country: "US",
+      name: normalizedShipFrom.name,
+      street1: normalizedShipFrom.street1,
+      street2: normalizedShipFrom.street2,
+      city: normalizedShipFrom.city,
+      state: normalizedShipFrom.state,
+      zip: normalizedShipFrom.zip,
+      country: normalizedShipFrom.country,
     },
     address_to: {
       name: orderRequest.customer.name,
@@ -301,7 +321,7 @@ function getMissingShippingRateDependencies(dependencies = {}) {
   ].filter((name) => typeof dependencies[name] !== "function");
 }
 
-async function createShippingRates({ orderRequestDraft, shippingAddress, createShippoShipment }) {
+async function createShippingRates({ orderRequestDraft, shippingAddress, createShippoShipment, shipFromAddress }) {
   if (typeof createShippoShipment !== "function") {
     const error = new Error("Shipping rates require a trusted Shippo shipment creator.");
     error.code = "shipping_rate_dependency_missing";
@@ -331,6 +351,7 @@ async function createShippingRates({ orderRequestDraft, shippingAddress, createS
         orderRequest: orderValidation.orderRequest,
         shippingAddress: addressValidation.address,
         parcels: [parcel],
+        shipFromAddress,
       }),
     });
     packageRateGroups.push(filterCustomerRates(shipment && shipment.rates));
@@ -354,6 +375,7 @@ async function createShippingRates({ orderRequestDraft, shippingAddress, createS
 
 module.exports = {
   PACKAGE_CATALOG,
+  SHIP_FROM_STATE,
   SHIP_FROM_ZIP,
   buildParcels,
   buildShippoShipmentPayload,
@@ -361,5 +383,6 @@ module.exports = {
   createShippingRates,
   filterCustomerRates,
   getMissingShippingRateDependencies,
+  normalizeShipFromAddress,
   validateShippingAddress,
 };

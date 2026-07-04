@@ -9,6 +9,7 @@ const {
   createShippingRates,
   filterCustomerRates,
   getMissingShippingRateDependencies,
+  normalizeShipFromAddress,
   validateShippingAddress,
 } = require("./shipping-rates-adapter");
 
@@ -102,13 +103,36 @@ test("builds Shippo shipment payload with server-owned package specs", () => {
   const payload = buildShippoShipmentPayload({
     orderRequest: validOrderRequest,
     shippingAddress: validateShippingAddress(validAddress).address,
+    shipFromAddress: {
+      street1: "456 Farm Road",
+      city: "Teutopolis",
+      state: "IL",
+      zip: "62467",
+    },
   });
 
   assert.equal(payload.address_from.zip, "62467");
+  assert.equal(payload.address_from.street1, "456 Farm Road");
+  assert.equal(payload.address_from.city, "Teutopolis");
   assert.equal(payload.address_to.street1, "123 Oak Street");
   assert.equal(payload.address_to.state, "IL");
   assert.equal(payload.parcels.length, 2);
   assert.equal(payload.async, false);
+});
+
+test("normalizes ship-from address with 62467 fallback", () => {
+  const address = normalizeShipFromAddress({
+    name: " Theo's Farm ",
+    street1: " 456 Farm Road ",
+    city: " Teutopolis ",
+    state: " il ",
+  });
+
+  assert.equal(address.name, "Theo's Farm");
+  assert.equal(address.street1, "456 Farm Road");
+  assert.equal(address.city, "Teutopolis");
+  assert.equal(address.state, "IL");
+  assert.equal(address.zip, "62467");
 });
 
 test("filters express rates and sorts customer-safe rates cheapest first", () => {
@@ -146,6 +170,12 @@ test("creates shipping rates through injected Shippo dependency", async () => {
   const result = await createShippingRates({
     orderRequestDraft: validOrderRequest,
     shippingAddress: validAddress,
+    shipFromAddress: {
+      street1: "456 Farm Road",
+      city: "Teutopolis",
+      state: "IL",
+      zip: "62467",
+    },
     createShippoShipment({ payload }) {
       receivedPayload = payload;
       payloads.push(payload);
