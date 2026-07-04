@@ -10,10 +10,13 @@ const checkoutButton = document.querySelector("[data-checkout-button]");
 const orderForm = document.querySelector("[data-order-form]");
 const orderSummary = document.querySelector("[data-order-summary]");
 const orderStatus = document.querySelector("[data-order-status]");
+const shippingRatesContainer = document.querySelector("[data-shipping-rates]");
 const orderRequests = window.TheosOrderRequests;
 const checkoutConfig = window.TheosCheckoutConfig || {};
 const orderSubmitButton = orderForm.querySelector('button[type="submit"]');
 const checkoutFailureMessage = "Checkout could not be started. Please try again or contact Theo's Farm.";
+const shippingRatesFailureMessage = "Shipping rates could not be calculated. Please check the address or contact Theo's Farm.";
+let selectedShippingRate = null;
 
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -88,8 +91,8 @@ function isLocalCheckoutEndpoint(url) {
   return url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname);
 }
 
-function getCheckoutEndpoint() {
-  const rawEndpoint = String(checkoutConfig.checkoutEndpoint || "").trim();
+function getTrustedEndpoint(configKey) {
+  const rawEndpoint = String(checkoutConfig[configKey] || "").trim();
 
   if (!rawEndpoint || /^replace-with-/i.test(rawEndpoint)) {
     return "";
@@ -105,6 +108,43 @@ function getCheckoutEndpoint() {
   }
 
   return "";
+}
+
+function getCheckoutEndpoint() {
+  return getTrustedEndpoint("checkoutEndpoint");
+}
+
+function getShippingRatesEndpoint() {
+  return getTrustedEndpoint("shippingRatesEndpoint");
+}
+
+function clearSelectedShippingRate() {
+  selectedShippingRate = null;
+  shippingRatesContainer.hidden = true;
+  shippingRatesContainer.innerHTML = "";
+}
+
+function getOrderFormInput() {
+  const formData = new FormData(orderForm);
+  const shippingAddress = {
+    addressLine1: formData.get("addressLine1"),
+    addressLine2: formData.get("addressLine2"),
+    city: formData.get("city"),
+    state: formData.get("state"),
+    zip: formData.get("zip"),
+  };
+
+  return {
+    cart,
+    customer: {
+      name: formData.get("name"),
+      contact: formData.get("contact"),
+      shippingZip: shippingAddress.zip,
+      preferredContact: formData.get("contactMethod"),
+      note: formData.get("note"),
+    },
+    shippingAddress,
+  };
 }
 
 function isValidCheckoutHandoff(payload) {
@@ -131,6 +171,81 @@ function isValidCheckoutHandoff(payload) {
   } catch (error) {
     return false;
   }
+}
+
+function isValidShippingRatesPayload(payload) {
+  return (
+    payload &&
+    typeof payload === "object" &&
+    Array.isArray(payload.rates) &&
+    payload.rates.every((rate) =>
+      rate &&
+      typeof rate === "object" &&
+      typeof rate.rateId === "string" &&
+      typeof rate.provider === "string" &&
+      typeof rate.serviceName === "string" &&
+      Number.isInteger(rate.amountCents) &&
+      rate.currency === "USD"
+    )
+  );
+}
+
+function shippingRateLabel(rate) {
+  return rate.provider + " " + rate.serviceName;
+}
+
+function renderShippingRates(rates) {
+  shippingRatesContainer.hidden = false;
+  shippingRatesContainer.innerHTML = [
+    "<strong>Choose shipping</strong>",
+    ...rates.map((rate, index) => `
+      <label class="shipping-rate-option">
+        <input type="radio" name="shippingRate" value="${rate.rateId}" ${index === 0 ? "checked" : ""}>
+        <span>
+          <strong>${shippingRateLabel(rate)}</strong>
+          <small>${rate.durationTerms || "Estimated delivery shown by carrier"}</small>
+        </span>
+        <strong>${formatCents(rate.amountCents)}</strong>
+      </label>
+    `),
+  ].join("");
+
+  selectedShippingRate = rates[0] || null;
+
+  shippingRatesContainer.querySelectorAll('input[name="shippingRate"]').forEach((input) => {
+    input.addEventListener("change", () => {
+      selectedShippingRate = rates.find((rate) => rate.rateId === input.value) || null;
+      if (selectedShippingRate) {
+        orderStatus.textContent = shippingRateLabel(selectedShippingRate) + " selected. Stripe checkout will be enabled after the Stripe account is ready.";
+      }
+    });
+  });
+}
+
+async function requestShippingRates(endpoint, rateRequest) {
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      orderRequest: rateRequest.orderRequest,
+      shippingAddress: rateRequest.shippingAddress,
+    }),
+  });
+
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch (error) {
+    payload = null;
+  }
+
+  if (!response.ok || !isValidShippingRatesPayload(payload)) {
+    throw new Error("shipping_rates_unavailable");
+  }
+
+  return payload;
 }
 
 async function requestCheckoutSession(endpoint, orderRequest) {
@@ -169,6 +284,7 @@ document.querySelectorAll("[data-add-to-cart]").forEach((button) => {
       cart.push({ sku, name, unitPriceCents, quantity: 1 });
     }
 
+    clearSelectedShippingRate();
     orderStatus.textContent = "";
     renderCart();
     openCart();
@@ -186,26 +302,38 @@ checkoutButton.addEventListener("click", () => {
 orderForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
-  const formData = new FormData(orderForm);
-  const result = orderRequests.buildOrderRequest({
-    cart,
-    customer: {
-      name: formData.get("name"),
-      contact: formData.get("contact"),
-      shippingZip: formData.get("zip"),
-      preferredContact: formData.get("contactMethod"),
-      note: formData.get("note"),
-    },
-  });
+  const result = orderRequests.buildShippingRateRequest(getOrderFormInput());
 
   if (!result.ok) {
     orderStatus.textContent = result.message;
     return;
   }
 
+  const shippingRatesEndpoint = getShippingRatesEndpoint();
+  if (!selectedShippingRate) {
+    if (!shippingRatesEndpoint) {
+      orderStatus.textContent = "Shipping-rate lookup is not connected yet. Theo's Farm can still confirm shipping manually.";
+      return;
+    }
+
+    orderSubmitButton.disabled = true;
+    orderStatus.textContent = "Calculating live shipping rates...";
+
+    try {
+      const payload = await requestShippingRates(shippingRatesEndpoint, result);
+      renderShippingRates(payload.rates);
+      orderStatus.textContent = "Choose a shipping option. Stripe checkout will be enabled after the Stripe account is ready.";
+    } catch (error) {
+      orderStatus.textContent = shippingRatesFailureMessage;
+    } finally {
+      orderSubmitButton.disabled = false;
+    }
+    return;
+  }
+
   const checkoutEndpoint = getCheckoutEndpoint();
   if (!checkoutEndpoint) {
-    orderStatus.textContent = result.message;
+    orderStatus.textContent = shippingRateLabel(selectedShippingRate) + " selected. Stripe checkout will be enabled after the Stripe account is ready.";
     return;
   }
 
@@ -219,6 +347,14 @@ orderForm.addEventListener("submit", async (event) => {
     orderStatus.textContent = checkoutFailureMessage;
     orderSubmitButton.disabled = false;
   }
+});
+
+orderForm.addEventListener("input", (event) => {
+  if (event.target && event.target.name === "shippingRate") {
+    return;
+  }
+  clearSelectedShippingRate();
+  orderStatus.textContent = "";
 });
 
 cartDrawer.addEventListener("click", (event) => {

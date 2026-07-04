@@ -247,7 +247,7 @@
       <section class="section delivery" id="delivery" aria-labelledby="delivery-title">
         <div>
           <p class="eyebrow">Fulfillment concept</p>
-          <h2 id="delivery-title">Start an order request, then finish payment through Stripe.</h2>
+          <h2 id="delivery-title">Check shipping options before payment.</h2>
           <p>This prototype now collects buyer intent, shipping details, and the cart subtotal before handing payment off to Stripe Checkout. Theo's Farm should not collect or store raw card details on this static site.</p>
         </div>
         <form class="quote-form" data-order-form novalidate>
@@ -265,8 +265,26 @@
             <input type="text" name="contact" placeholder="Best contact" required>
           </label>
           <label>
+            Street address
+            <input type="text" name="addressLine1" autocomplete="shipping address-line1" placeholder="Street address" required>
+          </label>
+          <label>
+            Address line 2
+            <input type="text" name="addressLine2" autocomplete="shipping address-line2" placeholder="Apartment, suite, or delivery note">
+          </label>
+          <div class="address-grid">
+            <label>
+              City
+              <input type="text" name="city" autocomplete="shipping address-level2" placeholder="City" required>
+            </label>
+            <label>
+              State
+              <input type="text" name="state" autocomplete="shipping address-level1" maxlength="2" placeholder="IL" required>
+            </label>
+          </div>
+          <label>
             Shipping ZIP
-            <input type="text" name="zip" inputmode="numeric" autocomplete="postal-code" pattern="[0-9]{5}" placeholder="62401" required>
+            <input type="text" name="zip" inputmode="numeric" autocomplete="shipping postal-code" pattern="[0-9]{5}" placeholder="62401" required>
           </label>
           <label>
             Preferred contact method
@@ -279,10 +297,11 @@
           </label>
           <label>
             Order note
-            <textarea name="note" rows="4" placeholder="Delivery address, timing, or bulk quantity"></textarea>
+            <textarea name="note" rows="4" placeholder="Timing, special instructions, or bulk quantity"></textarea>
           </label>
-          <p class="payment-note">Payment should be completed through Stripe Checkout after shipping details are confirmed. This prototype prepares the order request only; live submission needs trusted Shippo and checkout endpoints.</p>
-          <button type="submit">Request checkout link</button>
+          <div class="shipping-rates" data-shipping-rates hidden></div>
+          <p class="payment-note">Shipping rates are calculated through Shippo from the farm's 62467 ship-from ZIP. Payment will be completed through Stripe Checkout after the Stripe account is ready.</p>
+          <button type="submit">Get shipping rates</button>
           <p class="form-status" data-order-status role="status" aria-live="polite"></p>
         </form>
       </section>

@@ -1,6 +1,6 @@
 # Shippo Shipping Plan
 
-This plan captures the approved Shippo direction for Theo's Farm. It does not add live Shippo calls, secrets, label purchases, or checkout behavior yet.
+This plan captures the approved Shippo direction for Theo's Farm. Live Shippo rate quoting is implemented. Label purchases and Stripe payment handoff are still future work.
 
 ## Direction
 
@@ -78,12 +78,18 @@ Package fields:
 
 ## Implementation Steps
 
-1. Create Shippo test/live API key under the client-controlled account.
-2. Add Firebase Function endpoint for shipping rate quotes.
-3. Add server-owned package specs and tests.
-4. Update storefront order form from ZIP-only to full shipping address.
-5. Show customer-selectable live Shippo rates before Stripe Checkout.
-6. Create Stripe Checkout Session using product subtotal plus selected shipping.
-7. Add admin label purchase endpoint.
-8. Add tracking and label fields to Firestore/admin views.
-9. Run test orders across nearby, regional, and far shipping ZIP codes before launch.
+Completed:
+
+- Created Shippo API token as Firebase secret `SHIPPO_API_TOKEN`.
+- Added Firebase HTTPS function route `POST /api/shipping-rates`.
+- Added server-owned package specs and tests.
+- Updated storefront order form from ZIP-only to full shipping address.
+- Show customer-selectable live Shippo rates before Stripe Checkout.
+
+Remaining:
+
+1. Create Stripe account and credentials when the client account is ready.
+2. Create Stripe Checkout Session using product subtotal plus selected shipping.
+3. Add admin label purchase endpoint.
+4. Add tracking and label fields to Firestore/admin views.
+5. Run test orders across nearby, regional, and far shipping ZIP codes before launch.

@@ -68,6 +68,12 @@ Current recommendation:
 - Start with customer-selected live rates at checkout, then let the admin buy labels after reviewing paid orders.
 - Do not automatically buy labels immediately after payment until real fulfillment patterns are proven.
 
+Implemented:
+
+- `POST /api/shipping-rates` calculates live Shippo rates from server-owned package specs.
+- Storefront collects full shipping address and lets customers choose a returned shipping option.
+- Stripe payment is still disabled until the client's Stripe account is ready.
+
 Checkout shipping flow:
 
 1. Customer enters full shipping address.
@@ -188,7 +194,7 @@ Build order:
 1. Confirm domain.
 2. Move static prototype into production app structure.
 3. Build product catalog and checkout flow.
-4. Add Shippo rate quoting from server-owned package specs.
+4. Add Shippo rate quoting from server-owned package specs. Done.
 5. Add Stripe Checkout with selected shipping.
 6. Add order persistence.
 7. Add Stripe webhooks.

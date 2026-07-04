@@ -15,7 +15,7 @@ This repo currently contains a static prototype for the Theo's Farm direct-to-co
 - Fulfillment: shipping only. No local pickup.
 - Shipping direction: Shippo for live rates, address validation, labels, and tracking.
 - Payments direction: Stripe Checkout with Google Pay enabled through Stripe.
-- Storefront flow: cart selections feed a prototype order request form before the future Stripe Checkout handoff.
+- Storefront flow: cart selections feed a shipping address form, live Shippo rate lookup, and customer-selected shipping option before the future Stripe Checkout handoff.
 - Public hosting direction: Firebase Hosting.
 - Firebase/Firestore/Functions are the selected production foundation because the same Firebase ecosystem is already used for EasiTask and Debris Locator.
 - Old Zerrusen Farms informational site should remain separate from Theo's Farm as a separate business/site.
@@ -89,7 +89,7 @@ Natural search phrases to keep in mind:
 ## Important Notes
 
 - Current prices are placeholders and should be confirmed before launch.
-- Current cart is only a prototype interaction. It is not connected to payment processing, inventory, orders, email, or shipping.
+- Current cart is connected to live Shippo shipping-rate lookup, but not yet connected to payment processing, inventory, order persistence, email, or label purchase.
 - Keep `checkout-config.js` blank until a trusted backend endpoint is ready. For Firebase Hosting, set only the public checkout session URL there, never secrets.
 - Do not store raw payment information in the app. Use Stripe-hosted payment collection and Stripe customer/payment method IDs.
 - Public Firestore writes are limited to validated order request creation. Payment status and Stripe IDs should be written only by trusted backend code.

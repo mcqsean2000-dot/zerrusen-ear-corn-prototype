@@ -14,6 +14,13 @@ const {
   buildTrustedOrderRequestForCreate,
   validateOrderRequestDraft,
 } = require("./order-validation");
+const {
+  createShippingRates,
+  getMissingShippingRateDependencies,
+} = require("./shipping-rates-adapter");
+const {
+  createShippoShipmentWithFetch,
+} = require("./shippo-api-adapter");
 
 const CHECKOUT_ENV_KEYS = [
   "CORS_ALLOWED_ORIGINS",
@@ -25,6 +32,10 @@ const CHECKOUT_ENV_KEYS = [
 
 const WEBHOOK_ENV_KEYS = [
   "STRIPE_WEBHOOK_SIGNING_SECRET",
+];
+
+const SHIPPING_RATE_ENV_KEYS = [
+  "SHIPPO_API_TOKEN",
 ];
 
 function isPlaceholder(value) {
@@ -203,6 +214,33 @@ function resolveStripeEventHandler(options) {
   return null;
 }
 
+function resolveShippingRateCreator(options) {
+  if (typeof options.createShippingRates === "function") {
+    return options.createShippingRates;
+  }
+
+  if (options.shippingRateDependencies) {
+    return (args) => createShippingRates({
+      ...args,
+      ...options.shippingRateDependencies,
+    });
+  }
+
+  return null;
+}
+
+function buildDefaultShippingRateDependencies(env, options = {}) {
+  return {
+    createShippoShipment({ payload }) {
+      return createShippoShipmentWithFetch({
+        payload,
+        token: env.SHIPPO_API_TOKEN,
+        fetchImpl: options.fetchImpl || fetch,
+      });
+    },
+  };
+}
+
 async function checkoutSessionsHandler(req, res, options = {}) {
   const env = options.env || process.env;
   const corsHeaders = buildCorsHeaders(req, env);
@@ -303,6 +341,100 @@ async function checkoutSessionsHandler(req, res, options = {}) {
       error: {
         code: "checkout_creation_failed",
         message: "Checkout could not be started. Please try again or contact Theo's Farm.",
+      },
+    }, corsHeaders);
+  }
+}
+
+async function shippingRatesHandler(req, res, options = {}) {
+  const env = options.env || process.env;
+  const corsHeaders = buildCorsHeaders(req, env);
+
+  if (req.method === "OPTIONS") {
+    return sendCorsPreflight(req, res, env);
+  }
+
+  if (req.method !== "POST") {
+    return sendJson(res, 405, {
+      error: {
+        code: "method_not_allowed",
+        message: "Use POST to request shipping rates.",
+      },
+    }, { allow: "POST, OPTIONS", ...corsHeaders });
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(req);
+  } catch (error) {
+    return sendJson(res, 400, {
+      error: {
+        code: "invalid_json",
+        message: "Send a valid JSON shipping rate request.",
+      },
+    }, corsHeaders);
+  }
+
+  const missingEnv = getMissingEnv(env, SHIPPING_RATE_ENV_KEYS);
+  if (missingEnv.length) {
+    return sendJson(res, 503, {
+      error: {
+        code: "shipping_rates_disabled",
+        message: "Live shipping rates are not enabled yet.",
+      },
+      mock: true,
+      ...safeSetupDetails(env, missingEnv),
+    }, corsHeaders);
+  }
+
+  const dependencies = options.shippingRateDependencies || buildDefaultShippingRateDependencies(env, options);
+  const missingDependencies = getMissingShippingRateDependencies(dependencies);
+  if (missingDependencies.length) {
+    return sendJson(res, 501, {
+      error: {
+        code: "shipping_rate_dependency_missing",
+        message: "Shipping rates require a trusted Shippo adapter.",
+      },
+      mock: true,
+      ...safeSetupDetails(env, missingDependencies),
+    }, corsHeaders);
+  }
+
+  const createRates = resolveShippingRateCreator({
+    ...options,
+    shippingRateDependencies: dependencies,
+  });
+
+  try {
+    const result = await createRates({
+      orderRequestDraft: body.orderRequest,
+      shippingAddress: body.shippingAddress,
+    });
+
+    return sendJson(res, 200, result, corsHeaders);
+  } catch (error) {
+    if (error.code === "invalid_shipping_rate_request") {
+      return sendJson(res, 400, {
+        error: {
+          code: "invalid_shipping_rate_request",
+          message: "Check the cart and shipping address before calculating rates.",
+        },
+      }, corsHeaders);
+    }
+
+    if (error.code === "shipping_rates_unavailable") {
+      return sendJson(res, 404, {
+        error: {
+          code: "shipping_rates_unavailable",
+          message: "No supported shipping rates were returned for this address.",
+        },
+      }, corsHeaders);
+    }
+
+    return sendJson(res, 502, {
+      error: {
+        code: "shipping_rates_failed",
+        message: "Shipping rates could not be calculated. Please try again or contact Theo's Farm.",
       },
     }, corsHeaders);
   }
@@ -417,6 +549,10 @@ function routeRequest(req, res, options = {}) {
     return checkoutSessionsHandler(req, res, options);
   }
 
+  if (path === "/api/shipping-rates") {
+    return shippingRatesHandler(req, res, options);
+  }
+
   if (path === "/api/stripe/webhook") {
     return stripeWebhookHandler(req, res, options);
   }
@@ -448,10 +584,13 @@ if (require.main === module) {
 module.exports = {
   buildCorsHeaders,
   checkoutSessionsHandler,
+  buildDefaultShippingRateDependencies,
   resolveStripeEventHandler,
   resolveCheckoutSessionCreator,
+  resolveShippingRateCreator,
   readJsonBody,
   readRawBody,
   routeRequest,
+  shippingRatesHandler,
   stripeWebhookHandler,
 };

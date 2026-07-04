@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
   checkoutSessionsHandler,
+  shippingRatesHandler,
   stripeWebhookHandler,
 } = require("./index");
 
@@ -40,6 +41,11 @@ const configuredEnv = {
   STRIPE_SECRET_KEY: "sk_test_configured_for_unit_tests",
   STRIPE_SUCCESS_URL: "https://theos.example/checkout/success?session_id={CHECKOUT_SESSION_ID}",
   STRIPE_WEBHOOK_SIGNING_SECRET: "whsec_configured_for_unit_tests",
+};
+
+const configuredShippingEnv = {
+  CORS_ALLOWED_ORIGINS: "https://theos.example",
+  SHIPPO_API_TOKEN: "shippo_test_configured_for_unit_tests",
 };
 
 function mockReq({ method = "POST", headers = {}, body = {} } = {}) {
@@ -204,6 +210,74 @@ test("webhook handler returns disabled mock response when signing secret is miss
 
   assert.equal(res.statusCode, 503);
   assert.equal(parseJson(res).error.code, "webhook_disabled");
+});
+
+test("shipping rates handler returns disabled response when Shippo token is missing", async () => {
+  const req = mockReq({
+    body: {
+      orderRequest: validOrderRequest,
+      shippingAddress: {
+        addressLine1: "123 Oak Street",
+        city: "Effingham",
+        state: "IL",
+        zip: "62401",
+      },
+    },
+  });
+  const res = mockRes();
+
+  await shippingRatesHandler(req, res, { env: {} });
+
+  assert.equal(res.statusCode, 503);
+  assert.equal(parseJson(res).error.code, "shipping_rates_disabled");
+});
+
+test("shipping rates handler returns customer-safe Shippo rate options", async () => {
+  const req = mockReq({
+    headers: { origin: "https://theos.example" },
+    body: {
+      orderRequest: validOrderRequest,
+      shippingAddress: {
+        addressLine1: "123 Oak Street",
+        city: "Effingham",
+        state: "IL",
+        zip: "62401",
+      },
+    },
+  });
+  const res = mockRes();
+
+  await shippingRatesHandler(req, res, {
+    env: configuredShippingEnv,
+    shippingRateDependencies: {
+      createShippoShipment({ payload }) {
+        assert.equal(payload.address_from.zip, "62467");
+        assert.equal(payload.address_to.zip, "62401");
+        return {
+          rates: [
+            {
+              object_id: "rate_123",
+              provider: "UPS",
+              servicelevel: {
+                name: "Ground",
+                token: "ups_ground",
+              },
+              amount: "18.42",
+              currency: "USD",
+              estimated_days: 2,
+              duration_terms: "2 business days",
+            },
+          ],
+        };
+      },
+    },
+  });
+
+  const body = parseJson(res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers["access-control-allow-origin"], "https://theos.example");
+  assert.equal(body.rates[0].rateId, "rate_123");
+  assert.equal(body.rates[0].amountCents, 1842);
 });
 
 test("webhook handler requires Stripe signature after env is configured", async () => {

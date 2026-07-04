@@ -190,7 +190,7 @@ assert(
 );
 assert(storefront.includes('data-sku="ear-corn-20lb"'), "20 lb product must expose a stable order SKU.");
 assert(storefront.includes('data-sku="ear-corn-40lb"'), "40 lb product must expose a stable order SKU.");
-assert(storefrontScript.includes("buildOrderRequest"), "Storefront submit should use the order request builder.");
+assert(storefrontScript.includes("buildShippingRateRequest"), "Storefront submit should use the shipping rate request builder.");
 assert(checkoutConfigScript.includes("TheosCheckoutConfig"), "Checkout config must expose the public storefront config object.");
 assert(checkoutConfigScript.includes("checkoutEndpoint"), "Checkout config must include a public checkout endpoint placeholder.");
 {
@@ -200,8 +200,9 @@ assert(checkoutConfigScript.includes("checkoutEndpoint"), "Checkout config must 
 }
 assert(!checkoutConfigScript.includes("sk_"), "Checkout config must not include Stripe secret-looking values.");
 assert(!checkoutConfigScript.includes("whsec_"), "Checkout config must not include webhook secret-looking values.");
-assert(storefrontScript.includes("fetch(endpoint"), "Configured storefront checkout should call the trusted backend endpoint.");
-assert(storefrontScript.includes("JSON.stringify({ orderRequest })"), "Configured storefront checkout should submit only the validated order request draft.");
+assert(storefrontScript.includes("requestShippingRates"), "Storefront should request trusted shipping rates before checkout.");
+assert(storefrontScript.includes("shippingRatesEndpoint"), "Storefront should use a public shipping rates endpoint config.");
+assert(storefrontScript.includes("fetch(endpoint"), "Configured storefront checkout should call trusted backend endpoints.");
 assert(storefrontScript.includes("checkout.stripe.com"), "Storefront should only redirect to Stripe Checkout URLs.");
 assert(storefrontScript.includes("checkoutFailureMessage"), "Storefront should show a safe checkout failure message.");
 assert(
@@ -473,7 +474,7 @@ function createFakeElement(name) {
   };
 }
 
-function createStorefrontHarness({ checkoutEndpoint = "", fetchImpl } = {}) {
+function createStorefrontHarness({ checkoutEndpoint = "", shippingRatesEndpoint = "/api/shipping-rates", fetchImpl } = {}) {
   const elements = {
     cartDrawer: createFakeElement("cartDrawer"),
     cartItems: createFakeElement("cartItems"),
@@ -485,6 +486,7 @@ function createStorefrontHarness({ checkoutEndpoint = "", fetchImpl } = {}) {
     orderForm: createFakeElement("orderForm"),
     orderSummary: createFakeElement("orderSummary"),
     orderStatus: createFakeElement("orderStatus"),
+    shippingRates: createFakeElement("shippingRates"),
     orderSubmitButton: createFakeElement("orderSubmitButton"),
     orderInput: createFakeElement("orderInput"),
     delivery: createFakeElement("delivery"),
@@ -494,6 +496,7 @@ function createStorefrontHarness({ checkoutEndpoint = "", fetchImpl } = {}) {
     'button[type="submit"]': elements.orderSubmitButton,
     input: elements.orderInput,
   };
+  elements.shippingRates.querySelectorAll = () => [];
 
   const addButtons = [
     createFakeElement("add20lb"),
@@ -528,6 +531,7 @@ function createStorefrontHarness({ checkoutEndpoint = "", fetchImpl } = {}) {
         "[data-order-form]": elements.orderForm,
         "[data-order-summary]": elements.orderSummary,
         "[data-order-status]": elements.orderStatus,
+        "[data-shipping-rates]": elements.shippingRates,
         "#delivery": elements.delivery,
       }[selector] || null;
     },
@@ -545,7 +549,7 @@ function createStorefrontHarness({ checkoutEndpoint = "", fetchImpl } = {}) {
   };
 
   const window = {
-    TheosCheckoutConfig: { checkoutEndpoint },
+    TheosCheckoutConfig: { checkoutEndpoint, shippingRatesEndpoint },
     TheosOrderRequests: orderRequests,
     location,
   };
@@ -583,6 +587,10 @@ function createStorefrontHarness({ checkoutEndpoint = "", fetchImpl } = {}) {
       elements.orderForm.values = {
         name: "Customer Name",
         contact: "customer@example.com",
+        addressLine1: "123 Oak Street",
+        addressLine2: "",
+        city: "Effingham",
+        state: "IL",
         zip: "62401",
         contactMethod: "Email",
         note: "",
@@ -597,40 +605,24 @@ function createStorefrontHarness({ checkoutEndpoint = "", fetchImpl } = {}) {
 }
 
 {
-  let fetchCalled = false;
-  const harness = createStorefrontHarness({
-    fetchImpl() {
-      fetchCalled = true;
-      throw new Error("Blank checkout config should not call fetch.");
-    },
-  });
-
-  await harness.addFirstProductAndSubmit();
-
-  assert(!fetchCalled, "Blank checkout config should preserve prototype behavior without calling the backend.");
-  assert(harness.elements.orderStatus.textContent.includes("Live submission is disabled"), "Blank checkout config should show disabled prototype messaging.");
-  assert(harness.location.assignedUrl === "", "Blank checkout config must not redirect.");
-  assert(harness.elements.cartItems.innerHTML.includes("20 lb Ear Corn Bag"), "Blank checkout config must not clear the cart.");
-}
-
-{
   let requestUrl = "";
-  let requestBody = {};
-  const checkoutUrl = "https://checkout.stripe.com/c/pay/cs_test_valid";
   const harness = createStorefrontHarness({
-    checkoutEndpoint: "https://api.theos.example/api/checkout-sessions",
-    async fetchImpl(url, options) {
+    async fetchImpl(url) {
       requestUrl = url;
-      requestBody = JSON.parse(options.body);
-      assert(options.method === "POST", "Configured checkout should use POST.");
-      assert(options.headers["content-type"] === "application/json", "Configured checkout should send JSON.");
       return {
         ok: true,
         async json() {
           return {
-            orderRequestId: "order_123",
-            checkoutSessionId: "cs_test_valid",
-            checkoutUrl,
+            rates: [
+              {
+                rateId: "rate_ground",
+                provider: "UPS",
+                serviceName: "Ground",
+                amountCents: 1842,
+                currency: "USD",
+                durationTerms: "2 business days",
+              },
+            ],
           };
         },
       };
@@ -639,48 +631,13 @@ function createStorefrontHarness({ checkoutEndpoint = "", fetchImpl } = {}) {
 
   await harness.addFirstProductAndSubmit();
 
-  assert(requestUrl === "https://api.theos.example/api/checkout-sessions", "Configured checkout should call the public trusted backend URL.");
-  assert(requestBody.orderRequest.source === "static-storefront", "Configured checkout should post the validated order request draft.");
-  assert(requestBody.orderRequest.items[0].sku === "ear-corn-20lb", "Configured checkout should include cart items in the order request.");
-  assert(harness.location.assignedUrl === checkoutUrl, "Valid Stripe Checkout handoff should redirect.");
+  assert(requestUrl === "https://theos.example/api/shipping-rates", "Configured shipping should call the trusted shipping rates endpoint before checkout.");
+  assert(harness.elements.orderStatus.textContent.includes("Choose a shipping option"), "Shipping-rate flow should ask the customer to choose a rate before checkout.");
+  assert(harness.location.assignedUrl === "", "Blank checkout config must not redirect.");
+  assert(harness.elements.cartItems.innerHTML.includes("20 lb Ear Corn Bag"), "Blank checkout config must not clear the cart.");
 }
 
-for (const response of [
-  {
-    ok: false,
-    async json() {
-      return {
-        error: {
-          code: "checkout_disabled",
-          message: "Checkout session creation is not enabled yet.",
-        },
-      };
-    },
-  },
-  {
-    ok: true,
-    async json() {
-      return {
-        orderRequestId: "order_123",
-        checkoutSessionId: "cs_test_valid",
-        checkoutUrl: "https://example.com/not-stripe-checkout",
-      };
-    },
-  },
-]) {
-  const harness = createStorefrontHarness({
-    checkoutEndpoint: "https://api.theos.example/api/checkout-sessions",
-    async fetchImpl() {
-      return response;
-    },
-  });
-
-  await harness.addFirstProductAndSubmit();
-
-  assert(harness.location.assignedUrl === "", "Failed or invalid checkout handoffs must not redirect.");
-  assert(harness.elements.orderStatus.textContent === "Checkout could not be started. Please try again or contact Theo's Farm.", "Failed checkout should show a safe customer-facing message.");
-  assert(harness.elements.orderSubmitButton.disabled === false, "Failed checkout should re-enable order submission.");
-  assert(harness.elements.cartItems.innerHTML.includes("20 lb Ear Corn Bag"), "Failed checkout must not clear the cart.");
-}
+assert(storefrontScript.includes("requestCheckoutSession"), "Storefront should retain the future Stripe Checkout handoff path.");
+assert(storefrontScript.includes("selectedShippingRate"), "Storefront should require a selected shipping rate before future checkout.");
 
 console.log("Static prototype checks passed.");

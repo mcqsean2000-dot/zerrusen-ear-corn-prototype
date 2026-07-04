@@ -478,6 +478,12 @@ h3 {
   background: #fbfaf6;
 }
 
+.address-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  gap: 12px;
+}
+
 .order-summary {
   display: grid;
   gap: 8px;
@@ -485,6 +491,40 @@ h3 {
   background: #fbfaf6;
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+.shipping-rates {
+  display: grid;
+  gap: 10px;
+}
+
+.shipping-rates[hidden] {
+  display: none;
+}
+
+.shipping-rate-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 13px;
+  background: #fbfaf6;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.shipping-rate-option input {
+  width: auto;
+}
+
+.shipping-rate-option strong,
+.shipping-rate-option span {
+  display: block;
+}
+
+.shipping-rate-option small {
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .order-summary p,
@@ -684,6 +724,11 @@ footer strong {
   .secondary-action,
   .buy-row button {
     width: 100%;
+  }
+
+  .address-grid,
+  .shipping-rate-option {
+    grid-template-columns: 1fr;
   }
 
   .product-body,

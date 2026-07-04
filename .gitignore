@@ -1,4 +1,6 @@
 zerrusen-ear-corn-prototype.zip
+node_modules/
+**/node_modules/
 .env
 .env.*
 !.env.example

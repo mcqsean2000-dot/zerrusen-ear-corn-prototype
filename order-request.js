@@ -176,8 +176,78 @@
     };
   }
 
+  function normalizeShippingAddress(address) {
+    const normalized = {
+      addressLine1: cleanText(address && address.addressLine1),
+      city: cleanText(address && address.city),
+      state: cleanText(address && address.state).toUpperCase(),
+      zip: cleanText(address && address.zip),
+    };
+
+    const addressLine2 = cleanText(address && address.addressLine2);
+    if (addressLine2) {
+      normalized.addressLine2 = addressLine2;
+    }
+
+    return normalized;
+  }
+
+  function validateShippingAddress(address) {
+    if (!address.addressLine1 || !address.city || !address.state || !address.zip) {
+      return "Add the full shipping address before calculating rates.";
+    }
+
+    if (address.addressLine1.length > 140 || (address.addressLine2 && address.addressLine2.length > 140)) {
+      return "Use a shorter shipping street address.";
+    }
+
+    if (address.city.length > 80) {
+      return "Use a shorter shipping city.";
+    }
+
+    if (!/^[A-Z]{2}$/.test(address.state)) {
+      return "Use a 2-letter state code for shipping.";
+    }
+
+    if (!/^\d{5}$/.test(address.zip)) {
+      return "Enter a 5-digit shipping ZIP.";
+    }
+
+    return "";
+  }
+
+  function buildShippingRateRequest(input) {
+    const shippingAddress = normalizeShippingAddress(input && input.shippingAddress);
+    const orderResult = buildOrderRequest({
+      cart: input && input.cart,
+      customer: {
+        ...(input && input.customer),
+        shippingZip: shippingAddress.zip,
+      },
+    });
+
+    if (!orderResult.ok) {
+      return orderResult;
+    }
+
+    const addressError = validateShippingAddress(shippingAddress);
+    if (addressError) {
+      return {
+        ok: false,
+        message: addressError,
+      };
+    }
+
+    return {
+      ok: true,
+      orderRequest: orderResult.payload,
+      shippingAddress,
+    };
+  }
+
   return {
     PRODUCT_CATALOG,
     buildOrderRequest,
+    buildShippingRateRequest,
   };
 });
