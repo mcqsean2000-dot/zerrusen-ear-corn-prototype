@@ -631,6 +631,24 @@ h3 {
   color: var(--muted);
 }
 
+.cart-line-actions {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+.cart-line-actions button {
+  min-height: 0;
+  padding: 0;
+  color: var(--rust);
+  background: transparent;
+  border-radius: 0;
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .cart-total {
   display: flex;
   justify-content: space-between;

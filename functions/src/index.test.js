@@ -276,8 +276,8 @@ test("shipping rates handler returns customer-safe Shippo rate options", async (
   const body = parseJson(res);
   assert.equal(res.statusCode, 200);
   assert.equal(res.headers["access-control-allow-origin"], "https://theos.example");
-  assert.equal(body.rates[0].rateId, "rate_123");
-  assert.equal(body.rates[0].amountCents, 1842);
+  assert.equal(body.rates[0].rateId, "[\"rate_123\",\"rate_123\"]");
+  assert.equal(body.rates[0].amountCents, 3684);
 });
 
 test("webhook handler requires Stripe signature after env is configured", async () => {

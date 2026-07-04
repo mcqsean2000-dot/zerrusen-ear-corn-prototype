@@ -465,6 +465,16 @@ function createFakeElement(name) {
     querySelector(selector) {
       return this.children?.[selector] || null;
     },
+    querySelectorAll(selector) {
+      if (selector === "[data-remove-cart-item]") {
+        return [...this.innerHTML.matchAll(/data-remove-cart-item="([^"]+)"/g)].map((match) => {
+          const element = createFakeElement(`remove-${match[1]}`);
+          element.dataset.removeCartItem = match[1];
+          return element;
+        });
+      }
+      return [];
+    },
     scrollIntoView() {
       this.scrolled = true;
     },

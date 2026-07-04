@@ -5,6 +5,7 @@ const test = require("node:test");
 const {
   buildParcels,
   buildShippoShipmentPayload,
+  combineMatchingPackageRates,
   createShippingRates,
   filterCustomerRates,
   getMissingShippingRateDependencies,
@@ -121,24 +122,47 @@ test("filters express rates and sorts customer-safe rates cheapest first", () =>
   assert.equal(rates[0].amountCents, 1750);
 });
 
+test("combines matching per-package rates into customer-facing totals", () => {
+  const combined = combineMatchingPackageRates([
+    filterCustomerRates([
+      shippoRate({ object_id: "rate_20_ups", amount: "18.42" }),
+      shippoRate({ object_id: "rate_20_usps", provider: "USPS", servicelevel: { name: "Ground Advantage", token: "usps_ground_advantage" }, amount: "24.36" }),
+    ]),
+    filterCustomerRates([
+      shippoRate({ object_id: "rate_40_ups", amount: "25.00" }),
+      shippoRate({ object_id: "rate_40_usps", provider: "USPS", servicelevel: { name: "Ground Advantage", token: "usps_ground_advantage" }, amount: "35.00" }),
+    ]),
+  ]);
+
+  assert.equal(combined[0].provider, "UPS");
+  assert.equal(combined[0].amountCents, 4342);
+  assert.deepEqual(combined[0].packageRateIds, ["rate_20_ups", "rate_40_ups"]);
+  assert.equal(combined[0].packageCount, 2);
+});
+
 test("creates shipping rates through injected Shippo dependency", async () => {
   let receivedPayload = null;
+  const payloads = [];
   const result = await createShippingRates({
     orderRequestDraft: validOrderRequest,
     shippingAddress: validAddress,
     createShippoShipment({ payload }) {
       receivedPayload = payload;
+      payloads.push(payload);
       return {
         rates: [
-          shippoRate({ object_id: "rate_ground_low", provider: "USPS", servicelevel: { name: "Ground Advantage", token: "usps_ground_advantage" }, amount: "17.50" }),
+          shippoRate({ object_id: `rate_ground_low_${payloads.length}`, provider: "USPS", servicelevel: { name: "Ground Advantage", token: "usps_ground_advantage" }, amount: "17.50" }),
         ],
       };
     },
   });
 
   assert.equal(receivedPayload.address_from.zip, "62467");
+  assert.equal(payloads.length, 2);
+  assert.equal(payloads[0].parcels.length, 1);
   assert.equal(result.packageCount, 2);
-  assert.equal(result.rates[0].rateId, "rate_ground_low");
+  assert.equal(result.rates[0].amountCents, 3500);
+  assert.deepEqual(result.rates[0].packageRateIds, ["rate_ground_low_1", "rate_ground_low_2"]);
 });
 
 test("reports missing shipping rate dependencies", () => {

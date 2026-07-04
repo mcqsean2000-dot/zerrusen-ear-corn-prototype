@@ -80,11 +80,20 @@ function renderCart() {
             <strong>${item.name}</strong>
             <small>Qty ${item.quantity} x ${formatCents(item.unitPriceCents)}</small>
           </span>
-          <strong>${formatCents(item.unitPriceCents * item.quantity)}</strong>
+          <span class="cart-line-actions">
+            <strong>${formatCents(item.unitPriceCents * item.quantity)}</strong>
+            <button type="button" data-remove-cart-item="${item.sku}" aria-label="Remove ${item.name} from cart">Remove</button>
+          </span>
         </div>
       `
     )
     .join("");
+
+  cartItems.querySelectorAll("[data-remove-cart-item]").forEach((button) => {
+    button.addEventListener("click", () => {
+      removeCartItem(button.dataset.removeCartItem);
+    });
+  });
 }
 
 function isLocalCheckoutEndpoint(url) {
@@ -122,6 +131,18 @@ function clearSelectedShippingRate() {
   selectedShippingRate = null;
   shippingRatesContainer.hidden = true;
   shippingRatesContainer.innerHTML = "";
+}
+
+function removeCartItem(sku) {
+  const index = cart.findIndex((item) => item.sku === sku);
+  if (index < 0) {
+    return;
+  }
+
+  cart.splice(index, 1);
+  clearSelectedShippingRate();
+  orderStatus.textContent = "";
+  renderCart();
 }
 
 function getOrderFormInput() {

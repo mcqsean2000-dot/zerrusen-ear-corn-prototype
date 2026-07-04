@@ -160,7 +160,7 @@ function buildParcels(items) {
   return parcels;
 }
 
-function buildShippoShipmentPayload({ orderRequest, shippingAddress }) {
+function buildShippoShipmentPayload({ orderRequest, shippingAddress, parcels }) {
   return {
     address_from: {
       zip: SHIP_FROM_ZIP,
@@ -175,7 +175,7 @@ function buildShippoShipmentPayload({ orderRequest, shippingAddress }) {
       zip: shippingAddress.zip,
       country: "US",
     },
-    parcels: buildParcels(orderRequest.items),
+    parcels: parcels || buildParcels(orderRequest.items),
     async: false,
   };
 }
@@ -249,6 +249,52 @@ function filterCustomerRates(rates) {
   return (groundRates.length ? groundRates : normalizedRates).slice(0, MAX_RATE_OPTIONS);
 }
 
+function combineMatchingPackageRates(packageRateGroups) {
+  if (!packageRateGroups.length) {
+    return [];
+  }
+
+  const combined = new Map();
+  const firstGroup = packageRateGroups[0];
+
+  for (const rate of firstGroup) {
+    const key = `${rate.provider}|${rate.serviceToken || rate.serviceName}`;
+    combined.set(key, {
+      ...rate,
+      rateId: JSON.stringify([rate.rateId]),
+      amountCents: rate.amountCents,
+      packageRateIds: [rate.rateId],
+      packageCount: 1,
+    });
+  }
+
+  for (const group of packageRateGroups.slice(1)) {
+    const groupByKey = new Map(group.map((rate) => [`${rate.provider}|${rate.serviceToken || rate.serviceName}`, rate]));
+
+    for (const [key, rate] of [...combined.entries()]) {
+      const nextRate = groupByKey.get(key);
+      if (!nextRate) {
+        combined.delete(key);
+        continue;
+      }
+
+      combined.set(key, {
+        ...rate,
+        amountCents: rate.amountCents + nextRate.amountCents,
+        estimatedDays: Math.max(rate.estimatedDays || 0, nextRate.estimatedDays || 0) || null,
+        durationTerms: rate.durationTerms || nextRate.durationTerms,
+        packageRateIds: [...rate.packageRateIds, nextRate.rateId],
+        packageCount: rate.packageCount + 1,
+        rateId: JSON.stringify([...rate.packageRateIds, nextRate.rateId]),
+      });
+    }
+  }
+
+  return [...combined.values()]
+    .sort((left, right) => left.amountCents - right.amountCents)
+    .slice(0, MAX_RATE_OPTIONS);
+}
+
 function getMissingShippingRateDependencies(dependencies = {}) {
   return [
     "createShippoShipment",
@@ -276,13 +322,21 @@ async function createShippingRates({ orderRequestDraft, shippingAddress, createS
     throw error;
   }
 
-  const shipment = await createShippoShipment({
-    payload: buildShippoShipmentPayload({
-      orderRequest: orderValidation.orderRequest,
-      shippingAddress: addressValidation.address,
-    }),
-  });
-  const rates = filterCustomerRates(shipment && shipment.rates);
+  const parcels = buildParcels(orderValidation.orderRequest.items);
+  const packageRateGroups = [];
+
+  for (const parcel of parcels) {
+    const shipment = await createShippoShipment({
+      payload: buildShippoShipmentPayload({
+        orderRequest: orderValidation.orderRequest,
+        shippingAddress: addressValidation.address,
+        parcels: [parcel],
+      }),
+    });
+    packageRateGroups.push(filterCustomerRates(shipment && shipment.rates));
+  }
+
+  const rates = combineMatchingPackageRates(packageRateGroups);
 
   if (!rates.length) {
     const error = new Error("Shippo returned no supported customer shipping rates.");
@@ -293,7 +347,7 @@ async function createShippingRates({ orderRequestDraft, shippingAddress, createS
   return {
     shipFromZip: SHIP_FROM_ZIP,
     shippingAddress: addressValidation.address,
-    packageCount: buildParcels(orderValidation.orderRequest.items).length,
+    packageCount: parcels.length,
     rates,
   };
 }
@@ -303,6 +357,7 @@ module.exports = {
   SHIP_FROM_ZIP,
   buildParcels,
   buildShippoShipmentPayload,
+  combineMatchingPackageRates,
   createShippingRates,
   filterCustomerRates,
   getMissingShippingRateDependencies,
