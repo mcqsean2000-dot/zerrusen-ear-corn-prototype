@@ -178,6 +178,7 @@ assert(storefront.includes('"sku": "ear-corn-40lb"'), "Structured data must incl
 assert(robots.includes("Sitemap: https://theosfarm.com/sitemap.xml"), "robots.txt must point crawlers at the production sitemap.");
 assert(sitemap.includes("<loc>https://theosfarm.com/</loc>"), "sitemap.xml must list the production storefront URL.");
 assert(storefront.includes("data-order-form"), "Storefront purchase request form is missing.");
+assert(storefront.includes("data-checkout-result"), "Storefront checkout return status region is missing.");
 assert(storefront.includes("order-request.js"), "Storefront must load the order request integration layer.");
 assert(storefront.includes("checkout-config.js"), "Storefront must load the public checkout config placeholder.");
 assert(
@@ -205,6 +206,9 @@ assert(storefrontScript.includes("shippingRatesEndpoint"), "Storefront should us
 assert(storefrontScript.includes("fetch(endpoint"), "Configured storefront checkout should call trusted backend endpoints.");
 assert(storefrontScript.includes("checkout.stripe.com"), "Storefront should only redirect to Stripe Checkout URLs.");
 assert(storefrontScript.includes("checkoutFailureMessage"), "Storefront should show a safe checkout failure message.");
+assert(storefrontScript.includes("renderCheckoutReturnState"), "Storefront should render Stripe Checkout return status.");
+assert(storefrontScript.includes("/checkout/success"), "Storefront should recognize the Stripe success return path.");
+assert(storefrontScript.includes("/checkout/cancel"), "Storefront should recognize the Stripe cancel return path.");
 assert(
   !storefrontScript.toLowerCase().includes("firebase") &&
     !orderRequestScript.toLowerCase().includes("firebase") &&
@@ -484,7 +488,7 @@ function createFakeElement(name) {
   };
 }
 
-function createStorefrontHarness({ checkoutEndpoint = "", shippingRatesEndpoint = "/api/shipping-rates", fetchImpl } = {}) {
+function createStorefrontHarness({ checkoutEndpoint = "", href = "https://theos.example/", shippingRatesEndpoint = "/api/shipping-rates", fetchImpl } = {}) {
   const elements = {
     cartDrawer: createFakeElement("cartDrawer"),
     cartItems: createFakeElement("cartItems"),
@@ -497,6 +501,11 @@ function createStorefrontHarness({ checkoutEndpoint = "", shippingRatesEndpoint 
     orderSummary: createFakeElement("orderSummary"),
     orderStatus: createFakeElement("orderStatus"),
     shippingRates: createFakeElement("shippingRates"),
+    checkoutResult: createFakeElement("checkoutResult"),
+    checkoutResultKicker: createFakeElement("checkoutResultKicker"),
+    checkoutResultTitle: createFakeElement("checkoutResultTitle"),
+    checkoutResultCopy: createFakeElement("checkoutResultCopy"),
+    checkoutResultReference: createFakeElement("checkoutResultReference"),
     orderSubmitButton: createFakeElement("orderSubmitButton"),
     orderInput: createFakeElement("orderInput"),
     delivery: createFakeElement("delivery"),
@@ -507,6 +516,8 @@ function createStorefrontHarness({ checkoutEndpoint = "", shippingRatesEndpoint 
     input: elements.orderInput,
   };
   elements.shippingRates.querySelectorAll = () => [];
+  elements.checkoutResult.hidden = true;
+  elements.checkoutResultReference.hidden = true;
 
   const addButtons = [
     createFakeElement("add20lb"),
@@ -542,6 +553,11 @@ function createStorefrontHarness({ checkoutEndpoint = "", shippingRatesEndpoint 
         "[data-order-summary]": elements.orderSummary,
         "[data-order-status]": elements.orderStatus,
         "[data-shipping-rates]": elements.shippingRates,
+        "[data-checkout-result]": elements.checkoutResult,
+        "[data-checkout-result-kicker]": elements.checkoutResultKicker,
+        "[data-checkout-result-title]": elements.checkoutResultTitle,
+        "[data-checkout-result-copy]": elements.checkoutResultCopy,
+        "[data-checkout-result-reference]": elements.checkoutResultReference,
         "#delivery": elements.delivery,
       }[selector] || null;
     },
@@ -551,7 +567,7 @@ function createStorefrontHarness({ checkoutEndpoint = "", shippingRatesEndpoint 
   };
 
   const location = {
-    href: "https://theos.example/",
+    href,
     assignedUrl: "",
     assign(url) {
       this.assignedUrl = url;
@@ -615,6 +631,34 @@ function createStorefrontHarness({ checkoutEndpoint = "", shippingRatesEndpoint 
       await this.submitOrder(values);
     },
   };
+}
+
+{
+  const harness = createStorefrontHarness();
+
+  assert(harness.elements.checkoutResult.hidden === true, "Checkout return status should stay hidden on the storefront home page.");
+}
+
+{
+  const harness = createStorefrontHarness({
+    href: "https://theos.example/zerrusen-ear-corn-prototype/checkout/success?session_id=cs_test_1234567890abcdef",
+  });
+
+  assert(harness.elements.checkoutResult.hidden === false, "Checkout success return should reveal the status region.");
+  assert(harness.elements.checkoutResult.scrolled === true, "Checkout success return should scroll the status region into view.");
+  assert(harness.elements.checkoutResult.focused === true, "Checkout success return should focus the status region for accessibility.");
+  assert(harness.elements.checkoutResultTitle.textContent.includes("payment is being confirmed"), "Checkout success should explain payment confirmation.");
+  assert(harness.elements.checkoutResultReference.textContent.includes("90abcdef"), "Checkout success should show only a short Stripe reference.");
+}
+
+{
+  const harness = createStorefrontHarness({
+    href: "https://theos.example/checkout/cancel",
+  });
+
+  assert(harness.elements.checkoutResult.hidden === false, "Checkout cancel return should reveal the status region.");
+  assert(harness.elements.checkoutResultTitle.textContent.includes("cart is still here"), "Checkout cancel should tell the customer the cart can be reviewed.");
+  assert(harness.elements.checkoutResultReference.hidden === true, "Checkout cancel should not show a Stripe reference.");
 }
 
 {

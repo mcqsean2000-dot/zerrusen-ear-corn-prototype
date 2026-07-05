@@ -11,6 +11,11 @@ const orderForm = document.querySelector("[data-order-form]");
 const orderSummary = document.querySelector("[data-order-summary]");
 const orderStatus = document.querySelector("[data-order-status]");
 const shippingRatesContainer = document.querySelector("[data-shipping-rates]");
+const checkoutResult = document.querySelector("[data-checkout-result]");
+const checkoutResultKicker = document.querySelector("[data-checkout-result-kicker]");
+const checkoutResultTitle = document.querySelector("[data-checkout-result-title]");
+const checkoutResultCopy = document.querySelector("[data-checkout-result-copy]");
+const checkoutResultReference = document.querySelector("[data-checkout-result-reference]");
 const orderRequests = window.TheosOrderRequests;
 const checkoutConfig = window.TheosCheckoutConfig || {};
 const orderSubmitButton = orderForm.querySelector('button[type="submit"]');
@@ -45,6 +50,66 @@ function openCart() {
 function closeCart() {
   cartDrawer.classList.remove("is-open");
   cartDrawer.setAttribute("aria-hidden", "true");
+}
+
+function getCheckoutReturnState() {
+  const url = new URL(window.location.href);
+  const path = url.pathname.replace(/\/+$/, "");
+
+  if (path.endsWith("/checkout/success") || url.searchParams.get("checkout") === "success") {
+    return {
+      type: "success",
+      sessionId: String(url.searchParams.get("session_id") || "").trim(),
+    };
+  }
+
+  if (path.endsWith("/checkout/cancel") || url.searchParams.get("checkout") === "cancel") {
+    return {
+      type: "cancel",
+      sessionId: "",
+    };
+  }
+
+  return {
+    type: "",
+    sessionId: "",
+  };
+}
+
+function shortCheckoutReference(sessionId) {
+  if (!/^cs_/.test(sessionId)) {
+    return "";
+  }
+
+  return sessionId.length > 16 ? "Stripe reference ending " + sessionId.slice(-8) : "Stripe reference received";
+}
+
+function renderCheckoutReturnState() {
+  const state = getCheckoutReturnState();
+
+  if (!state.type) {
+    return;
+  }
+
+  checkoutResult.hidden = false;
+  checkoutResult.scrollIntoView({ block: "start", behavior: "smooth" });
+  checkoutResult.focus({ preventScroll: true });
+
+  if (state.type === "success") {
+    checkoutResultKicker.textContent = "Checkout received";
+    checkoutResultTitle.textContent = "Thanks, your payment is being confirmed.";
+    checkoutResultCopy.textContent = "Stripe has sent the checkout result back to Theo's Farm. The order will move into fulfillment after the trusted webhook confirms payment.";
+    const reference = shortCheckoutReference(state.sessionId);
+    checkoutResultReference.hidden = !reference;
+    checkoutResultReference.textContent = reference;
+    return;
+  }
+
+  checkoutResultKicker.textContent = "Checkout paused";
+  checkoutResultTitle.textContent = "Your cart is still here.";
+  checkoutResultCopy.textContent = "Checkout was canceled before payment. You can review the order details, choose shipping again if needed, and return to Stripe Checkout when ready.";
+  checkoutResultReference.hidden = true;
+  checkoutResultReference.textContent = "";
 }
 
 function renderOrderSummary(subtotalCents) {
@@ -403,4 +468,5 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+renderCheckoutReturnState();
 renderCart();
