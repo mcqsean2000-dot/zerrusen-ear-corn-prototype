@@ -72,7 +72,8 @@ Implemented:
 
 - `POST /api/shipping-rates` calculates live Shippo rates from server-owned package specs.
 - Storefront collects full shipping address and lets customers choose a returned shipping option.
-- Stripe payment is still disabled until the client's Stripe account is ready.
+- Checkout handoff now carries the selected shipping rate and backend code re-rates it server-side before Stripe Checkout.
+- Stripe payment remains disabled in public config until the client's Stripe account and production endpoint are ready.
 
 Checkout shipping flow:
 
@@ -195,7 +196,7 @@ Build order:
 2. Move static prototype into production app structure.
 3. Build product catalog and checkout flow.
 4. Add Shippo rate quoting from server-owned package specs. Done.
-5. Add Stripe Checkout with selected shipping.
+5. Add Stripe Checkout with selected shipping. Backend handoff implemented; production credentials/config still pending.
 6. Add order persistence.
 7. Add Stripe webhooks.
 8. Build admin fulfillment dashboard.
