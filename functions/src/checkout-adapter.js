@@ -21,7 +21,7 @@ function getCustomerEmail(orderRequest) {
 function buildLineItems(orderRequest, options = {}) {
   const currency = String(options.currency || DEFAULT_CURRENCY).toLowerCase();
 
-  return orderRequest.items.map((item) => ({
+  const lineItems = orderRequest.items.map((item) => ({
     quantity: item.quantity,
     price_data: {
       currency,
@@ -34,6 +34,25 @@ function buildLineItems(orderRequest, options = {}) {
       },
     },
   }));
+
+  if (Number.isInteger(orderRequest.shippingAmountCents) && orderRequest.shippingAmountCents > 0) {
+    lineItems.push({
+      quantity: 1,
+      price_data: {
+        currency,
+        unit_amount: orderRequest.shippingAmountCents,
+        product_data: {
+          name: `Shipping - ${orderRequest.shippingCarrier} ${orderRequest.shippingService}`.trim(),
+          metadata: {
+            type: "shipping",
+            rateId: String(orderRequest.shippingRateId || ""),
+          },
+        },
+      },
+    });
+  }
+
+  return lineItems;
 }
 
 function buildCheckoutSessionParams({ env, orderRequest, orderRequestId }) {

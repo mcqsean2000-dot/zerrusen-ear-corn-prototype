@@ -184,6 +184,39 @@ function parseJson(res) {
   return res.body ? JSON.parse(res.body) : {};
 }
 
+function validShippingCheckoutFields() {
+  return {
+    shippingAddress: {
+      addressLine1: "123 Oak Street",
+      city: "Effingham",
+      state: "IL",
+      zip: "62401",
+    },
+    selectedShippingRate: {
+      rateId: "rate_ground",
+    },
+  };
+}
+
+function createFakeShippingRates() {
+  return {
+    shippingAddress: validShippingCheckoutFields().shippingAddress,
+    rates: [
+      {
+        rateId: "rate_ground",
+        provider: "UPS",
+        serviceName: "Ground",
+        amountCents: 4342,
+        currency: "USD",
+        estimatedDays: 2,
+        durationTerms: "2 business days",
+        packageRateIds: ["rate_20", "rate_40"],
+        packageCount: 2,
+      },
+    ],
+  };
+}
+
 function collectionDocs(firestore, name) {
   return firestore.collection(name).docs;
 }
@@ -248,12 +281,13 @@ test("checkout handler starts a fake Stripe session through composed dependencie
       return "SERVER_TIMESTAMP";
     },
   });
-  const req = mockReq({ body: { orderRequest: validOrderRequest } });
+  const req = mockReq({ body: { orderRequest: validOrderRequest, ...validShippingCheckoutFields() } });
   const res = mockRes();
 
   await checkoutSessionsHandler(req, res, {
     env: configuredEnv,
     ...composition,
+    createShippingRates: createFakeShippingRates,
   });
 
   const body = parseJson(res);
@@ -271,6 +305,16 @@ test("checkout handler starts a fake Stripe session through composed dependencie
     stripeCheckoutSessionId: "cs_test_composed",
     stripePaymentIntentId: "pi_test_composed",
     stripeCustomerId: "cus_test_composed",
+    shippingAddress: validShippingCheckoutFields().shippingAddress,
+    shippingRateId: "rate_ground",
+    shippingCarrier: "UPS",
+    shippingService: "Ground",
+    shippingAmountCents: 4342,
+    shippingCurrency: "USD",
+    shippingEstimatedDays: 2,
+    shippingDurationTerms: "2 business days",
+    shippingPackageRateIds: ["rate_20", "rate_40"],
+    shippingPackageCount: 2,
   });
 });
 
@@ -284,9 +328,9 @@ test("webhook handler verifies a fake event and updates fake storage through com
     },
   });
   await checkoutSessionsHandler(
-    mockReq({ body: { orderRequest: validOrderRequest } }),
+    mockReq({ body: { orderRequest: validOrderRequest, ...validShippingCheckoutFields() } }),
     mockRes(),
-    { env: configuredEnv, ...composition },
+    { env: configuredEnv, ...composition, createShippingRates: createFakeShippingRates },
   );
 
   const event = {

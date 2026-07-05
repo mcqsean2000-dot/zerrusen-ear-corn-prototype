@@ -195,6 +195,39 @@ function parseJson(res) {
   return res.body ? JSON.parse(res.body) : {};
 }
 
+function validShippingCheckoutFields() {
+  return {
+    shippingAddress: {
+      addressLine1: "123 Oak Street",
+      city: "Effingham",
+      state: "IL",
+      zip: "62401",
+    },
+    selectedShippingRate: {
+      rateId: "rate_ground",
+    },
+  };
+}
+
+function createFakeShippingRates() {
+  return {
+    shippingAddress: validShippingCheckoutFields().shippingAddress,
+    rates: [
+      {
+        rateId: "rate_ground",
+        provider: "UPS",
+        serviceName: "Ground",
+        amountCents: 4342,
+        currency: "USD",
+        estimatedDays: 2,
+        durationTerms: "2 business days",
+        packageRateIds: ["rate_20", "rate_40"],
+        packageCount: 2,
+      },
+    ],
+  };
+}
+
 test("runtime guard reports missing env and injected runtime capabilities without exposing values", () => {
   assert.deepEqual(getMissingRuntimeEnv({
     ...configuredEnv,
@@ -254,7 +287,12 @@ test("runtime guard composes checkout handler options with injected fake clients
   });
   const res = mockRes();
 
-  await checkoutSessionsHandler(mockReq({ body: { orderRequest: validOrderRequest } }), res, runtime);
+  await checkoutSessionsHandler(mockReq({
+    body: { orderRequest: validOrderRequest, ...validShippingCheckoutFields() },
+  }), res, {
+    ...runtime,
+    createShippingRates: createFakeShippingRates,
+  });
 
   const body = parseJson(res);
   const order = firestore.collection("runtimeOrders").docs.get("runtimeOrders_1");
@@ -274,7 +312,12 @@ test("runtime guard composes webhook handler options with injected fake clients"
       return "SERVER_TIMESTAMP";
     },
   });
-  await checkoutSessionsHandler(mockReq({ body: { orderRequest: validOrderRequest } }), mockRes(), runtime);
+  await checkoutSessionsHandler(mockReq({
+    body: { orderRequest: validOrderRequest, ...validShippingCheckoutFields() },
+  }), mockRes(), {
+    ...runtime,
+    createShippingRates: createFakeShippingRates,
+  });
 
   const event = {
     id: "evt_runtime",

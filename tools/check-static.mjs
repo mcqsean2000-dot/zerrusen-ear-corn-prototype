@@ -592,8 +592,7 @@ function createStorefrontHarness({ checkoutEndpoint = "", shippingRatesEndpoint 
     addButtons,
     elements,
     location,
-    async addFirstProductAndSubmit(values = {}) {
-      addButtons[0].listeners.click[0]();
+    async submitOrder(values = {}) {
       elements.orderForm.values = {
         name: "Customer Name",
         contact: "customer@example.com",
@@ -610,6 +609,10 @@ function createStorefrontHarness({ checkoutEndpoint = "", shippingRatesEndpoint 
       await elements.orderForm.listeners.submit[0]({
         preventDefault() {},
       });
+    },
+    async addFirstProductAndSubmit(values = {}) {
+      addButtons[0].listeners.click[0]();
+      await this.submitOrder(values);
     },
   };
 }
@@ -645,6 +648,56 @@ function createStorefrontHarness({ checkoutEndpoint = "", shippingRatesEndpoint 
   assert(harness.elements.orderStatus.textContent.includes("Choose a shipping option"), "Shipping-rate flow should ask the customer to choose a rate before checkout.");
   assert(harness.location.assignedUrl === "", "Blank checkout config must not redirect.");
   assert(harness.elements.cartItems.innerHTML.includes("20 lb Ear Corn Bag"), "Blank checkout config must not clear the cart.");
+}
+
+{
+  const requests = [];
+  const harness = createStorefrontHarness({
+    checkoutEndpoint: "/api/checkout-sessions",
+    async fetchImpl(url, options) {
+      requests.push({ url, body: JSON.parse(options.body) });
+      if (url.endsWith("/api/shipping-rates")) {
+        return {
+          ok: true,
+          async json() {
+            return {
+              rates: [
+                {
+                  rateId: "[\"rate_20\",\"rate_40\"]",
+                  provider: "UPS",
+                  serviceName: "Ground",
+                  amountCents: 4342,
+                  currency: "USD",
+                  durationTerms: "2 business days",
+                },
+              ],
+            };
+          },
+        };
+      }
+
+      return {
+        ok: true,
+        async json() {
+          return {
+            orderRequestId: "order_123",
+            checkoutSessionId: "cs_test_123",
+            checkoutUrl: "https://checkout.stripe.com/c/pay/cs_test_123",
+          };
+        },
+      };
+    },
+  });
+
+  await harness.addFirstProductAndSubmit();
+  await harness.submitOrder();
+
+  assert(requests.length === 2, "Storefront should request rates before requesting checkout.");
+  assert(requests[1].url === "https://theos.example/api/checkout-sessions", "Storefront should call the trusted checkout endpoint after rate selection.");
+  assert(requests[1].body.orderRequest.subtotalCents === 1795, "Checkout request must include the prepared order request.");
+  assert(requests[1].body.shippingAddress.zip === "62401", "Checkout request must include the shipping address used for re-rating.");
+  assert(requests[1].body.selectedShippingRate.rateId === "[\"rate_20\",\"rate_40\"]", "Checkout request must include the selected shipping rate id.");
+  assert(harness.location.assignedUrl === "https://checkout.stripe.com/c/pay/cs_test_123", "Valid checkout handoff should redirect to Stripe Checkout.");
 }
 
 assert(storefrontScript.includes("requestCheckoutSession"), "Storefront should retain the future Stripe Checkout handoff path.");

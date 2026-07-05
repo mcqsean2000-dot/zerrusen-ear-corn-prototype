@@ -67,6 +67,16 @@ const TRUSTED_ORDER_FIELDS = Object.freeze([
   "readyToPackAt",
   "refundedAt",
   "shippedAt",
+  "shippingAddress",
+  "shippingAmountCents",
+  "shippingCarrier",
+  "shippingCurrency",
+  "shippingDurationTerms",
+  "shippingEstimatedDays",
+  "shippingPackageCount",
+  "shippingPackageRateIds",
+  "shippingRateId",
+  "shippingService",
   "stripeCheckoutSessionId",
   "stripeCustomerId",
   "stripePaymentIntentId",
@@ -307,11 +317,29 @@ function buildStripeMetadata(orderRequest, orderRequestId) {
   };
 }
 
+function withoutUndefinedFields(value) {
+  return Object.fromEntries(Object.entries(value).filter(([, fieldValue]) => fieldValue !== undefined));
+}
+
 function buildTrustedOrderRequestForCreate(orderRequest, options = {}) {
   const serverTimestamp = options.serverTimestamp || "FIRESTORE_SERVER_TIMESTAMP_REQUIRED";
+  const shippingSelection = options.shippingSelection || {};
+  const shippingFields = shippingSelection.rate ? withoutUndefinedFields({
+    shippingAddress: shippingSelection.shippingAddress,
+    shippingRateId: shippingSelection.rate.rateId,
+    shippingCarrier: shippingSelection.rate.provider,
+    shippingService: shippingSelection.rate.serviceName,
+    shippingAmountCents: shippingSelection.rate.amountCents,
+    shippingCurrency: shippingSelection.rate.currency,
+    shippingEstimatedDays: shippingSelection.rate.estimatedDays,
+    shippingDurationTerms: shippingSelection.rate.durationTerms,
+    shippingPackageRateIds: shippingSelection.rate.packageRateIds,
+    shippingPackageCount: shippingSelection.rate.packageCount,
+  }) : {};
 
   return {
     ...orderRequest,
+    ...shippingFields,
     createdAt: serverTimestamp,
     paymentStatus: "unpaid",
     checkoutStatus: "open",

@@ -82,6 +82,37 @@ test("checkout session params use server-owned line items and safe metadata", ()
   assert.equal(Object.prototype.hasOwnProperty.call(params.metadata, "contact"), false);
 });
 
+test("checkout session params include server-verified shipping as a line item", () => {
+  const params = buildCheckoutSessionParams({
+    env,
+    orderRequest: {
+      ...trustedOrderRequest,
+      shippingRateId: "[\"rate_20\",\"rate_40\"]",
+      shippingCarrier: "UPS",
+      shippingService: "Ground",
+      shippingAmountCents: 4342,
+      shippingCurrency: "USD",
+    },
+    orderRequestId: "order_123",
+  });
+
+  assert.equal(params.line_items.length, 3);
+  assert.deepEqual(params.line_items[2], {
+    quantity: 1,
+    price_data: {
+      currency: "usd",
+      unit_amount: 4342,
+      product_data: {
+        name: "Shipping - UPS Ground",
+        metadata: {
+          type: "shipping",
+          rateId: "[\"rate_20\",\"rate_40\"]",
+        },
+      },
+    },
+  });
+});
+
 test("checkout adapter is disabled without injected trusted dependencies", async () => {
   const adapter = createCheckoutSessionAdapter();
 
