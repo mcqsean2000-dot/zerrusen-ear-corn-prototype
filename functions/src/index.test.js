@@ -46,6 +46,10 @@ const configuredEnv = {
 const configuredShippingEnv = {
   CORS_ALLOWED_ORIGINS: "https://theos.example",
   SHIPPO_API_TOKEN: "shippo_test_configured_for_unit_tests",
+  SHIP_FROM_STREET1: "456 Farm Road",
+  SHIP_FROM_CITY: "Teutopolis",
+  SHIP_FROM_STATE: "IL",
+  SHIP_FROM_ZIP: "62467",
 };
 
 function mockReq({ method = "POST", headers = {}, body = {} } = {}) {
@@ -73,6 +77,39 @@ function mockRes() {
 
 function parseJson(res) {
   return res.body ? JSON.parse(res.body) : {};
+}
+
+function validShippingCheckoutFields(selectedRateId = "rate_ground") {
+  return {
+    shippingAddress: {
+      addressLine1: "123 Oak Street",
+      city: "Effingham",
+      state: "IL",
+      zip: "62401",
+    },
+    selectedShippingRate: {
+      rateId: selectedRateId,
+    },
+  };
+}
+
+function createFakeShippingRates() {
+  return {
+    shippingAddress: validShippingCheckoutFields().shippingAddress,
+    rates: [
+      {
+        rateId: "rate_ground",
+        provider: "UPS",
+        serviceName: "Ground",
+        amountCents: 4342,
+        currency: "USD",
+        estimatedDays: 2,
+        durationTerms: "2 business days",
+        packageRateIds: ["rate_20", "rate_40"],
+        packageCount: 2,
+      },
+    ],
+  };
 }
 
 test("checkout handler returns disabled mock response when env is missing", async () => {
@@ -147,14 +184,16 @@ test("checkout handler reports incomplete injected adapter setup", async () => {
 });
 
 test("checkout handler passes Firestore timestamp sentinel to future adapter by default", async () => {
-  const req = mockReq({ body: { orderRequest: validOrderRequest } });
+  const req = mockReq({ body: { orderRequest: validOrderRequest, ...validShippingCheckoutFields() } });
   const res = mockRes();
 
   await checkoutSessionsHandler(req, res, {
     env: configuredEnv,
+    createShippingRates: createFakeShippingRates,
     createCheckoutSession({ orderRequest }) {
       assert.equal(orderRequest.createdAt, "FIRESTORE_SERVER_TIMESTAMP_REQUIRED");
       assert.equal(orderRequest.checkoutCreatedAt, "FIRESTORE_SERVER_TIMESTAMP_REQUIRED");
+      assert.equal(orderRequest.shippingAmountCents, 4342);
       return {
         orderRequestId: "order_123",
         checkoutSessionId: "cs_test_123",
@@ -169,11 +208,12 @@ test("checkout handler passes Firestore timestamp sentinel to future adapter by 
 });
 
 test("checkout handler can use injected checkout adapter dependencies", async () => {
-  const req = mockReq({ body: { orderRequest: validOrderRequest } });
+  const req = mockReq({ body: { orderRequest: validOrderRequest, ...validShippingCheckoutFields() } });
   const res = mockRes();
 
   await checkoutSessionsHandler(req, res, {
     env: configuredEnv,
+    createShippingRates: createFakeShippingRates,
     serverTimestamp() {
       return "SERVER_TIMESTAMP";
     },
@@ -200,6 +240,108 @@ test("checkout handler can use injected checkout adapter dependencies", async ()
 
   assert.equal(res.statusCode, 200);
   assert.equal(parseJson(res).checkoutUrl, "https://checkout.stripe.com/c/pay/cs_test_123");
+});
+
+test("checkout handler re-rates selected shipping before creating checkout", async () => {
+  const req = mockReq({
+    body: {
+      orderRequest: validOrderRequest,
+      shippingAddress: {
+        addressLine1: "123 Oak Street",
+        city: "Effingham",
+        state: "IL",
+        zip: "62401",
+      },
+      selectedShippingRate: {
+        rateId: "rate_ground",
+        amountCents: 1,
+      },
+    },
+  });
+  const res = mockRes();
+  let trustedOrderRequest;
+
+  await checkoutSessionsHandler(req, res, {
+    env: configuredEnv,
+    serverTimestamp() {
+      return "SERVER_TIMESTAMP";
+    },
+    createShippingRates({ orderRequestDraft, shippingAddress }) {
+      assert.equal(orderRequestDraft.subtotalCents, 4790);
+      assert.equal(shippingAddress.zip, "62401");
+      return {
+        shippingAddress,
+        rates: [
+          {
+            rateId: "rate_ground",
+            provider: "UPS",
+            serviceName: "Ground",
+            amountCents: 4342,
+            currency: "USD",
+            estimatedDays: 2,
+            durationTerms: "2 business days",
+            packageRateIds: ["rate_20", "rate_40"],
+            packageCount: 2,
+          },
+        ],
+      };
+    },
+    createCheckoutSession({ orderRequest }) {
+      trustedOrderRequest = orderRequest;
+      return {
+        orderRequestId: "order_123",
+        checkoutSessionId: "cs_test_123",
+        checkoutUrl: "https://checkout.stripe.com/c/pay/cs_test_123",
+      };
+    },
+  });
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(trustedOrderRequest.shippingAmountCents, 4342);
+  assert.equal(trustedOrderRequest.shippingCarrier, "UPS");
+  assert.deepEqual(trustedOrderRequest.shippingPackageRateIds, ["rate_20", "rate_40"]);
+});
+
+test("checkout handler rejects selected rates that are not returned by the server", async () => {
+  const req = mockReq({
+    body: {
+      orderRequest: validOrderRequest,
+      shippingAddress: {
+        addressLine1: "123 Oak Street",
+        city: "Effingham",
+        state: "IL",
+        zip: "62401",
+      },
+      selectedShippingRate: {
+        rateId: "tampered_rate",
+      },
+    },
+  });
+  const res = mockRes();
+
+  await checkoutSessionsHandler(req, res, {
+    env: configuredEnv,
+    createShippingRates() {
+      return {
+        shippingAddress: req.body.shippingAddress,
+        rates: [
+          {
+            rateId: "rate_ground",
+            provider: "UPS",
+            serviceName: "Ground",
+            amountCents: 4342,
+            currency: "USD",
+          },
+        ],
+      };
+    },
+    createCheckoutSession() {
+      throw new Error("Checkout should not start for a tampered shipping rate.");
+    },
+  });
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(parseJson(res).error.code, "checkout_shipping_rate_unavailable");
 });
 
 test("webhook handler returns disabled mock response when signing secret is missing", async () => {
@@ -230,6 +372,36 @@ test("shipping rates handler returns disabled response when Shippo token is miss
 
   assert.equal(res.statusCode, 503);
   assert.equal(parseJson(res).error.code, "shipping_rates_disabled");
+});
+
+test("shipping rates handler requires sender address before live Shippo lookup", async () => {
+  const req = mockReq({
+    body: {
+      orderRequest: validOrderRequest,
+      shippingAddress: {
+        addressLine1: "123 Oak Street",
+        city: "Effingham",
+        state: "IL",
+        zip: "62401",
+      },
+    },
+  });
+  const res = mockRes();
+
+  await shippingRatesHandler(req, res, {
+    env: {
+      SHIPPO_API_TOKEN: "shippo_test_configured_for_unit_tests",
+    },
+  });
+
+  assert.equal(res.statusCode, 503);
+  assert.equal(parseJson(res).error.code, "shipping_rates_disabled");
+  assert.deepEqual(parseJson(res).setupRequired, [
+    "SHIP_FROM_STREET1",
+    "SHIP_FROM_CITY",
+    "SHIP_FROM_STATE",
+    "SHIP_FROM_ZIP",
+  ]);
 });
 
 test("shipping rates handler returns customer-safe Shippo rate options", async () => {

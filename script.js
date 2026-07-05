@@ -215,16 +215,25 @@ function shippingRateLabel(rate) {
   return rate.provider + " " + rate.serviceName;
 }
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function renderShippingRates(rates) {
   shippingRatesContainer.hidden = false;
   shippingRatesContainer.innerHTML = [
     "<strong>Choose shipping</strong>",
     ...rates.map((rate, index) => `
       <label class="shipping-rate-option">
-        <input type="radio" name="shippingRate" value="${rate.rateId}" ${index === 0 ? "checked" : ""}>
+        <input type="radio" name="shippingRate" value="${escapeHtml(rate.rateId)}" ${index === 0 ? "checked" : ""}>
         <span>
-          <strong>${shippingRateLabel(rate)}</strong>
-          <small>${rate.durationTerms || "Estimated delivery shown by carrier"}</small>
+          <strong>${escapeHtml(shippingRateLabel(rate))}</strong>
+          <small>${escapeHtml(rate.durationTerms || "Estimated delivery shown by carrier")}</small>
         </span>
         <strong>${formatCents(rate.amountCents)}</strong>
       </label>
@@ -269,13 +278,13 @@ async function requestShippingRates(endpoint, rateRequest) {
   return payload;
 }
 
-async function requestCheckoutSession(endpoint, orderRequest) {
+async function requestCheckoutSession(endpoint, checkoutRequest) {
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
       "content-type": "application/json",
     },
-    body: JSON.stringify({ orderRequest }),
+    body: JSON.stringify(checkoutRequest),
   });
 
   let payload = null;
@@ -362,7 +371,11 @@ orderForm.addEventListener("submit", async (event) => {
   orderStatus.textContent = "Starting secure checkout...";
 
   try {
-    const handoff = await requestCheckoutSession(checkoutEndpoint, result.payload);
+    const handoff = await requestCheckoutSession(checkoutEndpoint, {
+      orderRequest: result.orderRequest,
+      shippingAddress: result.shippingAddress,
+      selectedShippingRate,
+    });
     window.location.assign(handoff.checkoutUrl);
   } catch (error) {
     orderStatus.textContent = checkoutFailureMessage;

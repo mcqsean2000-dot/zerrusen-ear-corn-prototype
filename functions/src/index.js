@@ -36,6 +36,10 @@ const WEBHOOK_ENV_KEYS = [
 
 const SHIPPING_RATE_ENV_KEYS = [
   "SHIPPO_API_TOKEN",
+  "SHIP_FROM_STREET1",
+  "SHIP_FROM_CITY",
+  "SHIP_FROM_STATE",
+  "SHIP_FROM_ZIP",
 ];
 
 function isPlaceholder(value) {
@@ -229,6 +233,10 @@ function resolveShippingRateCreator(options) {
   return null;
 }
 
+function shippingEnvIsRequired(options = {}) {
+  return !options.shippingRateDependencies && typeof options.createShippingRates !== "function";
+}
+
 function buildDefaultShippingRateDependencies(env, options = {}) {
   return {
     shipFromAddress: {
@@ -246,6 +254,60 @@ function buildDefaultShippingRateDependencies(env, options = {}) {
         fetchImpl: options.fetchImpl || fetch,
       });
     },
+  };
+}
+
+function getSelectedShippingRateId(value) {
+  return String(value && value.rateId || "").trim();
+}
+
+async function resolveTrustedShippingSelection({ body, orderRequest, env, options }) {
+  const selectedRateId = getSelectedShippingRateId(body.selectedShippingRate);
+  if (!selectedRateId) {
+    const error = new Error("A selected shipping rate is required before checkout.");
+    error.code = "checkout_shipping_required";
+    throw error;
+  }
+
+  if (shippingEnvIsRequired(options)) {
+    const missingEnv = getMissingEnv(env, SHIPPING_RATE_ENV_KEYS);
+    if (missingEnv.length) {
+      const error = new Error("Shipping rate configuration is incomplete.");
+      error.code = "shipping_rates_disabled";
+      error.missingEnv = missingEnv;
+      throw error;
+    }
+  }
+
+  const dependencies = options.shippingRateDependencies || buildDefaultShippingRateDependencies(env, options);
+  const missingDependencies = getMissingShippingRateDependencies(dependencies);
+  if (missingDependencies.length) {
+    const error = new Error("Shipping rates require a trusted Shippo adapter.");
+    error.code = "shipping_rate_dependency_missing";
+    error.missingDependencies = missingDependencies;
+    throw error;
+  }
+
+  const createRates = resolveShippingRateCreator({
+    ...options,
+    shippingRateDependencies: dependencies,
+  });
+  const result = await createRates({
+    orderRequestDraft: orderRequest,
+    shippingAddress: body.shippingAddress,
+    shipFromAddress: dependencies.shipFromAddress,
+  });
+  const rate = (result.rates || []).find((candidate) => candidate.rateId === selectedRateId);
+
+  if (!rate) {
+    const error = new Error("Selected shipping rate is no longer available.");
+    error.code = "checkout_shipping_rate_unavailable";
+    throw error;
+  }
+
+  return {
+    shippingAddress: result.shippingAddress,
+    rate,
   };
 }
 
@@ -325,12 +387,61 @@ async function checkoutSessionsHandler(req, res, options = {}) {
     }, corsHeaders);
   }
 
+  let shippingSelection;
+  try {
+    shippingSelection = await resolveTrustedShippingSelection({
+      body,
+      orderRequest: validation.orderRequest,
+      env,
+      options,
+    });
+  } catch (error) {
+    if (error.code === "checkout_shipping_required" || error.code === "invalid_shipping_rate_request" || error.code === "checkout_shipping_rate_unavailable") {
+      return sendJson(res, 400, {
+        error: {
+          code: error.code,
+          message: "Choose a valid shipping rate before starting checkout.",
+        },
+      }, corsHeaders);
+    }
+
+    if (error.code === "shipping_rates_disabled") {
+      return sendJson(res, 503, {
+        error: {
+          code: "shipping_rates_disabled",
+          message: "Live shipping rates are not enabled yet.",
+        },
+        mock: true,
+        ...safeSetupDetails(env, error.missingEnv || []),
+      }, corsHeaders);
+    }
+
+    if (error.code === "shipping_rate_dependency_missing") {
+      return sendJson(res, 501, {
+        error: {
+          code: "shipping_rate_dependency_missing",
+          message: "Shipping rates require a trusted Shippo adapter.",
+        },
+        mock: true,
+        ...safeSetupDetails(env, error.missingDependencies || []),
+      }, corsHeaders);
+    }
+
+    return sendJson(res, 502, {
+      error: {
+        code: "shipping_rates_failed",
+        message: "Shipping rates could not be calculated. Please try again or contact Theo's Farm.",
+      },
+    }, corsHeaders);
+  }
+
   try {
     const serverTimestamp = typeof options.serverTimestamp === "function"
       ? options.serverTimestamp()
       : "FIRESTORE_SERVER_TIMESTAMP_REQUIRED";
     const trustedOrderRequest = buildTrustedOrderRequestForCreate(validation.orderRequest, {
       serverTimestamp,
+      shippingSelection,
     });
 
     const result = await createCheckoutSession({
@@ -383,16 +494,18 @@ async function shippingRatesHandler(req, res, options = {}) {
     }, corsHeaders);
   }
 
-  const missingEnv = getMissingEnv(env, SHIPPING_RATE_ENV_KEYS);
-  if (missingEnv.length) {
-    return sendJson(res, 503, {
-      error: {
-        code: "shipping_rates_disabled",
-        message: "Live shipping rates are not enabled yet.",
-      },
-      mock: true,
-      ...safeSetupDetails(env, missingEnv),
-    }, corsHeaders);
+  if (shippingEnvIsRequired(options)) {
+    const missingEnv = getMissingEnv(env, SHIPPING_RATE_ENV_KEYS);
+    if (missingEnv.length) {
+      return sendJson(res, 503, {
+        error: {
+          code: "shipping_rates_disabled",
+          message: "Live shipping rates are not enabled yet.",
+        },
+        mock: true,
+        ...safeSetupDetails(env, missingEnv),
+      }, corsHeaders);
+    }
   }
 
   const dependencies = options.shippingRateDependencies || buildDefaultShippingRateDependencies(env, options);
@@ -594,6 +707,7 @@ module.exports = {
   buildCorsHeaders,
   checkoutSessionsHandler,
   buildDefaultShippingRateDependencies,
+  resolveTrustedShippingSelection,
   resolveStripeEventHandler,
   resolveCheckoutSessionCreator,
   resolveShippingRateCreator,
