@@ -10,9 +10,11 @@ The trusted checkout endpoint and Stripe webhook should run through Firebase Clo
 
 ## Scope
 
-In scope for the future backend:
+In scope for the backend:
 
 - accept a validated storefront order request draft
+- accept the full shipping address and selected Shippo rate ID
+- re-rate the selected shipping option through trusted server code
 - add the Firestore server timestamp
 - create the `orderRequests` document through trusted code
 - create a Stripe Checkout Session
@@ -109,11 +111,21 @@ Request body:
       "shippingZip": "62401",
       "note": "Delivery timing or address notes"
     }
+  },
+  "shippingAddress": {
+    "addressLine1": "123 Oak Street",
+    "addressLine2": "Dock 2",
+    "city": "Effingham",
+    "state": "IL",
+    "zip": "62401"
+  },
+  "selectedShippingRate": {
+    "rateId": "[\"rate_20\",\"rate_40\"]"
   }
 }
 ```
 
-Backend validation must mirror the product, customer, and subtotal constraints from the Firestore public create rules and `order-request.js`. The exception is `createdAt`: the browser draft omits it, and the backend adds the server timestamp.
+Backend validation must mirror the product, customer, subtotal, shipping address, and selected-rate constraints from the storefront helpers and trusted backend. The exception is `createdAt`: the browser draft omits it, and the backend adds the server timestamp.
 
 - `source` must be `static-storefront`
 - initial `status` must be `needs_review`
@@ -123,6 +135,9 @@ Backend validation must mirror the product, customer, and subtotal constraints f
 - `subtotalCents` must match the server-side recalculation
 - customer name, contact, preferred contact, shipping ZIP, and note limits must be enforced
 - client-supplied `createdAt`, Stripe IDs, payment status, or trusted fulfillment fields must be ignored or rejected
+- shipping address must include street, city, 2-letter state code, and 5-digit ZIP
+- selected shipping must include a rate ID returned by a fresh trusted Shippo rate lookup
+- shipping amount, carrier, service, package count, and package rate IDs must come from trusted server code, not the browser
 
 ## Checkout Session Response
 
@@ -153,13 +168,15 @@ Keep error messages safe for customers. Do not expose Stripe secrets, webhook de
 
 ## Backend Create Sequence
 
-1. Receive the storefront draft.
+1. Receive the storefront draft, full shipping address, and selected Shippo rate ID.
 2. Recalculate catalog item names, unit prices, quantities, and subtotal from server-owned product data.
-3. Create an `orderRequests` document with `createdAt` set to the Firestore server timestamp.
-4. Create a Stripe Checkout Session in `payment` mode using server-owned line items.
-5. Attach the Firestore document ID and order summary metadata to the Checkout Session.
-6. Save the trusted Checkout Session ID to the order document.
-7. Return the Checkout URL to the client.
+3. Re-rate the order against Shippo from server-owned package specs and ship-from config.
+4. Confirm the selected rate ID still exists in the trusted Shippo response.
+5. Create an `orderRequests` document with `createdAt` set to the Firestore server timestamp and trusted shipping fields stored on the order.
+6. Create a Stripe Checkout Session in `payment` mode using server-owned product line items plus one server-verified shipping line item.
+7. Attach the Firestore document ID and order summary metadata to the Checkout Session.
+8. Save the trusted Checkout Session ID to the order document.
+9. Return the Checkout URL to the client.
 
 The backend may create the Firestore document before the Stripe session so the session can include the Firestore ID in metadata. If Stripe session creation fails, mark the order request for review or delete the abandoned draft through trusted backend policy; never ask the public client to clean up trusted fields.
 
@@ -169,7 +186,7 @@ Recommended session configuration:
 
 - `mode`: `payment`
 - `ui_mode`: hosted Checkout redirect
-- `line_items`: server-generated from the supported product catalog
+- `line_items`: server-generated from the supported product catalog plus server-verified selected shipping
 - `payment_method_types`: let Stripe determine available methods, including Google Pay, Apple Pay, and Link when enabled in Stripe
 - `success_url`: production storefront success page with the Checkout Session ID placeholder
 - `cancel_url`: production storefront cart or checkout page
@@ -214,6 +231,16 @@ Public storefront code may provide only the draft order fields documented in `do
   "checkoutCompletedAt": "server timestamp",
   "lastStripeEventId": "evt_...",
   "lastStripeEventAt": "server timestamp",
+  "shippingAddress": "validated shipping address object",
+  "shippingRateId": "selected trusted Shippo rate id",
+  "shippingCarrier": "UPS",
+  "shippingService": "Ground",
+  "shippingAmountCents": 4342,
+  "shippingCurrency": "USD",
+  "shippingEstimatedDays": 2,
+  "shippingDurationTerms": "2 business days",
+  "shippingPackageRateIds": ["rate_20", "rate_40"],
+  "shippingPackageCount": 2,
   "trustedUpdatedAt": "server timestamp"
 }
 ```
