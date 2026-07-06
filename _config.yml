@@ -1,0 +1,15 @@
+exclude:
+  - .firebaserc.example
+  - admin.css
+  - admin.html
+  - admin.js
+  - dist/
+  - docs/
+  - firebase.json
+  - firestore.indexes.json
+  - firestore.rules
+  - functions/
+  - package.json
+  - tools/
+  - README.md
+  - ROADMAP.md

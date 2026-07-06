@@ -64,6 +64,7 @@ Natural search phrases to keep in mind:
 - `checkout-config.js` - public static-host checkout endpoint placeholder, disabled by default
 - `robots.txt` - crawl policy pointing search engines to the production sitemap
 - `sitemap.xml` - one-page production sitemap for the canonical Theo's Farm domain
+- `_config.yml` - GitHub Pages preview exclude list that keeps backend, docs, admin prototype, and tooling files out of the public Pages artifact
 - `admin.html` - static admin fulfillment prototype
 - `admin.css` - admin shell styles
 - `admin.js` - sample admin queue behavior
@@ -101,6 +102,14 @@ Natural search phrases to keep in mind:
 npm run check
 npm run package:static
 npm --prefix functions run check
+```
+
+On Windows PowerShell, use `npm.cmd` if the local execution policy blocks `npm.ps1`:
+
+```powershell
+npm.cmd run check
+npm.cmd run package:static
+npm.cmd --prefix functions run check
 ```
 
 The static package scripts remain useful for smoke checks and emergency static export, but Firebase Hosting is now the production target.
