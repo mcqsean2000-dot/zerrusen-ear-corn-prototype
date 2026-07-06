@@ -229,6 +229,120 @@ test("failure marker updates through the same trusted field boundary", async () 
   );
 });
 
+test("updates admin order status with audit metadata", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({
+    firestore,
+    serverTimestamp: () => "SERVER_TIMESTAMP",
+  });
+
+  await adapter.createOrderRequest({ orderRequest: trustedOrderRequest });
+  const result = await adapter.updateAdminOrderStatus({
+    admin: {
+      email: "admin@example.test",
+      uid: "admin-user-001",
+    },
+    orderRequestId: "orderRequests_1",
+    status: "ready_to_pack",
+  });
+
+  assert.deepEqual(result, {
+    audit: {
+      lastAction: "status_changed",
+      updatedAt: "SERVER_TIMESTAMP",
+      updatedByEmail: "admin@example.test",
+      updatedByUid: "admin-user-001",
+    },
+    fromStatus: "needs_review",
+    id: "orderRequests_1",
+    status: "ready_to_pack",
+  });
+  assert.deepEqual(collectionDocs(firestore, "orderRequests").get("orderRequests_1"), {
+    ...trustedOrderRequest,
+    audit: {
+      lastAction: "status_changed",
+      updatedAt: "SERVER_TIMESTAMP",
+      updatedByEmail: "admin@example.test",
+      updatedByUid: "admin-user-001",
+    },
+    status: "ready_to_pack",
+  });
+});
+
+test("admin status updates reject unsupported transitions and future statuses", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({ firestore });
+
+  await adapter.createOrderRequest({ orderRequest: trustedOrderRequest });
+
+  await assert.rejects(
+    adapter.updateAdminOrderStatus({
+      admin: {
+        email: "admin@example.test",
+        uid: "admin-user-001",
+      },
+      orderRequestId: "orderRequests_1",
+      status: "packed",
+    }),
+    (error) => {
+      assert.equal(error.code, "admin_status_transition_invalid");
+      assert.equal(error.fromStatus, "needs_review");
+      assert.equal(error.toStatus, "packed");
+      return true;
+    },
+  );
+
+  await assert.rejects(
+    adapter.updateAdminOrderStatus({
+      admin: {
+        email: "admin@example.test",
+        uid: "admin-user-001",
+      },
+      orderRequestId: "orderRequests_1",
+      status: "shipped",
+    }),
+    (error) => {
+      assert.equal(error.code, "admin_next_status_invalid");
+      assert.equal(error.status, "shipped");
+      return true;
+    },
+  );
+});
+
+test("admin status updates require admin identity and an existing order", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({ firestore });
+
+  await assert.rejects(
+    adapter.updateAdminOrderStatus({
+      admin: {
+        email: "admin@example.test",
+      },
+      orderRequestId: "orderRequests_1",
+      status: "ready_to_pack",
+    }),
+    (error) => {
+      assert.equal(error.code, "admin_actor_invalid");
+      return true;
+    },
+  );
+
+  await assert.rejects(
+    adapter.updateAdminOrderStatus({
+      admin: {
+        email: "admin@example.test",
+        uid: "admin-user-001",
+      },
+      orderRequestId: "missing",
+      status: "ready_to_pack",
+    }),
+    (error) => {
+      assert.equal(error.code, "order_request_not_found");
+      return true;
+    },
+  );
+});
+
 test("finds orders by trusted Stripe checkout session and payment intent IDs", async () => {
   const firestore = new MemoryFirestore();
   const adapter = createFirestoreAdapter({ firestore });

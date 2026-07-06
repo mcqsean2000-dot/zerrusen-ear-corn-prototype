@@ -5,6 +5,16 @@ const { TRUSTED_ORDER_FIELDS } = require("./order-validation");
 const DEFAULT_ORDER_COLLECTION = "orderRequests";
 const DEFAULT_STRIPE_EVENT_COLLECTION = "stripeEvents";
 const SERVER_TIMESTAMP_SENTINEL = "FIRESTORE_SERVER_TIMESTAMP_REQUIRED";
+const ADMIN_ORDER_STATUSES = Object.freeze([
+  "needs_review",
+  "ready_to_pack",
+  "packed",
+]);
+const ADMIN_STATUS_TRANSITIONS = Object.freeze({
+  needs_review: Object.freeze(["ready_to_pack"]),
+  ready_to_pack: Object.freeze(["needs_review", "packed"]),
+  packed: Object.freeze(["ready_to_pack"]),
+});
 
 function isFunction(value) {
   return typeof value === "function";
@@ -13,6 +23,10 @@ function isFunction(value) {
 function cleanName(value, fallback) {
   const name = String(value || "").trim();
   return name || fallback;
+}
+
+function cleanText(value) {
+  return String(value || "").trim();
 }
 
 function withoutUndefinedFields(value) {
@@ -100,6 +114,59 @@ function firstQuerySnapshot(querySnapshot) {
   }
 
   return first;
+}
+
+function validateAdminActor(admin) {
+  const uid = cleanText(admin && admin.uid);
+  const email = cleanText(admin && admin.email);
+
+  if (!uid || email.length < 3 || email.length > 160) {
+    const error = new Error("Admin status updates require a bounded admin uid and email.");
+    error.code = "admin_actor_invalid";
+    throw error;
+  }
+
+  return {
+    email,
+    uid,
+  };
+}
+
+function assertAdminStatus(status, code) {
+  const cleanStatus = cleanText(status);
+  if (!ADMIN_ORDER_STATUSES.includes(cleanStatus)) {
+    const error = new Error("Admin status update used an unsupported fulfillment status.");
+    error.code = code;
+    error.status = cleanStatus;
+    throw error;
+  }
+
+  return cleanStatus;
+}
+
+function assertAdminStatusTransition(fromStatus, toStatus) {
+  const from = assertAdminStatus(fromStatus, "admin_current_status_invalid");
+  const to = assertAdminStatus(toStatus, "admin_next_status_invalid");
+
+  if (from === to) {
+    return {
+      from,
+      to,
+    };
+  }
+
+  if (!ADMIN_STATUS_TRANSITIONS[from].includes(to)) {
+    const error = new Error("Admin status update attempted an unsupported transition.");
+    error.code = "admin_status_transition_invalid";
+    error.fromStatus = from;
+    error.toStatus = to;
+    throw error;
+  }
+
+  return {
+    from,
+    to,
+  };
 }
 
 async function setDoc(ref, data, options) {
@@ -231,6 +298,51 @@ function createFirestoreAdapter(options = {}) {
     );
   }
 
+  async function updateAdminOrderStatus({ admin, collection, orderRequestId, status }) {
+    const id = cleanText(orderRequestId);
+    if (!id) {
+      const error = new Error("orderRequestId is required to update admin order status.");
+      error.code = "order_request_id_missing";
+      throw error;
+    }
+
+    const actor = validateAdminActor(admin);
+    const orders = collectionRef(firestore, orderCollectionName(options, collection));
+    const ref = orders.doc(id);
+    const existingOrder = normalizeSnapshot(await getDoc(ref));
+
+    if (!existingOrder) {
+      const error = new Error("Order request was not found for admin status update.");
+      error.code = "order_request_not_found";
+      throw error;
+    }
+
+    const transition = assertAdminStatusTransition(existingOrder.status, status);
+    const updatedAt = timestamp();
+
+    await updateDoc(ref, {
+      audit: {
+        lastAction: "status_changed",
+        updatedAt,
+        updatedByEmail: actor.email,
+        updatedByUid: actor.uid,
+      },
+      status: transition.to,
+    });
+
+    return {
+      audit: {
+        lastAction: "status_changed",
+        updatedAt,
+        updatedByEmail: actor.email,
+        updatedByUid: actor.uid,
+      },
+      fromStatus: transition.from,
+      id,
+      status: transition.to,
+    };
+  }
+
   async function claimStripeEventProcessing({ eventId, eventType }) {
     const id = String(eventId || "").trim();
     if (!id) {
@@ -293,11 +405,14 @@ function createFirestoreAdapter(options = {}) {
     findOrderByPaymentIntentId,
     markCheckoutSessionFailed,
     markStripeEventProcessed,
+    updateAdminOrderStatus,
     updateOrderRequest,
   };
 }
 
 module.exports = {
+  ADMIN_ORDER_STATUSES,
+  ADMIN_STATUS_TRANSITIONS,
   DEFAULT_ORDER_COLLECTION,
   DEFAULT_STRIPE_EVENT_COLLECTION,
   SERVER_TIMESTAMP_SENTINEL,
