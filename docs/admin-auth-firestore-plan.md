@@ -47,6 +47,12 @@ Likely admin writes:
 - Admin-facing fulfillment metadata, such as packed/shipped timestamps when those statuses exist.
 - Audit metadata describing who changed the order and when.
 
+Implemented backend boundary:
+
+- `functions/src/firestore-adapter.js` exposes `updateAdminOrderStatus` for trusted admin status movement.
+- The helper validates admin UID/email, checks the current order exists, limits status values to the first admin-shell statuses, enforces supported status transitions, and writes `status` plus audit metadata only.
+- It does not write Stripe, payment, customer, item, subtotal, shipping-label, or raw payment fields.
+
 ## Trusted Field Plan
 
 Order list reads should trust only fields needed to scan and triage:
