@@ -21,6 +21,14 @@ npm run package:static
 npm run smoke:static
 ```
 
+On Windows PowerShell, use `npm.cmd` if `npm.ps1` is blocked by the local execution policy:
+
+```powershell
+npm.cmd run check
+npm.cmd run package:static
+npm.cmd run smoke:static
+```
+
 The package script writes:
 
 ```text
@@ -81,6 +89,14 @@ Do not put Stripe secret keys, webhook signing secrets, Firebase service account
 7. Visit the production domain and verify product photos, cart behavior, order request validation, and mobile layout.
 8. If `checkout-config.js` is still blank, verify the form shows the disabled live submission message instead of attempting payment.
 9. After a trusted backend exists, verify the endpoint uses HTTPS and redirects only to Stripe Checkout.
+
+Windows PowerShell equivalent for steps 2 through 4:
+
+```powershell
+npm.cmd run check
+npm.cmd run package:static
+npm.cmd run smoke:static
+```
 
 ## Post-Upload Checks
 

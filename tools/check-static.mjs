@@ -16,6 +16,7 @@ const requiredFiles = [
   "admin.js",
   "robots.txt",
   "sitemap.xml",
+  "_config.yml",
   ".firebaserc.example",
   "firebase.json",
   "firestore.rules",
@@ -51,6 +52,7 @@ const rules = await readFile("firestore.rules", "utf8");
 const storefront = await readFile("index.html", "utf8");
 const robots = await readFile("robots.txt", "utf8");
 const sitemap = await readFile("sitemap.xml", "utf8");
+const jekyllConfig = await readFile("_config.yml", "utf8");
 const storefrontScript = await readFile("script.js", "utf8");
 const orderRequestScript = await readFile("order-request.js", "utf8");
 const checkoutConfigScript = await readFile("checkout-config.js", "utf8");
@@ -109,6 +111,13 @@ assert(godaddyDeploy.includes("Upload the contents of that folder, not the repo 
 assert(godaddyDeploy.includes("functions/"), "GoDaddy deploy doc must exclude backend functions from static hosting.");
 assert(godaddyDeploy.includes("docs/"), "GoDaddy deploy doc must exclude planning docs from static hosting.");
 assert(godaddyDeploy.includes(".env"), "GoDaddy deploy doc must exclude environment files from static hosting.");
+assert(jekyllConfig.includes("exclude:"), "GitHub Pages Jekyll config must define an explicit exclude list.");
+assert(jekyllConfig.includes("docs/"), "GitHub Pages preview must exclude planning docs.");
+assert(jekyllConfig.includes("functions/"), "GitHub Pages preview must exclude backend function source.");
+assert(jekyllConfig.includes("tools/"), "GitHub Pages preview must exclude repo tooling.");
+assert(jekyllConfig.includes("firebase.json"), "GitHub Pages preview must exclude Firebase config.");
+assert(jekyllConfig.includes("firestore.rules"), "GitHub Pages preview must exclude Firestore rules.");
+assert(jekyllConfig.includes("admin.html"), "GitHub Pages preview must exclude the unauthenticated admin prototype.");
 assert(packageStaticScript.includes("storefrontFiles"), "Static package script must use an explicit storefront file allowlist.");
 assert(packageStaticScript.includes("allowedAssetExtensions"), "Static package script must use an explicit asset type allowlist.");
 assert(packageStaticScript.includes("dist\", \"godaddy-static"), "Static package script must write to dist/godaddy-static.");
