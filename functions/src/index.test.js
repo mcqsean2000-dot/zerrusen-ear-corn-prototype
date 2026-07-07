@@ -3,6 +3,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
+  adminShippingLabelsHandler,
   checkoutSessionsHandler,
   shippingRatesHandler,
   stripeWebhookHandler,
@@ -450,6 +451,109 @@ test("shipping rates handler returns customer-safe Shippo rate options", async (
   assert.equal(res.headers["access-control-allow-origin"], "https://theos.example");
   assert.equal(body.rates[0].rateId, "[\"rate_123\",\"rate_123\"]");
   assert.equal(body.rates[0].amountCents, 3684);
+});
+
+test("admin shipping label handler returns disabled response when Shippo token is missing", async () => {
+  const req = mockReq({
+    body: {
+      admin: {
+        email: "admin@example.test",
+        uid: "admin-user-001",
+      },
+      orderRequestId: "order_123",
+      rateId: "rate_123",
+    },
+  });
+  const res = mockRes();
+
+  await adminShippingLabelsHandler(req, res, { env: {} });
+
+  assert.equal(res.statusCode, 503);
+  assert.equal(parseJson(res).error.code, "shipping_label_purchase_disabled");
+});
+
+test("admin shipping label handler reports missing trusted persistence dependency", async () => {
+  const req = mockReq({
+    body: {
+      admin: {
+        email: "admin@example.test",
+        uid: "admin-user-001",
+      },
+      orderRequestId: "order_123",
+      rateId: "rate_123",
+    },
+  });
+  const res = mockRes();
+
+  await adminShippingLabelsHandler(req, res, {
+    env: {
+      SHIPPO_API_TOKEN: "shippo_test_configured_for_unit_tests",
+      NODE_ENV: "development",
+    },
+  });
+
+  assert.equal(res.statusCode, 501);
+  assert.equal(parseJson(res).error.code, "shipping_label_dependency_missing");
+  assert.deepEqual(parseJson(res).setupRequired, [
+    "prepareLabelPurchase",
+    "recordLabelPurchase",
+  ]);
+});
+
+test("admin shipping label handler buys label through trusted dependencies", async () => {
+  const req = mockReq({
+    headers: { origin: "https://theos.example" },
+    body: {
+      admin: {
+        email: "admin@example.test",
+        uid: "admin-user-001",
+      },
+      orderRequestId: "order_123",
+      rateId: "rate_123",
+    },
+  });
+  const res = mockRes();
+  let recordedFields = null;
+
+  await adminShippingLabelsHandler(req, res, {
+    env: {
+      CORS_ALLOWED_ORIGINS: "https://theos.example",
+      SHIPPO_API_TOKEN: "shippo_test_configured_for_unit_tests",
+    },
+    serverTimestamp() {
+      return "SERVER_TIMESTAMP";
+    },
+    shippingLabelDependencies: {
+      createShippoTransaction({ rateId }) {
+        assert.equal(rateId, "rate_123");
+        return {
+          object_id: "transaction_123",
+          label_url: "https://shippo.example/label.pdf",
+          tracking_number: "9400100000000000000000",
+          tracking_url_provider: "https://carrier.example/track/9400",
+        };
+      },
+      prepareLabelPurchase({ orderRequestId, rateId }) {
+        assert.equal(orderRequestId, "order_123");
+        assert.equal(rateId, "rate_123");
+      },
+      recordLabelPurchase({ fields, orderRequestId }) {
+        recordedFields = fields;
+        return {
+          id: orderRequestId,
+          ...fields,
+        };
+      },
+    },
+  });
+
+  const body = parseJson(res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers["access-control-allow-origin"], "https://theos.example");
+  assert.equal(body.orderRequestId, "order_123");
+  assert.equal(body.shippoTransactionId, "transaction_123");
+  assert.equal(body.labelUrl, "https://shippo.example/label.pdf");
+  assert.equal(recordedFields.trustedUpdatedAt, "SERVER_TIMESTAMP");
 });
 
 test("webhook handler requires Stripe signature after env is configured", async () => {

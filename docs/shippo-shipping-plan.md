@@ -1,6 +1,6 @@
 # Shippo Shipping Plan
 
-This plan captures the approved Shippo direction for Theo's Farm. Live Shippo rate quoting, the trusted selected-shipping checkout handoff, and the Shippo label transaction API boundary are implemented. The admin label purchase endpoint, production Stripe credentials, and live payment launch are still future work.
+This plan captures the approved Shippo direction for Theo's Farm. Live Shippo rate quoting, the trusted selected-shipping checkout handoff, the Shippo label transaction API boundary, and the trusted admin label purchase endpoint scaffold are implemented. Production Stripe credentials, live label testing, and live payment launch are still future work.
 
 ## Direction
 
@@ -89,11 +89,13 @@ Completed:
 - Re-rate the selected Shippo rate server-side before creating Stripe Checkout.
 - Include server-verified shipping as a Stripe Checkout line item.
 - Add an SDK-free Shippo transaction adapter for the future admin label purchase flow.
+- Add trusted admin endpoint scaffold `POST /api/admin/shippo-labels` to buy one Shippo label and persist label/tracking fields for a paid order.
 
 Remaining:
 
 1. Create Stripe account and credentials when the client account is ready.
 2. Configure the public checkout endpoint and run test-mode Stripe Checkout with product subtotal plus selected shipping.
-3. Add admin label purchase endpoint that calls the Shippo transaction adapter after an admin confirms the selected rate and package details.
+3. Wire authenticated admin UI controls to the label endpoint.
 4. Add tracking and label fields to Firestore/admin views.
-5. Run test orders across nearby, regional, and far shipping ZIP codes before launch.
+5. Confirm whether multi-package orders should buy one label at a time or batch multiple package-rate transactions.
+6. Run test orders across nearby, regional, and far shipping ZIP codes before launch.

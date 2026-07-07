@@ -343,6 +343,138 @@ test("admin status updates require admin identity and an existing order", async 
   );
 });
 
+test("records admin label purchase with tracking fields and audit metadata", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({
+    firestore,
+    serverTimestamp: () => "SERVER_TIMESTAMP",
+  });
+
+  await adapter.createOrderRequest({
+    orderRequest: {
+      ...trustedOrderRequest,
+      paymentStatus: "paid",
+    },
+  });
+  const result = await adapter.recordLabelPurchase({
+    admin: {
+      email: "admin@example.test",
+      uid: "admin-user-001",
+    },
+    orderRequestId: "orderRequests_1",
+    fields: {
+      labelPurchasedAt: "SERVER_TIMESTAMP",
+      labelUrl: "https://shippo.example/label.pdf",
+      shippoTransactionId: "transaction_123",
+      trackingNumber: "9400100000000000000000",
+      trackingUrl: "https://carrier.example/track/9400",
+      trustedUpdatedAt: "SERVER_TIMESTAMP",
+    },
+  });
+
+  assert.deepEqual(result, {
+    audit: {
+      lastAction: "label_purchased",
+      updatedAt: "SERVER_TIMESTAMP",
+      updatedByEmail: "admin@example.test",
+      updatedByUid: "admin-user-001",
+    },
+    id: "orderRequests_1",
+    labelPurchasedAt: "SERVER_TIMESTAMP",
+    labelUrl: "https://shippo.example/label.pdf",
+    shippoTransactionId: "transaction_123",
+    trackingNumber: "9400100000000000000000",
+    trackingUrl: "https://carrier.example/track/9400",
+    trustedUpdatedAt: "SERVER_TIMESTAMP",
+  });
+  assert.equal(
+    collectionDocs(firestore, "orderRequests").get("orderRequests_1").shippoTransactionId,
+    "transaction_123",
+  );
+  assert.deepEqual(collectionDocs(firestore, "orderRequests").get("orderRequests_1").audit, result.audit);
+});
+
+test("prepares admin label purchase only for paid orders with owned rates", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({ firestore });
+
+  await adapter.createOrderRequest({
+    orderRequest: {
+      ...trustedOrderRequest,
+      paymentStatus: "paid",
+      shippingRateId: JSON.stringify(["rate_20", "rate_40"]),
+      shippingPackageRateIds: ["rate_20", "rate_40"],
+    },
+  });
+
+  assert.deepEqual(await adapter.prepareLabelPurchase({
+    admin: {
+      email: "admin@example.test",
+      uid: "admin-user-001",
+    },
+    orderRequestId: "orderRequests_1",
+    rateId: "rate_20",
+  }), {
+    id: "orderRequests_1",
+    paymentStatus: "paid",
+    rateId: "rate_20",
+  });
+
+  await assert.rejects(
+    adapter.prepareLabelPurchase({
+      admin: {
+        email: "admin@example.test",
+        uid: "admin-user-001",
+      },
+      orderRequestId: "orderRequests_1",
+      rateId: "rate_other",
+    }),
+    (error) => error.code === "shipping_label_rate_mismatch",
+  );
+});
+
+test("admin label purchase requires a paid order and trusted fields", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({ firestore });
+
+  await adapter.createOrderRequest({ orderRequest: trustedOrderRequest });
+
+  await assert.rejects(
+    adapter.prepareLabelPurchase({
+      admin: {
+        email: "admin@example.test",
+        uid: "admin-user-001",
+      },
+      orderRequestId: "orderRequests_1",
+      rateId: "rate_123",
+    }),
+    (error) => error.code === "shipping_label_order_not_paid",
+  );
+
+  await adapter.updateOrderRequest({
+    orderRequestId: "orderRequests_1",
+    fields: {
+      paymentStatus: "paid",
+    },
+  });
+
+  await assert.rejects(
+    adapter.recordLabelPurchase({
+      admin: {
+        email: "admin@example.test",
+        uid: "admin-user-001",
+      },
+      orderRequestId: "orderRequests_1",
+      fields: {
+        customer: {
+          name: "Not trusted here",
+        },
+      },
+    }),
+    (error) => error.code === "firestore_adapter_untrusted_field",
+  );
+});
+
 test("finds orders by trusted Stripe checkout session and payment intent IDs", async () => {
   const firestore = new MemoryFirestore();
   const adapter = createFirestoreAdapter({ firestore });

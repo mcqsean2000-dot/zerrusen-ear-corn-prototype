@@ -270,6 +270,10 @@ test("composition exposes the handler dependency shapes expected by index.js", (
     "markStripeEventProcessed",
     "updateOrderRequest",
   ].sort());
+  assert.deepEqual(Object.keys(composition.shippingLabelDependencies).sort(), [
+    "prepareLabelPurchase",
+    "recordLabelPurchase",
+  ].sort());
 });
 
 test("checkout handler starts a fake Stripe session through composed dependencies", async () => {

@@ -20,7 +20,12 @@ const {
 } = require("./shipping-rates-adapter");
 const {
   createShippoShipmentWithFetch,
+  createShippoTransactionWithFetch,
 } = require("./shippo-api-adapter");
+const {
+  getMissingShippingLabelDependencies,
+  purchaseShippingLabel,
+} = require("./shipping-label-adapter");
 
 const CHECKOUT_ENV_KEYS = [
   "CORS_ALLOWED_ORIGINS",
@@ -40,6 +45,9 @@ const SHIPPING_RATE_ENV_KEYS = [
   "SHIP_FROM_CITY",
   "SHIP_FROM_STATE",
   "SHIP_FROM_ZIP",
+];
+const SHIPPING_LABEL_ENV_KEYS = [
+  "SHIPPO_API_TOKEN",
 ];
 
 function isPlaceholder(value) {
@@ -233,8 +241,30 @@ function resolveShippingRateCreator(options) {
   return null;
 }
 
+function resolveShippingLabelPurchaser(options) {
+  if (typeof options.purchaseShippingLabel === "function") {
+    return options.purchaseShippingLabel;
+  }
+
+  if (options.shippingLabelDependencies) {
+    return (args) => purchaseShippingLabel({
+      ...args,
+      ...options.shippingLabelDependencies,
+    });
+  }
+
+  return null;
+}
+
 function shippingEnvIsRequired(options = {}) {
   return !options.shippingRateDependencies && typeof options.createShippingRates !== "function";
+}
+
+function shippingLabelEnvIsRequired(options = {}) {
+  return !(
+    options.shippingLabelDependencies
+    && typeof options.shippingLabelDependencies.createShippoTransaction === "function"
+  ) && typeof options.purchaseShippingLabel !== "function";
 }
 
 function buildDefaultShippingRateDependencies(env, options = {}) {
@@ -254,6 +284,19 @@ function buildDefaultShippingRateDependencies(env, options = {}) {
         fetchImpl: options.fetchImpl || fetch,
       });
     },
+  };
+}
+
+function buildDefaultShippingLabelDependencies(env, options = {}) {
+  return {
+    ...(options.shippingLabelDependencies || {}),
+    createShippoTransaction: options.shippingLabelDependencies && options.shippingLabelDependencies.createShippoTransaction
+      ? options.shippingLabelDependencies.createShippoTransaction
+      : ({ rateId }) => createShippoTransactionWithFetch({
+        rateId,
+        token: env.SHIPPO_API_TOKEN,
+        fetchImpl: options.fetchImpl || fetch,
+      }),
   };
 }
 
@@ -562,6 +605,140 @@ async function shippingRatesHandler(req, res, options = {}) {
   }
 }
 
+async function adminShippingLabelsHandler(req, res, options = {}) {
+  const env = options.env || process.env;
+  const corsHeaders = buildCorsHeaders(req, env);
+
+  if (req.method === "OPTIONS") {
+    return sendCorsPreflight(req, res, env);
+  }
+
+  if (req.method !== "POST") {
+    return sendJson(res, 405, {
+      error: {
+        code: "method_not_allowed",
+        message: "Use POST to purchase a shipping label.",
+      },
+    }, { allow: "POST, OPTIONS", ...corsHeaders });
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(req);
+  } catch (error) {
+    return sendJson(res, 400, {
+      error: {
+        code: "invalid_json",
+        message: "Send a valid JSON shipping label request.",
+      },
+    }, corsHeaders);
+  }
+
+  if (shippingLabelEnvIsRequired(options)) {
+    const missingEnv = getMissingEnv(env, SHIPPING_LABEL_ENV_KEYS);
+    if (missingEnv.length) {
+      return sendJson(res, 503, {
+        error: {
+          code: "shipping_label_purchase_disabled",
+          message: "Shipping label purchase is not enabled yet.",
+        },
+        mock: true,
+        ...safeSetupDetails(env, missingEnv),
+      }, corsHeaders);
+    }
+  }
+
+  const dependencies = buildDefaultShippingLabelDependencies(env, options);
+  const missingDependencies = getMissingShippingLabelDependencies(dependencies);
+  if (missingDependencies.length) {
+    return sendJson(res, 501, {
+      error: {
+        code: "shipping_label_dependency_missing",
+        message: "Shipping label purchase requires trusted Shippo and order persistence adapters.",
+      },
+      mock: true,
+      ...safeSetupDetails(env, missingDependencies),
+    }, corsHeaders);
+  }
+
+  const buyLabel = resolveShippingLabelPurchaser({
+    ...options,
+    shippingLabelDependencies: dependencies,
+  });
+
+  try {
+    const serverTimestamp = typeof options.serverTimestamp === "function"
+      ? options.serverTimestamp()
+      : "FIRESTORE_SERVER_TIMESTAMP_REQUIRED";
+    const result = await buyLabel({
+      admin: body.admin,
+      orderRequestId: body.orderRequestId,
+      rateId: body.rateId,
+      serverTimestamp,
+    });
+
+    return sendJson(res, 200, {
+      labelUrl: result.labelUrl,
+      orderRequestId: result.id,
+      shippoTransactionId: result.shippoTransactionId,
+      trackingNumber: result.trackingNumber,
+      trackingUrl: result.trackingUrl,
+    }, corsHeaders);
+  } catch (error) {
+    if (error.code === "admin_actor_invalid" || error.code === "order_request_id_missing" || error.code === "shippo_rate_id_missing") {
+      return sendJson(res, 400, {
+        error: {
+          code: error.code,
+          message: "Check the admin identity, order, and selected Shippo rate before purchasing a label.",
+        },
+      }, corsHeaders);
+    }
+
+    if (error.code === "order_request_not_found") {
+      return sendJson(res, 404, {
+        error: {
+          code: "order_request_not_found",
+          message: "Order request was not found.",
+        },
+      }, corsHeaders);
+    }
+
+    if (error.code === "shipping_label_order_not_paid") {
+      return sendJson(res, 409, {
+        error: {
+          code: "shipping_label_order_not_paid",
+          message: "Shipping labels can only be purchased for paid orders.",
+        },
+      }, corsHeaders);
+    }
+
+    if (error.code === "shipping_label_rate_mismatch") {
+      return sendJson(res, 409, {
+        error: {
+          code: "shipping_label_rate_mismatch",
+          message: "Selected Shippo rate does not belong to this order.",
+        },
+      }, corsHeaders);
+    }
+
+    if (error.code === "shippo_label_transaction_incomplete") {
+      return sendJson(res, 502, {
+        error: {
+          code: "shippo_label_transaction_incomplete",
+          message: "Shippo did not return complete label details.",
+        },
+      }, corsHeaders);
+    }
+
+    return sendJson(res, 502, {
+      error: {
+        code: "shipping_label_purchase_failed",
+        message: "Shipping label purchase failed. Please retry from the admin after checking the order.",
+      },
+    }, corsHeaders);
+  }
+}
+
 async function stripeWebhookHandler(req, res, options = {}) {
   const env = options.env || process.env;
   const corsHeaders = buildCorsHeaders(req, env);
@@ -667,6 +844,10 @@ async function stripeWebhookHandler(req, res, options = {}) {
 function routeRequest(req, res, options = {}) {
   const path = new URL(req.url, "http://localhost").pathname;
 
+  if (path === "/api/admin/shippo-labels") {
+    return adminShippingLabelsHandler(req, res, options);
+  }
+
   if (path === "/api/checkout-sessions") {
     return checkoutSessionsHandler(req, res, options);
   }
@@ -704,13 +885,16 @@ if (require.main === module) {
 }
 
 module.exports = {
+  adminShippingLabelsHandler,
   buildCorsHeaders,
   checkoutSessionsHandler,
   buildDefaultShippingRateDependencies,
+  buildDefaultShippingLabelDependencies,
   resolveTrustedShippingSelection,
   resolveStripeEventHandler,
   resolveCheckoutSessionCreator,
   resolveShippingRateCreator,
+  resolveShippingLabelPurchaser,
   readJsonBody,
   readRawBody,
   routeRequest,
