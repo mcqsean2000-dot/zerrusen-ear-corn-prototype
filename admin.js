@@ -32,14 +32,32 @@ const sampleOrders = [
     id: "REQ-1002",
     customer: { name: "J. Smith", contact: "217-555-0148", preferredContact: "text", shippingZip: "62462", note: "Repeat buyer. Wants two large bags this week." },
     status: "ready_to_pack",
+    paymentStatus: "paid",
     subtotalCents: 5990,
+    shippingCarrier: "UPS",
+    shippingService: "Ground",
+    shippingAmountCents: 4825,
+    shippingCurrency: "USD",
+    shippingPackageCount: 2,
+    shippingPackageRateIds: ["rate_large_1", "rate_large_2"],
     items: [{ sku: "ear-corn-40lb", name: "40 lb Ear Corn Bag", quantity: 2, unitPriceCents: 2995 }],
   },
   {
     id: "REQ-1003",
     customer: { name: "A. Martin", contact: "amartin@example.com", preferredContact: "phone", shippingZip: "62565", note: "Packing complete; waiting on shipping confirmation." },
     status: "packed",
+    paymentStatus: "paid",
     subtotalCents: 5385,
+    shippingCarrier: "USPS",
+    shippingService: "Ground Advantage",
+    shippingAmountCents: 3642,
+    shippingCurrency: "USD",
+    shippingPackageCount: 3,
+    shippoTransactionId: "shippo_txn_sample_1003",
+    trackingNumber: "9400100000000000000000",
+    trackingUrl: "https://tools.usps.com/go/TrackConfirmAction?tLabels=9400100000000000000000",
+    labelUrl: "https://example.com/theos-sample-label.pdf",
+    labelPurchasedAt: "2026-07-07",
     items: [{ sku: "ear-corn-20lb", name: "20 lb Ear Corn Bag", quantity: 3, unitPriceCents: 1795 }],
   },
 ];
@@ -70,6 +88,11 @@ function escapeHtml(value) {
 
 function cents(value) {
   return money.format(asWholeNumber(value) / 100);
+}
+
+function safeUrl(value) {
+  const url = asText(value);
+  return /^https:\/\//i.test(url) ? url : "";
 }
 
 function isAllowedAdminStatus(status) {
@@ -111,6 +134,28 @@ function normalizeAdminCustomer(customer) {
   };
 }
 
+function normalizeAdminShipping(order) {
+  const source = order?.shipping || order || {};
+  const packageRateIds = Array.isArray(source?.packageRateIds || source?.shippingPackageRateIds)
+    ? (source.packageRateIds || source.shippingPackageRateIds).map(asText).filter(Boolean)
+    : [];
+
+  return {
+    carrier: asText(source?.carrier || source?.shippingCarrier),
+    service: asText(source?.service || source?.shippingService),
+    amountCents: asWholeNumber(source?.amountCents || source?.shippingAmountCents),
+    currency: asText(source?.currency || source?.shippingCurrency) || "USD",
+    packageCount: asWholeNumber(source?.packageCount || source?.shippingPackageCount),
+    packageRateIds,
+    rateId: asText(source?.rateId || source?.shippingRateId),
+    shippoTransactionId: asText(source?.shippoTransactionId),
+    labelPurchasedAt: asText(source?.labelPurchasedAt),
+    labelUrl: safeUrl(source?.labelUrl),
+    trackingNumber: asText(source?.trackingNumber),
+    trackingUrl: safeUrl(source?.trackingUrl),
+  };
+}
+
 function normalizeAdminOrder(order) {
   const items = Array.isArray(order?.items) ? order.items.map(normalizeAdminItem).filter((item) => item.quantity > 0) : [];
   const calculatedSubtotalCents = items.reduce((total, item) => total + item.lineSubtotalCents, 0);
@@ -119,6 +164,8 @@ function normalizeAdminOrder(order) {
   return {
     id: asText(order?.id) || "Unassigned",
     customer: normalizeAdminCustomer(order?.customer),
+    paymentStatus: asText(order?.paymentStatus) || "unpaid",
+    shipping: normalizeAdminShipping(order),
     status: normalizeAdminStatus(order?.status),
     subtotalCents,
     items,
@@ -132,6 +179,7 @@ function normalizeAdminOrders(orders) {
 function buildAdminOrderViewModel(order) {
   const normalizedOrder = normalizeAdminOrder(order);
   const itemSummary = normalizedOrder.items.map((item) => item.quantity + " x " + item.name).join(", ") || "No items";
+  const shipping = buildAdminShippingViewModel(normalizedOrder.shipping);
 
   return {
     id: normalizedOrder.id,
@@ -144,7 +192,31 @@ function buildAdminOrderViewModel(order) {
     statusLabel: adminStatusLabels[normalizedOrder.status],
     allowedNextStatuses: getAllowedAdminStatusTransitions(normalizedOrder.status),
     itemSummary,
+    paymentStatus: normalizedOrder.paymentStatus,
+    shipping,
     subtotalLabel: cents(normalizedOrder.subtotalCents),
+  };
+}
+
+function buildAdminShippingViewModel(shipping) {
+  const carrierService = [asText(shipping?.carrier), asText(shipping?.service)].filter(Boolean).join(" ");
+  const packageCount = asWholeNumber(shipping?.packageCount);
+  const packageLabel = packageCount ? packageCount + " package" + (packageCount === 1 ? "" : "s") : "Package count pending";
+  const amountLabel = asWholeNumber(shipping?.amountCents) ? cents(shipping.amountCents) + " shipping" : "Shipping not set";
+  const trackingNumber = asText(shipping?.trackingNumber);
+  const trackingUrl = safeUrl(shipping?.trackingUrl);
+  const labelUrl = safeUrl(shipping?.labelUrl);
+
+  return {
+    amountLabel,
+    carrierService: carrierService || "Carrier pending",
+    hasLabel: Boolean(labelUrl),
+    labelPurchasedAt: asText(shipping?.labelPurchasedAt),
+    labelUrl,
+    packageLabel,
+    trackingLabel: trackingNumber || "Tracking pending",
+    trackingNumber,
+    trackingUrl,
   };
 }
 
@@ -186,6 +258,7 @@ if (typeof window !== "undefined") {
     normalizeOrder: normalizeAdminOrder,
     normalizeOrders: normalizeAdminOrders,
     buildOrderViewModel: buildAdminOrderViewModel,
+    buildShippingViewModel: buildAdminShippingViewModel,
     calculateBagCounts: calculateAdminBagCounts,
     buildFulfillmentSummary: buildAdminFulfillmentSummary,
     getPackableOrders: getAdminPackableOrders,
@@ -208,11 +281,18 @@ function renderSummary(orders) {
 function renderRows(orders) {
   rows.innerHTML = normalizeAdminOrders(orders).map((order) => {
     const viewModel = buildAdminOrderViewModel(order);
+    const trackingMarkup = viewModel.shipping.trackingUrl
+      ? '<a class="admin-link" href="' + escapeHtml(viewModel.shipping.trackingUrl) + '" target="_blank" rel="noreferrer">' + escapeHtml(viewModel.shipping.trackingLabel) + "</a>"
+      : escapeHtml(viewModel.shipping.trackingLabel);
+    const labelMarkup = viewModel.shipping.labelUrl
+      ? '<a class="admin-link" href="' + escapeHtml(viewModel.shipping.labelUrl) + '" target="_blank" rel="noreferrer">Label ready</a>'
+      : "Label pending";
     return [
       "<tr>",
       "<td><strong>" + escapeHtml(viewModel.customerName) + "</strong><small>" + escapeHtml(viewModel.id) + " - ZIP " + escapeHtml(viewModel.shippingZip) + "</small></td>",
       "<td>" + escapeHtml(viewModel.itemSummary) + "<small>" + escapeHtml(viewModel.subtotalLabel) + " estimated subtotal</small></td>",
       '<td><span class="status-pill" data-status="' + escapeHtml(viewModel.status) + '">' + escapeHtml(viewModel.statusLabel) + "</span></td>",
+      "<td><strong>" + escapeHtml(viewModel.shipping.carrierService) + "</strong><small>" + escapeHtml(viewModel.shipping.amountLabel) + " - " + escapeHtml(viewModel.shipping.packageLabel) + "</small><small>" + labelMarkup + " - " + trackingMarkup + "</small></td>",
       "<td>" + escapeHtml(viewModel.contact) + "<small>Prefers " + escapeHtml(viewModel.preferredContact) + "</small></td>",
       "<td>" + escapeHtml(viewModel.note) + "</td>",
       "</tr>",
