@@ -52,6 +52,8 @@ Implemented backend boundary:
 - `functions/src/firestore-adapter.js` exposes `updateAdminOrderStatus` for trusted admin status movement.
 - The helper validates admin UID/email, checks the current order exists, limits status values to the first admin-shell statuses, enforces supported status transitions, and writes `status` plus audit metadata only.
 - It does not write Stripe, payment, customer, item, subtotal, shipping-label, or raw payment fields.
+- `functions/src/index.js` exposes `POST /api/admin/order-status` as the trusted HTTP boundary for future authenticated admin status updates. The route stays disabled with `admin_status_dependency_missing` unless a trusted runtime injects `updateAdminOrderStatus`.
+- The current Firebase runtime must not inject `updateAdminOrderStatus` until it verifies an authenticated admin custom claim and derives the admin actor server-side.
 
 ## Trusted Field Plan
 

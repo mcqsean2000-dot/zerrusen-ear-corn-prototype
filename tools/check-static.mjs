@@ -33,6 +33,7 @@ const requiredFiles = [
   "functions/.env.example",
   "functions/package.json",
   "functions/src/index.js",
+  "functions/src/firebase-runtime.js",
   "functions/src/index.test.js",
   "functions/src/order-validation.js",
   "functions/src/order-validation.test.js",
@@ -72,6 +73,7 @@ const smokeStaticPackageScript = await readFile("tools/smoke-static-package.mjs"
 const functionsPackage = JSON.parse(await readFile("functions/package.json", "utf8"));
 const functionsEnvExample = await readFile("functions/.env.example", "utf8");
 const functionsIndex = await readFile("functions/src/index.js", "utf8");
+const functionsRuntime = await readFile("functions/src/firebase-runtime.js", "utf8");
 const functionsValidation = await readFile("functions/src/order-validation.js", "utf8");
 
 assert(firebaseConfig.hosting?.public === ".", "Firebase Hosting should serve the static repo root.");
@@ -106,10 +108,14 @@ assert(stripeHandoff.includes("POST /api/stripe/webhook"), "Stripe handoff must 
 assert(backendScaffold.includes("checkoutSessionsHandler"), "Backend scaffold doc must name the checkout session handler.");
 assert(backendScaffold.includes("stripeWebhookHandler"), "Backend scaffold doc must name the Stripe webhook handler.");
 assert(backendScaffold.includes("adminShippingLabelsHandler"), "Backend scaffold doc must name the admin shipping label handler.");
+assert(backendScaffold.includes("adminOrderStatusHandler"), "Backend scaffold doc must name the admin order status handler.");
 assert(backendScaffold.includes("POST /api/admin/shippo-labels"), "Backend scaffold doc must document the admin Shippo label endpoint.");
+assert(backendScaffold.includes("POST /api/admin/order-status"), "Backend scaffold doc must document the admin order status endpoint.");
 assert(backendScaffold.includes("order is paid"), "Backend scaffold doc must document paid-order validation before label purchase.");
 assert(backendScaffold.includes("belongs to the order"), "Backend scaffold doc must document owned Shippo rate validation before label purchase.");
 assert(backendScaffold.includes("request-provided admin identity only"), "Backend scaffold doc must call out the temporary admin identity boundary.");
+assert(backendScaffold.includes("admin_status_dependency_missing"), "Backend scaffold doc must document disabled admin status endpoint behavior.");
+assert(backendScaffold.includes("Firebase runtime intentionally does not inject `updateAdminOrderStatus` yet"), "Backend scaffold doc must preserve the admin-auth-before-runtime-wiring boundary.");
 assert(adminFulfillment.includes("POST /api/admin/shippo-labels"), "Admin fulfillment doc must point future UI work at the trusted label endpoint.");
 assert(adminFulfillment.includes("No browser-side Shippo label purchase"), "Admin fulfillment doc must reject browser-side Shippo label purchase.");
 assert(shippoPlan.includes("POST /api/admin/shippo-labels"), "Shippo plan must document the admin label endpoint.");
@@ -147,6 +153,11 @@ assert(smokeStaticPackageScript.includes("STRIPE_SECRET_KEY"), "Static smoke che
 assert(functionsPackage.scripts?.check?.includes("node --test"), "Backend package must include a local test check.");
 assert(functionsIndex.includes("checkoutSessionsHandler"), "Backend scaffold must export checkout session handling.");
 assert(functionsIndex.includes("stripeWebhookHandler"), "Backend scaffold must export Stripe webhook handling.");
+assert(functionsIndex.includes("adminOrderStatusHandler"), "Backend scaffold must export admin order status handling.");
+assert(functionsIndex.includes("/api/admin/order-status"), "Backend scaffold must route admin order status updates.");
+assert(functionsIndex.includes("admin_status_dependency_missing"), "Backend scaffold must keep admin status writes disabled without trusted persistence.");
+assert(!functionsRuntime.includes("adminStatusDependencies"), "Firebase runtime must not wire admin status updates before authenticated admin claim verification exists.");
+assert(!functionsRuntime.includes("updateAdminOrderStatus"), "Firebase runtime must not expose admin status writes before authenticated admin claim verification exists.");
 assert(functionsIndex.includes("CORS_ALLOWED_ORIGINS"), "Backend scaffold must include configurable CORS origin handling.");
 assert(functionsValidation.includes("validateOrderRequestDraft"), "Backend scaffold must include order request validation helpers.");
 assert(functionsValidation.includes("FIRESTORE_SERVER_TIMESTAMP_REQUIRED"), "Backend scaffold must preserve Firestore server timestamp boundary.");

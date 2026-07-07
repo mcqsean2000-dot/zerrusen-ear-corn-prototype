@@ -256,6 +256,18 @@ function resolveShippingLabelPurchaser(options) {
   return null;
 }
 
+function resolveAdminStatusUpdater(options) {
+  if (typeof options.updateAdminOrderStatus === "function") {
+    return options.updateAdminOrderStatus;
+  }
+
+  if (options.adminStatusDependencies && typeof options.adminStatusDependencies.updateAdminOrderStatus === "function") {
+    return options.adminStatusDependencies.updateAdminOrderStatus;
+  }
+
+  return null;
+}
+
 function shippingEnvIsRequired(options = {}) {
   return !options.shippingRateDependencies && typeof options.createShippingRates !== "function";
 }
@@ -739,6 +751,97 @@ async function adminShippingLabelsHandler(req, res, options = {}) {
   }
 }
 
+async function adminOrderStatusHandler(req, res, options = {}) {
+  const env = options.env || process.env;
+  const corsHeaders = buildCorsHeaders(req, env);
+
+  if (req.method === "OPTIONS") {
+    return sendCorsPreflight(req, res, env);
+  }
+
+  if (req.method !== "POST") {
+    return sendJson(res, 405, {
+      error: {
+        code: "method_not_allowed",
+        message: "Use POST to update an admin order status.",
+      },
+    }, { allow: "POST, OPTIONS", ...corsHeaders });
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(req);
+  } catch (error) {
+    return sendJson(res, 400, {
+      error: {
+        code: "invalid_json",
+        message: "Send a valid JSON admin status request.",
+      },
+    }, corsHeaders);
+  }
+
+  const updateStatus = resolveAdminStatusUpdater(options);
+  if (typeof updateStatus !== "function") {
+    return sendJson(res, 501, {
+      error: {
+        code: "admin_status_dependency_missing",
+        message: "Admin status updates require a trusted order persistence adapter.",
+      },
+      mock: true,
+      ...safeSetupDetails(env, ["updateAdminOrderStatus"]),
+    }, corsHeaders);
+  }
+
+  try {
+    const result = await updateStatus({
+      admin: body.admin,
+      orderRequestId: body.orderRequestId,
+      status: body.status,
+    });
+
+    return sendJson(res, 200, {
+      audit: result.audit,
+      fromStatus: result.fromStatus,
+      orderRequestId: result.id,
+      status: result.status,
+    }, corsHeaders);
+  } catch (error) {
+    if (error.code === "admin_actor_invalid" || error.code === "order_request_id_missing" || error.code === "admin_next_status_invalid") {
+      return sendJson(res, 400, {
+        error: {
+          code: error.code,
+          message: "Check the admin identity, order, and requested status before updating fulfillment.",
+        },
+      }, corsHeaders);
+    }
+
+    if (error.code === "order_request_not_found") {
+      return sendJson(res, 404, {
+        error: {
+          code: "order_request_not_found",
+          message: "Order request was not found.",
+        },
+      }, corsHeaders);
+    }
+
+    if (error.code === "admin_current_status_invalid" || error.code === "admin_status_transition_invalid") {
+      return sendJson(res, 409, {
+        error: {
+          code: error.code,
+          message: "Requested fulfillment status transition is not allowed.",
+        },
+      }, corsHeaders);
+    }
+
+    return sendJson(res, 502, {
+      error: {
+        code: "admin_status_update_failed",
+        message: "Admin status update failed. Please retry after checking the order.",
+      },
+    }, corsHeaders);
+  }
+}
+
 async function stripeWebhookHandler(req, res, options = {}) {
   const env = options.env || process.env;
   const corsHeaders = buildCorsHeaders(req, env);
@@ -844,6 +947,10 @@ async function stripeWebhookHandler(req, res, options = {}) {
 function routeRequest(req, res, options = {}) {
   const path = new URL(req.url, "http://localhost").pathname;
 
+  if (path === "/api/admin/order-status") {
+    return adminOrderStatusHandler(req, res, options);
+  }
+
   if (path === "/api/admin/shippo-labels") {
     return adminShippingLabelsHandler(req, res, options);
   }
@@ -885,6 +992,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  adminOrderStatusHandler,
   adminShippingLabelsHandler,
   buildCorsHeaders,
   checkoutSessionsHandler,
@@ -895,6 +1003,7 @@ module.exports = {
   resolveCheckoutSessionCreator,
   resolveShippingRateCreator,
   resolveShippingLabelPurchaser,
+  resolveAdminStatusUpdater,
   readJsonBody,
   readRawBody,
   routeRequest,

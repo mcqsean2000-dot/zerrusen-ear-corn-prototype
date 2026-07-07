@@ -28,10 +28,16 @@ Authenticated admin tooling should buy shipping labels through:
 POST /api/admin/shippo-labels
 ```
 
+Authenticated admin tooling should update fulfillment status through:
+
+```text
+POST /api/admin/order-status
+```
+
 ## Files
 
 - `functions/src/order-validation.js` keeps the server-owned product catalog, validates storefront drafts, recalculates subtotals, rejects client-supplied trusted fields, and builds safe Stripe metadata.
-- `functions/src/index.js` exports lightweight route handlers for checkout sessions and Stripe webhooks. They are disabled by default unless environment configuration and future trusted adapters are provided.
+- `functions/src/index.js` exports lightweight route handlers for checkout sessions, Stripe webhooks, admin status updates, and admin shipping label purchase. They are disabled by default unless environment configuration and future trusted adapters are provided.
 - `functions/src/checkout-adapter.js` builds the production-adjacent Stripe Checkout handoff using injected trusted storage and Stripe functions only. It does not import Stripe, Firebase, or make network calls by itself.
 - `functions/src/stripe-api-adapter.js` provides the SDK-agnostic Stripe API boundary for future injection. It wraps a Stripe-like client passed in by trusted runtime code, forwards hosted Checkout Session params to `checkout.sessions.create`, and forwards raw webhook payloads to `webhooks.constructEvent` without importing Stripe or storing secrets.
 - `functions/src/stripe-webhook-adapter.js` maps already-verified Stripe webhook events to trusted order update fields using injected order lookup, update, and event idempotency functions only. It does not import Stripe, Firebase, or make network calls by itself.
@@ -180,6 +186,29 @@ The trusted storage adapter must verify two things before Shippo is called: the 
 Successful label purchase responses return only the current fulfillment-safe response fields: `orderRequestId`, `shippoTransactionId`, `labelUrl`, `trackingNumber`, and `trackingUrl`. The trusted backend still persists the broader label, carrier, service, amount, status, audit, and `labelPurchasedAt` fields for later admin reads. Do not expose Shippo tokens, raw payment details, or private customer data beyond what the admin UI already needs to fulfill the paid order.
 
 For multi-package orders, the scaffold buys one label for one owned Shippo rate ID. Keep batch label purchase as a separate, explicit future change so the admin UX and reconciliation story are reviewed together.
+
+## Admin Order Status Handler
+
+`adminOrderStatusHandler` expects authenticated admin tooling to send:
+
+```json
+{
+  "orderRequestId": "firestore-order-id",
+  "status": "ready_to_pack",
+  "admin": {
+    "uid": "firebase-admin-uid",
+    "email": "admin@example.com"
+  }
+}
+```
+
+The current scaffold accepts request-provided admin identity only to keep the handler testable before the authenticated admin surface exists. Production runtime must derive the admin identity from Firebase Auth custom claims or the selected admin provider before calling the same adapter boundary.
+
+The trusted storage adapter validates the current order exists, the requested status is one of the initial admin-shell statuses, and the transition is allowed before writing `status` plus audit metadata. Without an injected `updateAdminOrderStatus` dependency, the route returns `admin_status_dependency_missing` instead of attempting a live write.
+
+The Firebase runtime intentionally does not inject `updateAdminOrderStatus` yet. Production wiring must first verify an authenticated Firebase Auth admin custom claim and derive the admin actor server-side instead of trusting `body.admin` from browser JavaScript.
+
+Version-one status transitions remain intentionally narrow: `needs_review` to `ready_to_pack`, `ready_to_pack` to `needs_review` or `packed`, and `packed` back to `ready_to_pack` for correction.
 
 ## Trusted Firestore Ownership
 
