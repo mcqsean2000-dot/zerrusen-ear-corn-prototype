@@ -49,6 +49,45 @@ Initial assumption: multiple-bag orders should be rated as separate packages unl
 4. Backend stores carrier, service, shipping amount, label URL, tracking number, and shipment status.
 5. Admin prints label and updates fulfillment status.
 
+## Admin Label Endpoint Contract
+
+The trusted label purchase route is:
+
+```text
+POST /api/admin/shippo-labels
+```
+
+Expected request body:
+
+```json
+{
+  "orderRequestId": "firestore-order-id",
+  "rateId": "shippo-rate-id",
+  "admin": {
+    "uid": "firebase-admin-uid",
+    "email": "admin@example.com"
+  }
+}
+```
+
+The backend must reject label purchase unless the order is already paid and the requested `rateId` belongs to that order's trusted Shippo rate options. The admin identity is request-provided in the current scaffold only; production wiring must replace that with authenticated admin context from Firebase Auth or the selected admin provider.
+
+Successful responses include safe fulfillment fields for admin display:
+
+```json
+{
+  "orderRequestId": "firestore-order-id",
+  "shippoTransactionId": "shippo-transaction-id",
+  "labelUrl": "https://...",
+  "trackingNumber": "tracking-number",
+  "trackingUrl": "https://..."
+}
+```
+
+The backend persists the broader trusted fulfillment fields, including carrier, service, amount, status, audit metadata, and `labelPurchasedAt`, but the current endpoint response is intentionally smaller.
+
+For multi-package orders, the current endpoint buys one label for one owned Shippo rate ID. The final admin UX still needs a decision on whether to guide admins through one label at a time or batch multiple package-rate transactions.
+
 ## Data To Store
 
 Order-level shipping fields:
@@ -96,6 +135,5 @@ Remaining:
 1. Create Stripe account and credentials when the client account is ready.
 2. Configure the public checkout endpoint and run test-mode Stripe Checkout with product subtotal plus selected shipping.
 3. Wire authenticated admin UI controls to the label endpoint.
-4. Add tracking and label fields to Firestore/admin views.
-5. Confirm whether multi-package orders should buy one label at a time or batch multiple package-rate transactions.
-6. Run test orders across nearby, regional, and far shipping ZIP codes before launch.
+4. Confirm whether multi-package orders should buy one label at a time or batch multiple package-rate transactions.
+5. Run test orders across nearby, regional, and far shipping ZIP codes before launch.

@@ -26,6 +26,7 @@ const requiredFiles = [
   "docs/admin-fulfillment-foundation.md",
   "docs/stripe-checkout-handoff.md",
   "docs/backend-checkout-scaffold.md",
+  "docs/shippo-shipping-plan.md",
   "docs/godaddy-static-deploy.md",
   "tools/package-static.mjs",
   "tools/smoke-static-package.mjs",
@@ -63,6 +64,8 @@ const packageJson = JSON.parse(await readFile("package.json", "utf8"));
 const hostingReadiness = await readFile("docs/firebase-hosting-readiness.md", "utf8");
 const stripeHandoff = await readFile("docs/stripe-checkout-handoff.md", "utf8");
 const backendScaffold = await readFile("docs/backend-checkout-scaffold.md", "utf8");
+const adminFulfillment = await readFile("docs/admin-fulfillment-foundation.md", "utf8");
+const shippoPlan = await readFile("docs/shippo-shipping-plan.md", "utf8");
 const godaddyDeploy = await readFile("docs/godaddy-static-deploy.md", "utf8");
 const packageStaticScript = await readFile("tools/package-static.mjs", "utf8");
 const smokeStaticPackageScript = await readFile("tools/smoke-static-package.mjs", "utf8");
@@ -102,6 +105,15 @@ assert(stripeHandoff.includes("POST /api/checkout-sessions"), "Stripe handoff mu
 assert(stripeHandoff.includes("POST /api/stripe/webhook"), "Stripe handoff must document webhook endpoint.");
 assert(backendScaffold.includes("checkoutSessionsHandler"), "Backend scaffold doc must name the checkout session handler.");
 assert(backendScaffold.includes("stripeWebhookHandler"), "Backend scaffold doc must name the Stripe webhook handler.");
+assert(backendScaffold.includes("adminShippingLabelsHandler"), "Backend scaffold doc must name the admin shipping label handler.");
+assert(backendScaffold.includes("POST /api/admin/shippo-labels"), "Backend scaffold doc must document the admin Shippo label endpoint.");
+assert(backendScaffold.includes("order is paid"), "Backend scaffold doc must document paid-order validation before label purchase.");
+assert(backendScaffold.includes("belongs to the order"), "Backend scaffold doc must document owned Shippo rate validation before label purchase.");
+assert(backendScaffold.includes("request-provided admin identity only"), "Backend scaffold doc must call out the temporary admin identity boundary.");
+assert(adminFulfillment.includes("POST /api/admin/shippo-labels"), "Admin fulfillment doc must point future UI work at the trusted label endpoint.");
+assert(adminFulfillment.includes("No browser-side Shippo label purchase"), "Admin fulfillment doc must reject browser-side Shippo label purchase.");
+assert(shippoPlan.includes("POST /api/admin/shippo-labels"), "Shippo plan must document the admin label endpoint.");
+assert(shippoPlan.includes("one label for one owned Shippo rate ID"), "Shippo plan must document the current one-label-per-owned-rate boundary.");
 assert(godaddyDeploy.includes("dist/godaddy-static/"), "GoDaddy deploy doc must point to the generated static package folder.");
 assert(godaddyDeploy.includes("checkoutEndpoint: \"\""), "GoDaddy deploy doc must keep checkout config blank by default.");
 assert(godaddyDeploy.includes("pre-backend static package"), "GoDaddy deploy doc must explain the current blank endpoint gate.");

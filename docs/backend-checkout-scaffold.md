@@ -22,6 +22,12 @@ Stripe should send webhooks to:
 POST /api/stripe/webhook
 ```
 
+Authenticated admin tooling should buy shipping labels through:
+
+```text
+POST /api/admin/shippo-labels
+```
+
 ## Files
 
 - `functions/src/order-validation.js` keeps the server-owned product catalog, validates storefront drafts, recalculates subtotals, rejects client-supplied trusted fields, and builds safe Stripe metadata.
@@ -30,6 +36,7 @@ POST /api/stripe/webhook
 - `functions/src/stripe-api-adapter.js` provides the SDK-agnostic Stripe API boundary for future injection. It wraps a Stripe-like client passed in by trusted runtime code, forwards hosted Checkout Session params to `checkout.sessions.create`, and forwards raw webhook payloads to `webhooks.constructEvent` without importing Stripe or storing secrets.
 - `functions/src/stripe-webhook-adapter.js` maps already-verified Stripe webhook events to trusted order update fields using injected order lookup, update, and event idempotency functions only. It does not import Stripe, Firebase, or make network calls by itself.
 - `functions/src/firestore-adapter.js` provides an SDK-free Firestore adapter boundary for the injected checkout and webhook dependencies. It expects a Firestore-like backend object to be passed in and does not import Firebase Admin, load credentials, or make network calls by itself.
+- `functions/src/shipping-label-adapter.js` provides the SDK-free Shippo transaction boundary for admin label purchase. It accepts an injected Shippo transaction creator and normalizes label, tracking, carrier, service, amount, and transaction fields for trusted storage.
 - `functions/src/trusted-backend-composition.js` composes the Firestore adapter and Stripe API adapter into the exact dependency shapes expected by the checkout and webhook handlers. It accepts injected Firestore-like and Stripe-like clients plus optional collection names and server timestamp provider; it does not import Firebase Admin, Firebase Functions, Stripe SDK, read secrets, initialize clients, deploy, or call the network by itself.
 - `functions/src/firebase-functions-runtime-guard.js` is the SDK-free guard for the future Firebase Functions entrypoint. It checks that runtime wiring provided the required environment keys, Firestore-like client, Stripe-like client, and server timestamp provider before handing those injected pieces to `createTrustedBackendComposition`.
 - `functions/src/stripe-api-adapter.test.js` checks the Stripe API boundary with in-memory fake Stripe clients only. These tests do not import Stripe, call the network, or require secrets.
@@ -151,6 +158,29 @@ After verification, `stripeWebhookHandler` can receive `stripeWebhookAdapterDepe
 
 Webhook updates should be idempotent. Store processed Stripe event IDs through a separate event log or an equivalent trusted backend mechanism. The adapter records no-op outcomes for unsupported events so replays do not repeatedly touch order records. Supported events that cannot yet map to a known order remain retryable instead of being marked processed.
 
+## Admin Shipping Label Handler
+
+`adminShippingLabelsHandler` expects authenticated admin tooling to send:
+
+```json
+{
+  "orderRequestId": "firestore-order-id",
+  "rateId": "shippo-rate-id",
+  "admin": {
+    "uid": "firebase-admin-uid",
+    "email": "admin@example.com"
+  }
+}
+```
+
+The current scaffold accepts request-provided admin identity only to keep the handler testable before the authenticated admin surface exists. Production runtime must derive the admin identity from Firebase Auth custom claims or the selected admin provider before calling the same adapter boundary.
+
+The trusted storage adapter must verify two things before Shippo is called: the order is paid, and the requested Shippo `rateId` belongs to the order's stored trusted shipping rates. If either check fails, the handler must return a safe error instead of buying a label.
+
+Successful label purchase responses return only the current fulfillment-safe response fields: `orderRequestId`, `shippoTransactionId`, `labelUrl`, `trackingNumber`, and `trackingUrl`. The trusted backend still persists the broader label, carrier, service, amount, status, audit, and `labelPurchasedAt` fields for later admin reads. Do not expose Shippo tokens, raw payment details, or private customer data beyond what the admin UI already needs to fulfill the paid order.
+
+For multi-package orders, the scaffold buys one label for one owned Shippo rate ID. Keep batch label purchase as a separate, explicit future change so the admin UX and reconciliation story are reviewed together.
+
 ## Trusted Firestore Ownership
 
 Public storefront JavaScript may send only the draft fields documented in `docs/stripe-checkout-handoff.md`.
@@ -170,6 +200,11 @@ Trusted backend and webhook code own:
 - `checkoutErrorCode`
 - `lastStripeEventId`
 - `lastStripeEventAt`
+- `shippoTransactionId`
+- `labelUrl`
+- `trackingNumber`
+- `trackingUrl`
+- `labelPurchasedAt`
 - `trustedUpdatedAt`
 - fulfillment transition fields such as `readyToPackAt`, `packedAt`, `shippedAt`, `deliveredAt`, and `refundedAt`
 

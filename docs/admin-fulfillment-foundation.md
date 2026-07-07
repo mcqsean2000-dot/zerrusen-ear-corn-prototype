@@ -16,6 +16,7 @@ The shell uses sample order requests to model the first admin workflows:
 - see customer contact preference and shipping ZIP
 - scan product quantities and estimated subtotal
 - view daily bag counts for packing
+- review trusted shipping label and tracking fields after backend purchase
 - filter by fulfillment status
 
 ## Future Firestore Read Model
@@ -46,6 +47,19 @@ Expected production boundary:
 2. Trusted backend/admin tooling grants an `admin: true` custom claim.
 3. Firestore rules allow admin reads and updates only to authenticated admins.
 4. Stripe payment status and Stripe IDs are written by trusted backend/webhook code, not by public storefront JavaScript.
+5. Shippo labels are bought only through the trusted backend route `POST /api/admin/shippo-labels` after paid-order and owned-rate validation.
+
+## Label Purchase Boundary
+
+The static admin shell may display `labelUrl`, `trackingNumber`, `trackingUrl`, carrier, service, package count, and shipping amount from trusted order data. It must not buy labels directly from browser JavaScript, store Shippo API tokens, or trust a client-selected rate without backend ownership checks.
+
+Current backend scaffold behavior:
+
+- Requires `orderRequestId` and `rateId` in the admin label request.
+- Verifies the order is paid before buying a label.
+- Verifies the requested Shippo `rateId` belongs to the order before buying a label.
+- Persists the Shippo transaction, label, tracking, amount, carrier, service, status, and audit fields through trusted backend code.
+- Uses request-provided admin identity only as a temporary scaffold; production must replace this with authenticated admin context.
 
 ## Non-Goals For This Slice
 
@@ -54,3 +68,4 @@ Expected production boundary:
 - No inventory mutation
 - No deploy
 - No admin authentication implementation
+- No browser-side Shippo label purchase
