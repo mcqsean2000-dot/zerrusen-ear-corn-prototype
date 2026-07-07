@@ -74,6 +74,10 @@ function createTrustedBackendComposition(options = {}) {
       findOrderByPaymentIntentId: firestoreAdapter.findOrderByPaymentIntentId,
       updateOrderRequest: firestoreAdapter.updateOrderRequest,
     },
+    shippingLabelDependencies: {
+      prepareLabelPurchase: firestoreAdapter.prepareLabelPurchase,
+      recordLabelPurchase: firestoreAdapter.recordLabelPurchase,
+    },
   };
 }
 

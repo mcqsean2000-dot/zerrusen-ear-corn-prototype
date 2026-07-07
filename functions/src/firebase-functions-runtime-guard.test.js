@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 const {
+  adminShippingLabelsHandler,
   checkoutSessionsHandler,
   stripeWebhookHandler,
 } = require("./index");
@@ -345,6 +346,73 @@ test("runtime guard composes webhook handler options with injected fake clients"
   assert.equal(res.statusCode, 200);
   assert.equal(order.paymentStatus, "paid");
   assert.equal(order.lastStripeEventId, "evt_runtime");
+});
+
+test("runtime guard composes admin shipping label handler options with injected fake clients", async () => {
+  const firestore = new MemoryFirestore();
+  const runtime = createFirebaseFunctionsRuntime({
+    env: configuredEnv,
+    firestore,
+    stripe: fakeStripe(),
+    serverTimestamp() {
+      return "SERVER_TIMESTAMP";
+    },
+  });
+  await checkoutSessionsHandler(mockReq({
+    body: { orderRequest: validOrderRequest, ...validShippingCheckoutFields() },
+  }), mockRes(), {
+    ...runtime,
+    createShippingRates: createFakeShippingRates,
+  });
+  await stripeWebhookHandler(mockReq({
+    headers: { "stripe-signature": "t=123,v1=test" },
+    body: Buffer.from(JSON.stringify({
+      id: "evt_runtime_label",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_test_runtime",
+          payment_intent: "pi_test_runtime",
+          payment_status: "paid",
+          client_reference_id: "runtimeOrders_1",
+          metadata: {
+            orderRequestId: "runtimeOrders_1",
+          },
+        },
+      },
+    })),
+  }), mockRes(), runtime);
+
+  const res = mockRes();
+  await adminShippingLabelsHandler(mockReq({
+    body: {
+      admin: {
+        email: "admin@example.test",
+        uid: "admin-user-001",
+      },
+      orderRequestId: "runtimeOrders_1",
+      rateId: "rate_20",
+    },
+  }), res, {
+    ...runtime,
+    shippingLabelDependencies: {
+      ...runtime.shippingLabelDependencies,
+      createShippoTransaction({ rateId }) {
+        assert.equal(rateId, "rate_20");
+        return {
+          object_id: "transaction_runtime",
+          label_url: "https://shippo.example/runtime-label.pdf",
+          tracking_number: "9400100000000000000000",
+        };
+      },
+    },
+  });
+
+  const order = firestore.collection("runtimeOrders").docs.get("runtimeOrders_1");
+  assert.equal(res.statusCode, 200);
+  assert.equal(parseJson(res).shippoTransactionId, "transaction_runtime");
+  assert.equal(order.shippoTransactionId, "transaction_runtime");
+  assert.equal(order.audit.lastAction, "label_purchased");
 });
 
 test("runtime guard module remains SDK-free and secret-free", () => {

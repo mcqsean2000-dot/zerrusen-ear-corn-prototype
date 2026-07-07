@@ -169,6 +169,40 @@ function assertAdminStatusTransition(fromStatus, toStatus) {
   };
 }
 
+function normalizeRateIdList(value) {
+  if (Array.isArray(value)) {
+    return value.map(cleanText).filter(Boolean);
+  }
+
+  const text = cleanText(value);
+  if (!text) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) {
+      return parsed.map(cleanText).filter(Boolean);
+    }
+  } catch (error) {
+    return [text];
+  }
+
+  return [text];
+}
+
+function orderOwnsShippoRate(order, rateId) {
+  const selectedRateId = cleanText(rateId);
+  if (!selectedRateId) {
+    return false;
+  }
+
+  return [
+    cleanText(order && order.shippingRateId),
+    ...normalizeRateIdList(order && order.shippingPackageRateIds),
+  ].includes(selectedRateId);
+}
+
 async function setDoc(ref, data, options) {
   if (!isFunction(ref.set)) {
     const error = new Error("Firestore-like document reference must provide set(data).");
@@ -343,6 +377,92 @@ function createFirestoreAdapter(options = {}) {
     };
   }
 
+  async function prepareAdminLabelPurchase({ admin, collection, orderRequestId, rateId }) {
+    const id = cleanText(orderRequestId);
+    if (!id) {
+      const error = new Error("orderRequestId is required to prepare a shipping label purchase.");
+      error.code = "order_request_id_missing";
+      throw error;
+    }
+
+    validateAdminActor(admin);
+    const orders = collectionRef(firestore, orderCollectionName(options, collection));
+    const ref = orders.doc(id);
+    const existingOrder = normalizeSnapshot(await getDoc(ref));
+
+    if (!existingOrder) {
+      const error = new Error("Order request was not found for shipping label purchase.");
+      error.code = "order_request_not_found";
+      throw error;
+    }
+
+    if (existingOrder.paymentStatus !== "paid") {
+      const error = new Error("Shipping labels can only be purchased for paid orders.");
+      error.code = "shipping_label_order_not_paid";
+      error.paymentStatus = existingOrder.paymentStatus || "";
+      throw error;
+    }
+
+    if (!orderOwnsShippoRate(existingOrder, rateId)) {
+      const error = new Error("Shipping label purchase used a rate that does not belong to the order.");
+      error.code = "shipping_label_rate_mismatch";
+      throw error;
+    }
+
+    return {
+      id,
+      paymentStatus: existingOrder.paymentStatus,
+      rateId: cleanText(rateId),
+    };
+  }
+
+  async function recordAdminLabelPurchase({ admin, collection, orderRequestId, fields }) {
+    const id = cleanText(orderRequestId);
+    if (!id) {
+      const error = new Error("orderRequestId is required to record a shipping label purchase.");
+      error.code = "order_request_id_missing";
+      throw error;
+    }
+
+    const actor = validateAdminActor(admin);
+    const orders = collectionRef(firestore, orderCollectionName(options, collection));
+    const ref = orders.doc(id);
+    const existingOrder = normalizeSnapshot(await getDoc(ref));
+
+    if (!existingOrder) {
+      const error = new Error("Order request was not found for shipping label purchase.");
+      error.code = "order_request_not_found";
+      throw error;
+    }
+
+    if (existingOrder.paymentStatus !== "paid") {
+      const error = new Error("Shipping labels can only be purchased for paid orders.");
+      error.code = "shipping_label_order_not_paid";
+      error.paymentStatus = existingOrder.paymentStatus || "";
+      throw error;
+    }
+
+    const labelFields = trustedUpdateFields(fields);
+    const updatedAt = labelFields.trustedUpdatedAt || timestamp();
+    const updateFields = {
+      ...labelFields,
+      audit: {
+        lastAction: "label_purchased",
+        updatedAt,
+        updatedByEmail: actor.email,
+        updatedByUid: actor.uid,
+      },
+    };
+
+    await updateDoc(ref, updateFields);
+
+    return {
+      audit: updateFields.audit,
+      id,
+      ...labelFields,
+    };
+  }
+
   async function claimStripeEventProcessing({ eventId, eventType }) {
     const id = String(eventId || "").trim();
     if (!id) {
@@ -405,6 +525,10 @@ function createFirestoreAdapter(options = {}) {
     findOrderByPaymentIntentId,
     markCheckoutSessionFailed,
     markStripeEventProcessed,
+    prepareLabelPurchase: prepareAdminLabelPurchase,
+    prepareAdminLabelPurchase,
+    recordLabelPurchase: recordAdminLabelPurchase,
+    recordAdminLabelPurchase,
     updateAdminOrderStatus,
     updateOrderRequest,
   };

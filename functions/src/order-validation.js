@@ -59,6 +59,8 @@ const TRUSTED_ORDER_FIELDS = Object.freeze([
   "createdAt",
   "deliveredAt",
   "fulfillmentStatus",
+  "labelPurchasedAt",
+  "labelUrl",
   "lastStripeEventAt",
   "lastStripeEventId",
   "packedAt",
@@ -77,10 +79,13 @@ const TRUSTED_ORDER_FIELDS = Object.freeze([
   "shippingPackageRateIds",
   "shippingRateId",
   "shippingService",
+  "shippoTransactionId",
   "stripeCheckoutSessionId",
   "stripeCustomerId",
   "stripePaymentIntentId",
   "stripePaymentStatus",
+  "trackingNumber",
+  "trackingUrl",
   "trustedUpdatedAt",
 ]);
 
