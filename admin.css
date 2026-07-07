@@ -21,6 +21,8 @@
 .admin-table th { color: var(--muted); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; }
 .admin-table td { color: var(--ink); }
 .admin-table small, .admin-note { display: block; color: var(--muted); line-height: 1.45; }
+.admin-link { color: var(--field); font-weight: 900; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.admin-link:hover { color: var(--leaf); }
 .status-pill { display: inline-flex; align-items: center; min-height: 30px; padding: 0 10px; color: #fff; background: var(--leaf); border-radius: 999px; font-size: 0.82rem; font-weight: 900; }
 .status-pill[data-status="needs_review"] { color: var(--ink); background: var(--corn); }
 .status-pill[data-status="packed"] { background: var(--field); }

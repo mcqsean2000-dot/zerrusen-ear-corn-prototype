@@ -233,9 +233,13 @@ assert(
 assert(admin.includes("admin.js"), "Admin shell must load admin.js.");
 assert(adminScript.includes("sampleOrders"), "Admin shell should use sample data only in this slice.");
 assert(adminScript.includes("normalizeAdminOrder"), "Admin shell must centralize order normalization for future authenticated reads.");
+assert(adminScript.includes("normalizeAdminShipping"), "Admin shell must centralize shipping normalization for future authenticated reads.");
 assert(adminScript.includes("buildAdminOrderViewModel"), "Admin shell must centralize order view-model building.");
+assert(adminScript.includes("buildAdminShippingViewModel"), "Admin shell must centralize shipping view-model building.");
 assert(adminScript.includes("calculateAdminBagCounts"), "Admin shell must centralize bag-count calculations.");
 assert(adminScript.includes("adminStatusTransitions"), "Admin shell must define constrained status transitions before live status updates.");
+assert(adminScript.includes("labelUrl"), "Admin shell should include trusted label URL display fields.");
+assert(adminScript.includes("trackingNumber"), "Admin shell should include trusted tracking number display fields.");
 assert(!adminScript.toLowerCase().includes("firebase"), "Admin shell must not connect to Firebase yet.");
 
 function createAdminFakeElement(name, value = "") {
@@ -321,6 +325,14 @@ function createAdminHarness() {
       shippingZip: "62401",
       note: "<script>alert(1)</script>",
     },
+    paymentStatus: "paid",
+    shippingCarrier: "UPS",
+    shippingService: "Ground",
+    shippingAmountCents: 1842,
+    shippingPackageCount: 1,
+    labelUrl: "https://example.com/label.pdf",
+    trackingNumber: "TRACK123",
+    trackingUrl: "https://carrier.example/track/TRACK123",
     items: [
       { sku: "ear-corn-20lb", name: "20 lb Ear Corn Bag", quantity: "2", unitPriceCents: "1795" },
       { sku: "unknown", name: "Ignored count product", quantity: 1, unitPriceCents: 999 },
@@ -331,12 +343,20 @@ function createAdminHarness() {
   assert(normalized.id === "firestore-doc-id", "Admin order normalization should trim document IDs.");
   assert(normalized.status === "needs_review", "Unknown admin order statuses should normalize back to needs_review.");
   assert(normalized.customer.preferredContact === "text", "Admin order normalization should lower-case contact preference.");
+  assert(normalized.paymentStatus === "paid", "Admin order normalization should preserve payment status.");
+  assert(normalized.shipping.carrier === "UPS", "Admin order normalization should preserve trusted shipping carrier.");
+  assert(normalized.shipping.labelUrl === "https://example.com/label.pdf", "Admin order normalization should preserve safe label URLs.");
+  assert(normalized.shipping.trackingNumber === "TRACK123", "Admin order normalization should preserve trusted tracking numbers.");
   assert(normalized.items.length === 2, "Admin order normalization should keep positive quantity line items.");
   assert(normalized.subtotalCents === 4589, "Admin order normalization should calculate subtotal when the source subtotal is absent.");
 
   const viewModel = helpers.buildOrderViewModel(normalized);
   assert(viewModel.statusLabel === "Needs review", "Admin view model should include status labels.");
   assert(viewModel.itemSummary.includes("2 x 20 lb Ear Corn Bag"), "Admin view model should include item summaries.");
+  assert(viewModel.shipping.carrierService === "UPS Ground", "Admin view model should include carrier and service labels.");
+  assert(viewModel.shipping.amountLabel === "$18.42 shipping", "Admin view model should format shipping amount labels.");
+  assert(viewModel.shipping.trackingLabel === "TRACK123", "Admin view model should include tracking labels.");
+  assert(viewModel.shipping.hasLabel, "Admin view model should mark orders with a trusted label URL.");
   assert(viewModel.subtotalLabel === "$45.89", "Admin view model should format subtotal labels.");
 
   const counts = helpers.calculateBagCounts([
@@ -365,6 +385,8 @@ function createAdminHarness() {
 
   assert(elements.summary.innerHTML.includes("Order requests"), "Admin script should render the offline summary.");
   assert(elements.rows.innerHTML.includes("REQ-1001"), "Admin script should render sample order rows.");
+  assert(elements.rows.innerHTML.includes("Tracking pending"), "Admin script should render label/tracking status in sample rows.");
+  assert(elements.rows.innerHTML.includes("9400100000000000000000"), "Admin script should render trusted tracking numbers in sample rows.");
   assert(!elements.rows.innerHTML.includes("Â·"), "Admin rows should avoid mojibake separators.");
 }
 
