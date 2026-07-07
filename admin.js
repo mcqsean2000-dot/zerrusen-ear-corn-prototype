@@ -172,6 +172,16 @@ function normalizeAdminOrder(order) {
   };
 }
 
+function getAdminLabelRateIds(shipping) {
+  const rateIds = [];
+  const rateId = asText(shipping?.rateId);
+  if (rateId) rateIds.push(rateId);
+  if (Array.isArray(shipping?.packageRateIds)) {
+    shipping.packageRateIds.map(asText).filter(Boolean).forEach((packageRateId) => rateIds.push(packageRateId));
+  }
+  return Array.from(new Set(rateIds));
+}
+
 function normalizeAdminOrders(orders) {
   return Array.isArray(orders) ? orders.map(normalizeAdminOrder) : [];
 }
@@ -180,6 +190,7 @@ function buildAdminOrderViewModel(order) {
   const normalizedOrder = normalizeAdminOrder(order);
   const itemSummary = normalizedOrder.items.map((item) => item.quantity + " x " + item.name).join(", ") || "No items";
   const shipping = buildAdminShippingViewModel(normalizedOrder.shipping);
+  const labelAction = buildAdminLabelActionViewModel(normalizedOrder);
 
   return {
     id: normalizedOrder.id,
@@ -194,7 +205,62 @@ function buildAdminOrderViewModel(order) {
     itemSummary,
     paymentStatus: normalizedOrder.paymentStatus,
     shipping,
+    labelAction,
     subtotalLabel: cents(normalizedOrder.subtotalCents),
+  };
+}
+
+function buildAdminLabelActionViewModel(order) {
+  const normalizedOrder = normalizeAdminOrder(order);
+  const rateIds = getAdminLabelRateIds(normalizedOrder.shipping);
+  const paid = normalizedOrder.paymentStatus === "paid";
+  const hasLabel = Boolean(normalizedOrder.shipping.labelUrl || normalizedOrder.shipping.shippoTransactionId);
+  const labelCount = rateIds.length || asWholeNumber(normalizedOrder.shipping.packageCount) || 1;
+  const labelNoun = labelCount === 1 ? "label" : "labels";
+
+  if (hasLabel) {
+    return {
+      disabled: true,
+      endpoint: "",
+      label: "Label ready",
+      reason: "Tracking stored",
+      requestBody: null,
+      state: "complete",
+    };
+  }
+
+  if (!paid) {
+    return {
+      disabled: true,
+      endpoint: "",
+      label: "Payment required",
+      reason: "Awaiting paid order",
+      requestBody: null,
+      state: "blocked",
+    };
+  }
+
+  if (!rateIds.length) {
+    return {
+      disabled: true,
+      endpoint: "",
+      label: "Rate required",
+      reason: "No trusted rate",
+      requestBody: null,
+      state: "blocked",
+    };
+  }
+
+  return {
+    disabled: true,
+    endpoint: "/api/admin/shippo-labels",
+    label: "Queue " + labelCount + " " + labelNoun,
+    reason: "Auth required",
+    requestBody: {
+      orderRequestId: normalizedOrder.id,
+      rateId: rateIds[0],
+    },
+    state: "auth_required",
   };
 }
 
@@ -262,6 +328,7 @@ if (typeof window !== "undefined") {
     calculateBagCounts: calculateAdminBagCounts,
     buildFulfillmentSummary: buildAdminFulfillmentSummary,
     getPackableOrders: getAdminPackableOrders,
+    buildLabelActionViewModel: buildAdminLabelActionViewModel,
     canTransitionStatus: canTransitionAdminStatus,
     getAllowedStatusTransitions: getAllowedAdminStatusTransitions,
   };
@@ -287,6 +354,13 @@ function renderRows(orders) {
     const labelMarkup = viewModel.shipping.labelUrl
       ? '<a class="admin-link" href="' + escapeHtml(viewModel.shipping.labelUrl) + '" target="_blank" rel="noreferrer">Label ready</a>'
       : "Label pending";
+    const actionPayload = viewModel.labelAction.requestBody ? JSON.stringify(viewModel.labelAction.requestBody) : "";
+    const actionMarkup = [
+      '<button class="admin-action" type="button" disabled data-label-action="' + escapeHtml(viewModel.labelAction.state) + '" data-label-endpoint="' + escapeHtml(viewModel.labelAction.endpoint) + '" data-label-payload="' + escapeHtml(actionPayload) + '">',
+      escapeHtml(viewModel.labelAction.label),
+      "</button>",
+      "<small>" + escapeHtml(viewModel.labelAction.reason) + "</small>",
+    ].join("");
     return [
       "<tr>",
       "<td><strong>" + escapeHtml(viewModel.customerName) + "</strong><small>" + escapeHtml(viewModel.id) + " - ZIP " + escapeHtml(viewModel.shippingZip) + "</small></td>",
@@ -295,6 +369,7 @@ function renderRows(orders) {
       "<td><strong>" + escapeHtml(viewModel.shipping.carrierService) + "</strong><small>" + escapeHtml(viewModel.shipping.amountLabel) + " - " + escapeHtml(viewModel.shipping.packageLabel) + "</small><small>" + labelMarkup + " - " + trackingMarkup + "</small></td>",
       "<td>" + escapeHtml(viewModel.contact) + "<small>Prefers " + escapeHtml(viewModel.preferredContact) + "</small></td>",
       "<td>" + escapeHtml(viewModel.note) + "</td>",
+      "<td>" + actionMarkup + "</td>",
       "</tr>",
     ].join("");
   }).join("");
