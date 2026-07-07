@@ -23,6 +23,10 @@
 .admin-table small, .admin-note { display: block; color: var(--muted); line-height: 1.45; }
 .admin-link { color: var(--field); font-weight: 900; text-decoration-thickness: 2px; text-underline-offset: 3px; }
 .admin-link:hover { color: var(--leaf); }
+.admin-action { min-height: 34px; border: 1px solid var(--line); border-radius: 7px; padding: 0 10px; color: var(--ink); background: #fbfaf6; font-weight: 900; white-space: nowrap; }
+.admin-action[data-label-action="auth_required"] { border-color: var(--leaf); color: var(--leaf); background: #f2f8ee; }
+.admin-action[data-label-action="complete"] { border-color: var(--field); color: var(--field); background: #f0f6f7; }
+.admin-action:disabled { cursor: not-allowed; opacity: 0.78; }
 .status-pill { display: inline-flex; align-items: center; min-height: 30px; padding: 0 10px; color: #fff; background: var(--leaf); border-radius: 999px; font-size: 0.82rem; font-weight: 900; }
 .status-pill[data-status="needs_review"] { color: var(--ink); background: var(--corn); }
 .status-pill[data-status="packed"] { background: var(--field); }

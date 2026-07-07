@@ -252,6 +252,10 @@ assert(adminScript.includes("calculateAdminBagCounts"), "Admin shell must centra
 assert(adminScript.includes("adminStatusTransitions"), "Admin shell must define constrained status transitions before live status updates.");
 assert(adminScript.includes("labelUrl"), "Admin shell should include trusted label URL display fields.");
 assert(adminScript.includes("trackingNumber"), "Admin shell should include trusted tracking number display fields.");
+assert(adminScript.includes("buildAdminLabelActionViewModel"), "Admin shell must centralize label action readiness before live wiring.");
+assert(adminScript.includes("/api/admin/shippo-labels"), "Admin shell label action must target the trusted backend endpoint.");
+assert(adminScript.includes("Auth required"), "Admin shell label action must stay gated until authenticated admin wiring exists.");
+assert(!adminScript.includes("fetch("), "Admin shell must not call live backend endpoints before authenticated admin wiring exists.");
 assert(!adminScript.toLowerCase().includes("firebase"), "Admin shell must not connect to Firebase yet.");
 
 function createAdminFakeElement(name, value = "") {
@@ -369,7 +373,26 @@ function createAdminHarness() {
   assert(viewModel.shipping.amountLabel === "$18.42 shipping", "Admin view model should format shipping amount labels.");
   assert(viewModel.shipping.trackingLabel === "TRACK123", "Admin view model should include tracking labels.");
   assert(viewModel.shipping.hasLabel, "Admin view model should mark orders with a trusted label URL.");
+  assert(viewModel.labelAction.state === "complete", "Admin label action should show completed labels as non-purchasable.");
   assert(viewModel.subtotalLabel === "$45.89", "Admin view model should format subtotal labels.");
+
+  const unpaidLabelAction = helpers.buildLabelActionViewModel({ paymentStatus: "unpaid", shippingRateId: "rate_unpaid" });
+  assert(unpaidLabelAction.state === "blocked", "Admin label action should block unpaid orders.");
+  assert(unpaidLabelAction.label === "Payment required", "Admin label action should explain unpaid order blocking.");
+
+  const missingRateLabelAction = helpers.buildLabelActionViewModel({ paymentStatus: "paid" });
+  assert(missingRateLabelAction.state === "blocked", "Admin label action should block orders without trusted rates.");
+  assert(missingRateLabelAction.label === "Rate required", "Admin label action should explain missing-rate blocking.");
+
+  const readyLabelAction = helpers.buildLabelActionViewModel({
+    id: "REQ-2000",
+    paymentStatus: "paid",
+    shippingPackageRateIds: ["rate_a", "rate_b"],
+  });
+  assert(readyLabelAction.state === "auth_required", "Admin label action should gate ready label purchase behind auth wiring.");
+  assert(readyLabelAction.endpoint === "/api/admin/shippo-labels", "Admin label action should point to the trusted label endpoint.");
+  assert(readyLabelAction.requestBody.orderRequestId === "REQ-2000", "Admin label action should prepare the order id for trusted backend calls.");
+  assert(readyLabelAction.requestBody.rateId === "rate_a", "Admin label action should prepare one owned rate id at a time.");
 
   const counts = helpers.calculateBagCounts([
     normalized,
@@ -397,6 +420,9 @@ function createAdminHarness() {
 
   assert(elements.summary.innerHTML.includes("Order requests"), "Admin script should render the offline summary.");
   assert(elements.rows.innerHTML.includes("REQ-1001"), "Admin script should render sample order rows.");
+  assert(elements.rows.innerHTML.includes('data-label-action="auth_required"'), "Admin rows should render auth-gated label actions for paid rated orders.");
+  assert(elements.rows.innerHTML.includes('data-label-endpoint="/api/admin/shippo-labels"'), "Admin rows should keep label action routing on the trusted backend endpoint.");
+  assert(elements.rows.innerHTML.includes('<button class="admin-action" type="button" disabled'), "Admin label action buttons should remain disabled in the static shell.");
   assert(elements.rows.innerHTML.includes("Tracking pending"), "Admin script should render label/tracking status in sample rows.");
   assert(elements.rows.innerHTML.includes("9400100000000000000000"), "Admin script should render trusted tracking numbers in sample rows.");
   assert(!elements.rows.innerHTML.includes("Â·"), "Admin rows should avoid mojibake separators.");
