@@ -1,8 +1,10 @@
 exclude:
   - .firebaserc.example
   - admin.css
+  - admin-config.js
   - admin.html
   - admin.js
+  - admin-live.js
   - dist/
   - docs/
   - firebase.json

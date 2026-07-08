@@ -315,6 +315,12 @@ function getAdminPackableOrders(orders) {
 }
 
 const adminOrders = normalizeAdminOrders(sampleOrders);
+let currentAdminOrders = adminOrders;
+
+function setAdminOrders(orders) {
+  currentAdminOrders = normalizeAdminOrders(orders);
+  render(currentAdminOrders);
+}
 
 if (typeof window !== "undefined") {
   window.TheosAdminOrders = {
@@ -331,6 +337,8 @@ if (typeof window !== "undefined") {
     buildLabelActionViewModel: buildAdminLabelActionViewModel,
     canTransitionStatus: canTransitionAdminStatus,
     getAllowedStatusTransitions: getAllowedAdminStatusTransitions,
+    render,
+    setOrders: setAdminOrders,
   };
 }
 
@@ -384,13 +392,13 @@ function renderPackingList(orders) {
   ].join("");
 }
 
-function render() {
+function render(orders = currentAdminOrders) {
   const status = statusFilter.value;
-  const visibleOrders = status === "all" ? adminOrders : adminOrders.filter((order) => order.status === status);
+  const visibleOrders = status === "all" ? orders : orders.filter((order) => order.status === status);
   renderSummary(visibleOrders);
   renderRows(visibleOrders);
   renderPackingList(visibleOrders);
 }
 
-statusFilter.addEventListener("change", render);
+statusFilter.addEventListener("change", () => render());
 render();
