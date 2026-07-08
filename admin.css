@@ -8,6 +8,11 @@
 .admin-auth-panel strong { color: var(--field); font-size: 1rem; }
 .admin-auth-panel span { color: var(--muted); font-weight: 700; }
 :root[data-admin-signed-in] .admin-auth-panel strong { color: var(--leaf); }
+.admin-sign-in { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; align-items: end; }
+.admin-sign-in label { display: grid; gap: 5px; color: var(--muted); font-size: 0.78rem; font-weight: 900; }
+.admin-sign-in input { width: 180px; min-height: 36px; border: 1px solid var(--line); border-radius: 7px; padding: 0 10px; color: var(--ink); background: #fbfaf6; }
+.admin-sign-in button { min-height: 36px; border: 1px solid var(--field); border-radius: 7px; padding: 0 12px; color: #fff; background: var(--field); font-weight: 900; }
+.admin-sign-in input:disabled, .admin-sign-in button:disabled { cursor: not-allowed; opacity: 0.64; }
 .admin-action-status { min-height: 22px; margin: -14px 0 0; color: var(--field); font-weight: 800; }
 .admin-action-status[data-tone="error"] { color: #9b2c2c; }
 .admin-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
