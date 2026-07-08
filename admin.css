@@ -8,6 +8,8 @@
 .admin-auth-panel strong { color: var(--field); font-size: 1rem; }
 .admin-auth-panel span { color: var(--muted); font-weight: 700; }
 :root[data-admin-signed-in] .admin-auth-panel strong { color: var(--leaf); }
+.admin-action-status { min-height: 22px; margin: -14px 0 0; color: var(--field); font-weight: 800; }
+.admin-action-status[data-tone="error"] { color: #9b2c2c; }
 .admin-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .metric, .admin-panel { background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 12px 36px rgba(37, 33, 27, 0.07); }
 .metric { display: grid; gap: 8px; padding: 18px; }
