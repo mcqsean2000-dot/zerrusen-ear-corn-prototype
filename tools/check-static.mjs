@@ -13,7 +13,9 @@ const requiredFiles = [
   "checkout-config.js",
   "admin.html",
   "admin.css",
+  "admin-config.js",
   "admin.js",
+  "admin-live.js",
   "robots.txt",
   "sitemap.xml",
   "_config.yml",
@@ -61,7 +63,9 @@ const storefrontScript = await readFile("script.js", "utf8");
 const orderRequestScript = await readFile("order-request.js", "utf8");
 const checkoutConfigScript = await readFile("checkout-config.js", "utf8");
 const admin = await readFile("admin.html", "utf8");
+const adminConfigScript = await readFile("admin-config.js", "utf8");
 const adminScript = await readFile("admin.js", "utf8");
+const adminLiveScript = await readFile("admin-live.js", "utf8");
 const gitignore = await readFile(".gitignore", "utf8");
 const packageJson = JSON.parse(await readFile("package.json", "utf8"));
 const hostingReadiness = await readFile("docs/firebase-hosting-readiness.md", "utf8");
@@ -86,6 +90,8 @@ assert(firebaseConfig.hosting?.ignore?.includes("**/*.md"), "Firebase Hosting sh
 assert(firebaseConfig.hosting?.ignore?.includes("docs/**"), "Firebase Hosting should not publish planning docs.");
 assert(firebaseConfig.hosting?.ignore?.includes("functions/**"), "Firebase Hosting should not publish backend function source.");
 assert(firebaseConfig.hosting?.ignore?.includes("admin.html"), "Firebase Hosting should not publish the unauthenticated admin prototype.");
+assert(firebaseConfig.hosting?.ignore?.includes("admin-config.js"), "Firebase Hosting should not publish admin config before admin launch.");
+assert(firebaseConfig.hosting?.ignore?.includes("admin-live.js"), "Firebase Hosting should not publish admin live bridge before admin launch.");
 assert(firebaseConfig.hosting?.ignore?.includes("**/*.zip"), "Firebase Hosting should not publish local ZIP artifacts.");
 assert(firebaseConfig.hosting?.ignore?.includes("dist/**"), "Firebase Hosting should not publish generated package artifacts.");
 assert(firebaseConfig.firestore?.rules === "firestore.rules", "Firebase config must point at firestore.rules.");
@@ -139,6 +145,8 @@ assert(jekyllConfig.includes("tools/"), "GitHub Pages preview must exclude repo 
 assert(jekyllConfig.includes("firebase.json"), "GitHub Pages preview must exclude Firebase config.");
 assert(jekyllConfig.includes("firestore.rules"), "GitHub Pages preview must exclude Firestore rules.");
 assert(jekyllConfig.includes("admin.html"), "GitHub Pages preview must exclude the unauthenticated admin prototype.");
+assert(jekyllConfig.includes("admin-config.js"), "GitHub Pages preview must exclude admin config before admin launch.");
+assert(jekyllConfig.includes("admin-live.js"), "GitHub Pages preview must exclude admin live bridge before admin launch.");
 assert(packageStaticScript.includes("storefrontFiles"), "Static package script must use an explicit storefront file allowlist.");
 assert(packageStaticScript.includes("allowedAssetExtensions"), "Static package script must use an explicit asset type allowlist.");
 assert(packageStaticScript.includes("dist\", \"godaddy-static"), "Static package script must write to dist/godaddy-static.");
@@ -146,6 +154,8 @@ assert(packageStaticScript.includes("TheosCheckoutConfig?.checkoutEndpoint === \
 assert(packageStaticScript.includes("mkdtemp"), "Static package safety check must validate a generated package artifact.");
 assert(packageStaticScript.includes("functions"), "Static package script must prevent backend functions from entering the deploy package.");
 assert(packageStaticScript.includes("docs"), "Static package script must prevent docs from entering the deploy package.");
+assert(packageStaticScript.includes("admin-config.js"), "Static package script must prevent admin config from entering the storefront deploy package.");
+assert(packageStaticScript.includes("admin-live.js"), "Static package script must prevent admin live bridge from entering the storefront deploy package.");
 assert(packageStaticScript.includes("STRIPE_SECRET_KEY"), "Static package script must scan for Stripe secret-looking values.");
 assert(smokeStaticPackageScript.includes("dist\", \"godaddy-static"), "Static smoke check must target dist/godaddy-static by default.");
 assert(smokeStaticPackageScript.includes("createServer"), "Static smoke check must run against a local static server.");
@@ -266,7 +276,19 @@ assert(
     !checkoutConfigScript.includes("card"),
   "Storefront must not collect or handle raw payment details.",
 );
+assert(admin.includes("admin-config.js"), "Admin shell must load the public admin config gate.");
 assert(admin.includes("admin.js"), "Admin shell must load admin.js.");
+assert(admin.includes("admin-live.js"), "Admin shell must load the optional live admin bridge.");
+assert(admin.indexOf("admin-config.js") < admin.indexOf("admin.js"), "Admin config must load before admin behavior.");
+assert(admin.indexOf("admin.js") < admin.indexOf("admin-live.js"), "Admin sample renderer must load before the live bridge.");
+assert(admin.includes("data-admin-auth-status"), "Admin shell must render auth state.");
+assert(adminConfigScript.includes("TheosAdminConfig"), "Admin config must expose the public admin config object.");
+assert(adminConfigScript.includes("enabled: false"), "Admin live mode must stay disabled until Firebase config is intentionally filled.");
+assert(adminConfigScript.includes("apiKey: \"\""), "Admin config must keep Firebase API key blank by default.");
+assert(adminConfigScript.includes("projectId: \"\""), "Admin config must keep Firebase project ID blank by default.");
+assert(adminConfigScript.includes("/api/admin/order-status"), "Admin config must point status actions at the trusted backend endpoint.");
+assert(adminConfigScript.includes("/api/admin/shippo-labels"), "Admin config must point label actions at the trusted backend endpoint.");
+assert(!adminConfigScript.includes("sk_") && !adminConfigScript.includes("whsec_"), "Admin config must not include secret-looking values.");
 assert(adminScript.includes("sampleOrders"), "Admin shell should use sample data only in this slice.");
 assert(adminScript.includes("normalizeAdminOrder"), "Admin shell must centralize order normalization for future authenticated reads.");
 assert(adminScript.includes("normalizeAdminShipping"), "Admin shell must centralize shipping normalization for future authenticated reads.");
@@ -281,6 +303,14 @@ assert(adminScript.includes("/api/admin/shippo-labels"), "Admin shell label acti
 assert(adminScript.includes("Auth required"), "Admin shell label action must stay gated until authenticated admin wiring exists.");
 assert(!adminScript.includes("fetch("), "Admin shell must not call live backend endpoints before authenticated admin wiring exists.");
 assert(!adminScript.toLowerCase().includes("firebase"), "Admin shell must not connect to Firebase yet.");
+assert(adminLiveScript.includes("configuredFirebase"), "Admin live bridge must gate Firebase initialization behind config.");
+assert(adminLiveScript.includes("getIdToken"), "Admin live bridge must use Firebase ID tokens for admin endpoint calls.");
+assert(adminLiveScript.includes("authorization"), "Admin live bridge must send Authorization headers to admin endpoints.");
+assert(adminLiveScript.includes("orderRequests"), "Admin live bridge must read the orderRequests collection after sign-in.");
+assert(adminLiveScript.includes("setOrders"), "Admin live bridge must hand authenticated reads to the existing renderer.");
+assert(adminLiveScript.includes("postAdminJson"), "Admin live bridge must centralize guarded admin endpoint calls.");
+assert(!adminLiveScript.includes("body.admin"), "Admin live bridge must not send request-provided admin identity.");
+assert(!adminLiveScript.includes("sk_") && !adminLiveScript.includes("whsec_"), "Admin live bridge must not include secret-looking values.");
 
 function createAdminFakeElement(name, value = "") {
   return {
@@ -309,6 +339,7 @@ function createAdminHarness() {
         "[data-order-rows]": elements.rows,
         "[data-packing-list]": elements.packingList,
         "[data-status-filter]": elements.statusFilter,
+        "[data-admin-auth-status]": createAdminFakeElement("authStatus"),
       }[selector] || null;
     },
   };
@@ -353,6 +384,11 @@ function createAdminHarness() {
   }
   assert(!helpers.allowedStatuses.includes("refunded"), "Admin exported status list should not be expandable by mutating helper objects.");
   assert(!helpers.canTransitionStatus("needs_review", "refunded"), "Admin transitions should not be expandable by mutating helper objects.");
+  elements.statusFilter.value = "needs_review";
+  elements.statusFilter.listeners.change[0]({ type: "change" });
+  assert(elements.rows.innerHTML.includes("REQ-1001"), "Admin status filter listener should render current orders, not the browser event object.");
+  elements.statusFilter.value = "all";
+  elements.statusFilter.listeners.change[0]({ type: "change" });
 
   const normalized = helpers.normalizeOrder({
     id: " firestore-doc-id ",
@@ -450,6 +486,116 @@ function createAdminHarness() {
   assert(elements.rows.innerHTML.includes("Tracking pending"), "Admin script should render label/tracking status in sample rows.");
   assert(elements.rows.innerHTML.includes("9400100000000000000000"), "Admin script should render trusted tracking numbers in sample rows.");
   assert(!elements.rows.innerHTML.includes("Â·"), "Admin rows should avoid mojibake separators.");
+}
+
+{
+  const authStatus = createAdminFakeElement("authStatus");
+  const documentElement = {
+    attributes: new Set(),
+    toggleAttribute(name, enabled) {
+      if (enabled) {
+        this.attributes.add(name);
+      } else {
+        this.attributes.delete(name);
+      }
+    },
+    hasAttribute(name) {
+      return this.attributes.has(name);
+    },
+  };
+  const document = {
+    readyState: "loading",
+    documentElement,
+    addEventListener() {},
+    querySelector(selector) {
+      return selector === "[data-admin-auth-status]" ? authStatus : null;
+    },
+  };
+  let authCallback = null;
+  let liveOrders = null;
+  const sandbox = {
+    Error,
+    JSON,
+    Object,
+    Promise,
+    document,
+    fetch() {},
+    window: {
+      TheosAdminConfig: {
+        enabled: true,
+        firebase: {
+          apiKey: "public-api-key",
+          appId: "public-app-id",
+          authDomain: "theos.example",
+          projectId: "theos-project",
+        },
+        endpoints: {
+          labelPurchase: "/api/admin/shippo-labels",
+          statusUpdate: "/api/admin/order-status",
+        },
+      },
+      TheosAdminOrders: {
+        setOrders(orders) {
+          liveOrders = orders;
+        },
+      },
+    },
+  };
+
+  new Script(adminLiveScript, { filename: "admin-live.js" }).runInContext(createContext(sandbox));
+  await sandbox.window.TheosAdminLive.initializeAdminLive({
+    importModule(specifier) {
+      if (specifier.includes("firebase-app")) {
+        return Promise.resolve({
+          initializeApp() {
+            return {};
+          },
+        });
+      }
+      if (specifier.includes("firebase-auth")) {
+        return Promise.resolve({
+          getAuth() {
+            return {};
+          },
+          onAuthStateChanged(auth, callback) {
+            authCallback = callback;
+          },
+        });
+      }
+      if (specifier.includes("firebase-firestore")) {
+        return Promise.resolve({
+          collection() {
+            return {};
+          },
+          getFirestore() {
+            return {};
+          },
+          getDocs() {
+            return Promise.reject(new Error("permission-denied"));
+          },
+          limit(value) {
+            return value;
+          },
+          orderBy(field, direction) {
+            return [field, direction];
+          },
+          query() {
+            return {};
+          },
+        });
+      }
+      return Promise.reject(new Error("Unexpected import " + specifier));
+    },
+  });
+  await authCallback({
+    getIdToken() {
+      return Promise.resolve("not-admin-token");
+    },
+  });
+
+  assert(authStatus.textContent === "Admin access denied", "Admin live bridge should fail closed when Firestore admin reads are denied.");
+  assert(!documentElement.hasAttribute("data-admin-signed-in"), "Admin live bridge must not leave the page marked signed in after denied reads.");
+  assert(liveOrders === null, "Denied admin reads must not replace sample orders.");
 }
 
 const validOrderRequest = orderRequests.buildOrderRequest({

@@ -31,7 +31,12 @@
       <section class="admin-title" aria-labelledby="admin-title">
         <p class="eyebrow">Fulfillment foundation</p>
         <h1 id="admin-title">Order requests, packing counts, and follow-up cues.</h1>
-        <p>This static admin shell is a planning surface for the future authenticated dashboard. It uses sample data only and does not read or write Firebase.</p>
+        <p>This admin shell stays in sample mode until Firebase public config and admin custom-claim sign-in are enabled.</p>
+      </section>
+
+      <section class="admin-auth-panel" aria-label="Admin access" data-admin-auth-panel>
+        <strong data-admin-auth-status>Sample mode</strong>
+        <span>Firebase admin sign-in is not configured for this static preview.</span>
       </section>
 
       <section class="admin-metrics" aria-label="Fulfillment summary" data-admin-summary></section>
@@ -75,11 +80,13 @@
           <p class="eyebrow">Daily plan</p>
           <h2 id="packing-title">Packing list</h2>
           <div class="packing-list" data-packing-list></div>
-          <p class="admin-note">Future build: replace sample data with authenticated Firestore reads from <code>orderRequests</code>.</p>
+          <p class="admin-note">Authenticated reads will use <code>orderRequests</code> after admin sign-in is configured.</p>
         </aside>
       </section>
     </main>
 
+    <script src="admin-config.js"></script>
     <script src="admin.js"></script>
+    <script src="admin-live.js"></script>
   </body>
 </html>
