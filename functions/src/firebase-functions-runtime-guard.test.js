@@ -386,15 +386,17 @@ test("runtime guard composes admin shipping label handler options with injected 
   const res = mockRes();
   await adminShippingLabelsHandler(mockReq({
     body: {
-      admin: {
-        email: "admin@example.test",
-        uid: "admin-user-001",
-      },
       orderRequestId: "runtimeOrders_1",
       rateId: "rate_20",
     },
   }), res, {
     ...runtime,
+    authenticateAdminRequest() {
+      return {
+        email: "admin@example.test",
+        uid: "admin-user-001",
+      };
+    },
     shippingLabelDependencies: {
       ...runtime.shippingLabelDependencies,
       createShippoTransaction({ rateId }) {

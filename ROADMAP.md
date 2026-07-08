@@ -201,7 +201,8 @@ Build order:
 7. Add Stripe webhooks.
 8. Build admin fulfillment dashboard.
    - Static admin planning shell now exists at `admin.html`.
-   - Next step is authenticated Firestore reads and status updates.
+   - Backend admin label/status routes now require Firebase Auth admin custom-claim verification.
+   - Next step is authenticated admin UI sign-in, Firestore reads, and guarded status/label controls.
 9. Add Shippo label purchase and tracking updates in admin.
 10. Add email notifications.
 11. Deploy the public storefront to Firebase Hosting.

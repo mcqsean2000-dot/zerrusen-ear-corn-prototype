@@ -33,8 +33,10 @@ const requiredFiles = [
   "functions/.env.example",
   "functions/package.json",
   "functions/src/index.js",
+  "functions/src/admin-auth.js",
   "functions/src/firebase-runtime.js",
   "functions/src/index.test.js",
+  "functions/src/admin-auth.test.js",
   "functions/src/order-validation.js",
   "functions/src/order-validation.test.js",
 ];
@@ -73,6 +75,7 @@ const smokeStaticPackageScript = await readFile("tools/smoke-static-package.mjs"
 const functionsPackage = JSON.parse(await readFile("functions/package.json", "utf8"));
 const functionsEnvExample = await readFile("functions/.env.example", "utf8");
 const functionsIndex = await readFile("functions/src/index.js", "utf8");
+const functionsAdminAuth = await readFile("functions/src/admin-auth.js", "utf8");
 const functionsRuntime = await readFile("functions/src/firebase-runtime.js", "utf8");
 const functionsValidation = await readFile("functions/src/order-validation.js", "utf8");
 
@@ -113,9 +116,9 @@ assert(backendScaffold.includes("POST /api/admin/shippo-labels"), "Backend scaff
 assert(backendScaffold.includes("POST /api/admin/order-status"), "Backend scaffold doc must document the admin order status endpoint.");
 assert(backendScaffold.includes("order is paid"), "Backend scaffold doc must document paid-order validation before label purchase.");
 assert(backendScaffold.includes("belongs to the order"), "Backend scaffold doc must document owned Shippo rate validation before label purchase.");
-assert(backendScaffold.includes("request-provided admin identity only"), "Backend scaffold doc must call out the temporary admin identity boundary.");
+assert(backendScaffold.includes("Firebase Auth admin custom claim"), "Backend scaffold doc must document the admin custom-claim boundary.");
 assert(backendScaffold.includes("admin_status_dependency_missing"), "Backend scaffold doc must document disabled admin status endpoint behavior.");
-assert(backendScaffold.includes("Firebase runtime intentionally does not inject `updateAdminOrderStatus` yet"), "Backend scaffold doc must preserve the admin-auth-before-runtime-wiring boundary.");
+assert(backendScaffold.includes("derived from the verified Firebase ID token"), "Backend scaffold doc must preserve the server-derived admin actor boundary.");
 assert(adminFulfillment.includes("POST /api/admin/shippo-labels"), "Admin fulfillment doc must point future UI work at the trusted label endpoint.");
 assert(adminFulfillment.includes("No browser-side Shippo label purchase"), "Admin fulfillment doc must reject browser-side Shippo label purchase.");
 assert(shippoPlan.includes("POST /api/admin/shippo-labels"), "Shippo plan must document the admin label endpoint.");
@@ -151,13 +154,23 @@ assert(smokeStaticPackageScript.includes("functions"), "Static smoke check must 
 assert(smokeStaticPackageScript.includes("docs"), "Static smoke check must verify docs are not exposed.");
 assert(smokeStaticPackageScript.includes("STRIPE_SECRET_KEY"), "Static smoke check must scan for Stripe secret-looking values.");
 assert(functionsPackage.scripts?.check?.includes("node --test"), "Backend package must include a local test check.");
+assert(functionsPackage.scripts?.check?.includes("src/admin-auth.js"), "Backend package check must include admin auth helper syntax checks.");
+assert(functionsPackage.scripts?.check?.includes("src/admin-auth.test.js"), "Backend package check must include admin auth tests.");
 assert(functionsIndex.includes("checkoutSessionsHandler"), "Backend scaffold must export checkout session handling.");
 assert(functionsIndex.includes("stripeWebhookHandler"), "Backend scaffold must export Stripe webhook handling.");
 assert(functionsIndex.includes("adminOrderStatusHandler"), "Backend scaffold must export admin order status handling.");
 assert(functionsIndex.includes("/api/admin/order-status"), "Backend scaffold must route admin order status updates.");
 assert(functionsIndex.includes("admin_status_dependency_missing"), "Backend scaffold must keep admin status writes disabled without trusted persistence.");
-assert(!functionsRuntime.includes("adminStatusDependencies"), "Firebase runtime must not wire admin status updates before authenticated admin claim verification exists.");
-assert(!functionsRuntime.includes("updateAdminOrderStatus"), "Firebase runtime must not expose admin status writes before authenticated admin claim verification exists.");
+assert(functionsIndex.includes("admin_auth_dependency_missing"), "Admin endpoints must fail closed when auth verification is not injected.");
+assert(functionsIndex.includes("authenticateAdminRequest({ req })"), "Admin endpoints must derive the admin actor from the authenticated request.");
+assert(!/admin:\s*body\.admin/.test(functionsIndex), "Admin endpoints must not trust request-provided admin identity.");
+assert(functionsAdminAuth.includes("createFirebaseAdminAuthenticator"), "Backend must include a Firebase admin custom-claim authenticator.");
+assert(functionsAdminAuth.includes("verifyIdToken"), "Admin auth helper must verify Firebase ID tokens.");
+assert(functionsAdminAuth.includes("decodedToken.admin === true"), "Admin auth helper must require the admin custom claim.");
+assert(functionsRuntime.includes("getAuth"), "Firebase runtime must use Firebase Admin Auth for admin endpoints.");
+assert(functionsRuntime.includes("createFirebaseAdminAuthenticator"), "Firebase runtime must inject the admin custom-claim authenticator.");
+assert(functionsRuntime.includes("adminStatusDependencies"), "Firebase runtime may wire admin status updates only after admin auth verification is injected.");
+assert(functionsRuntime.includes("updateAdminOrderStatus: firestoreAdapter.updateAdminOrderStatus"), "Firebase runtime must wire admin status updates through the trusted Firestore adapter.");
 assert(functionsIndex.includes("CORS_ALLOWED_ORIGINS"), "Backend scaffold must include configurable CORS origin handling.");
 assert(functionsValidation.includes("validateOrderRequestDraft"), "Backend scaffold must include order request validation helpers.");
 assert(functionsValidation.includes("FIRESTORE_SERVER_TIMESTAMP_REQUIRED"), "Backend scaffold must preserve Firestore server timestamp boundary.");

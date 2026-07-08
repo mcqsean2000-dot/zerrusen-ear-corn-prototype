@@ -62,15 +62,11 @@ Expected request body:
 ```json
 {
   "orderRequestId": "firestore-order-id",
-  "rateId": "shippo-rate-id",
-  "admin": {
-    "uid": "firebase-admin-uid",
-    "email": "admin@example.com"
-  }
+  "rateId": "shippo-rate-id"
 }
 ```
 
-The backend must reject label purchase unless the order is already paid and the requested `rateId` belongs to that order's trusted Shippo rate options. The admin identity is request-provided in the current scaffold only; production wiring must replace that with authenticated admin context from Firebase Auth or the selected admin provider.
+The request must include an `Authorization: Bearer <Firebase ID token>` header. The backend verifies that token with Firebase Admin Auth, requires the Firebase Auth admin custom claim, and derives the admin actor from the verified token instead of trusting request body identity. It must also reject label purchase unless the order is already paid and the requested `rateId` belongs to that order's trusted Shippo rate options.
 
 Successful responses include safe fulfillment fields for admin display:
 
@@ -128,7 +124,7 @@ Completed:
 - Re-rate the selected Shippo rate server-side before creating Stripe Checkout.
 - Include server-verified shipping as a Stripe Checkout line item.
 - Add an SDK-free Shippo transaction adapter for the future admin label purchase flow.
-- Add trusted admin endpoint scaffold `POST /api/admin/shippo-labels` to buy one Shippo label and persist label/tracking fields for a paid order.
+- Add trusted admin endpoint scaffold `POST /api/admin/shippo-labels` to verify Firebase admin auth, buy one Shippo label, and persist label/tracking fields for a paid order.
 
 Remaining:
 

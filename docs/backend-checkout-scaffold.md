@@ -37,7 +37,8 @@ POST /api/admin/order-status
 ## Files
 
 - `functions/src/order-validation.js` keeps the server-owned product catalog, validates storefront drafts, recalculates subtotals, rejects client-supplied trusted fields, and builds safe Stripe metadata.
-- `functions/src/index.js` exports lightweight route handlers for checkout sessions, Stripe webhooks, admin status updates, and admin shipping label purchase. They are disabled by default unless environment configuration and future trusted adapters are provided.
+- `functions/src/index.js` exports lightweight route handlers for checkout sessions, Stripe webhooks, admin status updates, and admin shipping label purchase. Public checkout routes are disabled by default unless environment configuration and trusted adapters are provided. Admin routes also require authenticated Firebase admin custom-claim verification before they call trusted persistence or Shippo adapters.
+- `functions/src/admin-auth.js` verifies Firebase Auth bearer tokens and derives the admin actor from an `admin: true` custom claim. Admin route handlers must use this server-derived actor rather than `body.admin` supplied by browser JavaScript.
 - `functions/src/checkout-adapter.js` builds the production-adjacent Stripe Checkout handoff using injected trusted storage and Stripe functions only. It does not import Stripe, Firebase, or make network calls by itself.
 - `functions/src/stripe-api-adapter.js` provides the SDK-agnostic Stripe API boundary for future injection. It wraps a Stripe-like client passed in by trusted runtime code, forwards hosted Checkout Session params to `checkout.sessions.create`, and forwards raw webhook payloads to `webhooks.constructEvent` without importing Stripe or storing secrets.
 - `functions/src/stripe-webhook-adapter.js` maps already-verified Stripe webhook events to trusted order update fields using injected order lookup, update, and event idempotency functions only. It does not import Stripe, Firebase, or make network calls by itself.
@@ -171,15 +172,11 @@ Webhook updates should be idempotent. Store processed Stripe event IDs through a
 ```json
 {
   "orderRequestId": "firestore-order-id",
-  "rateId": "shippo-rate-id",
-  "admin": {
-    "uid": "firebase-admin-uid",
-    "email": "admin@example.com"
-  }
+  "rateId": "shippo-rate-id"
 }
 ```
 
-The current scaffold accepts request-provided admin identity only to keep the handler testable before the authenticated admin surface exists. Production runtime must derive the admin identity from Firebase Auth custom claims or the selected admin provider before calling the same adapter boundary.
+The request must include an `Authorization: Bearer <Firebase ID token>` header. The Firebase runtime verifies the token with Firebase Admin Auth, requires a Firebase Auth admin custom claim, and passes the admin actor derived from the verified Firebase ID token into the same adapter boundary. The handler returns `admin_auth_dependency_missing` when no trusted admin authenticator is injected, `admin_auth_required` when the bearer token is missing, and `admin_forbidden` when the verified token does not carry the admin claim.
 
 The trusted storage adapter must verify two things before Shippo is called: the order is paid, and the requested Shippo `rateId` belongs to the order's stored trusted shipping rates. If either check fails, the handler must return a safe error instead of buying a label.
 
@@ -194,19 +191,15 @@ For multi-package orders, the scaffold buys one label for one owned Shippo rate 
 ```json
 {
   "orderRequestId": "firestore-order-id",
-  "status": "ready_to_pack",
-  "admin": {
-    "uid": "firebase-admin-uid",
-    "email": "admin@example.com"
-  }
+  "status": "ready_to_pack"
 }
 ```
 
-The current scaffold accepts request-provided admin identity only to keep the handler testable before the authenticated admin surface exists. Production runtime must derive the admin identity from Firebase Auth custom claims or the selected admin provider before calling the same adapter boundary.
+The request must include an `Authorization: Bearer <Firebase ID token>` header. The handler ignores any request-provided admin identity and uses only the admin actor derived from the verified Firebase ID token.
 
 The trusted storage adapter validates the current order exists, the requested status is one of the initial admin-shell statuses, and the transition is allowed before writing `status` plus audit metadata. Without an injected `updateAdminOrderStatus` dependency, the route returns `admin_status_dependency_missing` instead of attempting a live write.
 
-The Firebase runtime intentionally does not inject `updateAdminOrderStatus` yet. Production wiring must first verify an authenticated Firebase Auth admin custom claim and derive the admin actor server-side instead of trusting `body.admin` from browser JavaScript.
+The Firebase runtime now injects `updateAdminOrderStatus` only alongside Firebase Admin Auth token verification. Keep that pairing intact: status writes must not be exposed without authenticated Firebase Auth admin custom-claim verification and a server-derived admin actor.
 
 Version-one status transitions remain intentionally narrow: `needs_review` to `ready_to_pack`, `ready_to_pack` to `needs_review` or `packed`, and `packed` back to `ready_to_pack` for correction.
 

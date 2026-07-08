@@ -54,6 +54,15 @@ const configuredShippingEnv = {
   SHIP_FROM_ZIP: "62467",
 };
 
+const authenticatedAdmin = Object.freeze({
+  email: "admin@example.test",
+  uid: "admin-user-001",
+});
+
+function authenticateAdminRequest() {
+  return authenticatedAdmin;
+}
+
 function mockReq({ method = "POST", headers = {}, body = {} } = {}) {
   return {
     method,
@@ -467,7 +476,7 @@ test("admin shipping label handler returns disabled response when Shippo token i
   });
   const res = mockRes();
 
-  await adminShippingLabelsHandler(req, res, { env: {} });
+  await adminShippingLabelsHandler(req, res, { authenticateAdminRequest, env: {} });
 
   assert.equal(res.statusCode, 503);
   assert.equal(parseJson(res).error.code, "shipping_label_purchase_disabled");
@@ -486,11 +495,33 @@ test("admin order status handler reports missing trusted persistence dependency"
   });
   const res = mockRes();
 
-  await adminOrderStatusHandler(req, res, { env: { NODE_ENV: "development" } });
+  await adminOrderStatusHandler(req, res, { authenticateAdminRequest, env: { NODE_ENV: "development" } });
 
   assert.equal(res.statusCode, 501);
   assert.equal(parseJson(res).error.code, "admin_status_dependency_missing");
   assert.deepEqual(parseJson(res).setupRequired, ["updateAdminOrderStatus"]);
+});
+
+test("admin order status handler allows Firebase auth headers during CORS preflight", async () => {
+  const req = mockReq({
+    method: "OPTIONS",
+    headers: {
+      origin: "https://theos.example",
+      "access-control-request-headers": "authorization, content-type",
+    },
+  });
+  const res = mockRes();
+
+  await adminOrderStatusHandler(req, res, {
+    env: {
+      CORS_ALLOWED_ORIGINS: "https://theos.example",
+    },
+  });
+
+  assert.equal(res.statusCode, 204);
+  assert.equal(res.headers["access-control-allow-origin"], "https://theos.example");
+  assert.match(res.headers["access-control-allow-headers"], /\bauthorization\b/);
+  assert.match(res.headers["access-control-allow-headers"], /\bcontent-type\b/);
 });
 
 test("admin order status handler updates through trusted dependency", async () => {
@@ -498,8 +529,8 @@ test("admin order status handler updates through trusted dependency", async () =
     headers: { origin: "https://theos.example" },
     body: {
       admin: {
-        email: "admin@example.test",
-        uid: "admin-user-001",
+        email: "spoofed@example.test",
+        uid: "spoofed-user",
       },
       orderRequestId: "order_123",
       status: "ready_to_pack",
@@ -512,6 +543,7 @@ test("admin order status handler updates through trusted dependency", async () =
     env: {
       CORS_ALLOWED_ORIGINS: "https://theos.example",
     },
+    authenticateAdminRequest,
     adminStatusDependencies: {
       updateAdminOrderStatus(args) {
         updateArgs = args;
@@ -534,6 +566,8 @@ test("admin order status handler updates through trusted dependency", async () =
   assert.equal(res.headers["access-control-allow-origin"], "https://theos.example");
   assert.equal(updateArgs.orderRequestId, "order_123");
   assert.equal(updateArgs.status, "ready_to_pack");
+  assert.equal(updateArgs.admin.email, "admin@example.test");
+  assert.equal(updateArgs.admin.uid, "admin-user-001");
   assert.equal(body.orderRequestId, "order_123");
   assert.equal(body.fromStatus, "needs_review");
   assert.equal(body.status, "ready_to_pack");
@@ -555,6 +589,7 @@ test("admin order status handler maps invalid transitions to safe errors", async
 
   await adminOrderStatusHandler(req, res, {
     env: {},
+    authenticateAdminRequest,
     updateAdminOrderStatus() {
       const error = new Error("Invalid transition.");
       error.code = "admin_status_transition_invalid";
@@ -564,6 +599,51 @@ test("admin order status handler maps invalid transitions to safe errors", async
 
   assert.equal(res.statusCode, 409);
   assert.equal(parseJson(res).error.code, "admin_status_transition_invalid");
+});
+
+test("admin order status handler requires authenticated admin boundary before trusted persistence", async () => {
+  const req = mockReq({
+    body: {
+      orderRequestId: "order_123",
+      status: "ready_to_pack",
+    },
+  });
+  const res = mockRes();
+
+  await adminOrderStatusHandler(req, res, {
+    env: { NODE_ENV: "development" },
+    updateAdminOrderStatus() {
+      throw new Error("Status update should not run without admin auth.");
+    },
+  });
+
+  assert.equal(res.statusCode, 501);
+  assert.equal(parseJson(res).error.code, "admin_auth_dependency_missing");
+  assert.deepEqual(parseJson(res).setupRequired, ["authenticateAdminRequest"]);
+});
+
+test("admin order status handler rejects non-admin authenticated accounts", async () => {
+  const req = mockReq({
+    body: {
+      orderRequestId: "order_123",
+      status: "ready_to_pack",
+    },
+  });
+  const res = mockRes();
+
+  await adminOrderStatusHandler(req, res, {
+    authenticateAdminRequest() {
+      const error = new Error("Not an admin.");
+      error.code = "admin_forbidden";
+      throw error;
+    },
+    updateAdminOrderStatus() {
+      throw new Error("Status update should not run for non-admin accounts.");
+    },
+  });
+
+  assert.equal(res.statusCode, 403);
+  assert.equal(parseJson(res).error.code, "admin_forbidden");
 });
 
 test("admin shipping label handler reports missing trusted persistence dependency", async () => {
@@ -584,6 +664,7 @@ test("admin shipping label handler reports missing trusted persistence dependenc
       SHIPPO_API_TOKEN: "shippo_test_configured_for_unit_tests",
       NODE_ENV: "development",
     },
+    authenticateAdminRequest,
   });
 
   assert.equal(res.statusCode, 501);
@@ -599,8 +680,8 @@ test("admin shipping label handler buys label through trusted dependencies", asy
     headers: { origin: "https://theos.example" },
     body: {
       admin: {
-        email: "admin@example.test",
-        uid: "admin-user-001",
+        email: "spoofed@example.test",
+        uid: "spoofed-user",
       },
       orderRequestId: "order_123",
       rateId: "rate_123",
@@ -617,6 +698,7 @@ test("admin shipping label handler buys label through trusted dependencies", asy
     serverTimestamp() {
       return "SERVER_TIMESTAMP";
     },
+    authenticateAdminRequest,
     shippingLabelDependencies: {
       createShippoTransaction({ rateId }) {
         assert.equal(rateId, "rate_123");
@@ -631,8 +713,10 @@ test("admin shipping label handler buys label through trusted dependencies", asy
         assert.equal(orderRequestId, "order_123");
         assert.equal(rateId, "rate_123");
       },
-      recordLabelPurchase({ fields, orderRequestId }) {
+      recordLabelPurchase({ admin, fields, orderRequestId }) {
         recordedFields = fields;
+        assert.equal(admin.email, "admin@example.test");
+        assert.equal(admin.uid, "admin-user-001");
         return {
           id: orderRequestId,
           ...fields,
