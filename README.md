@@ -68,8 +68,8 @@ Natural search phrases to keep in mind:
 - `admin.html` - static admin fulfillment prototype
 - `admin.css` - admin shell styles
 - `admin-config.js` - disabled public admin Firebase config gate
-- `admin.js` - sample admin queue behavior
-- `admin-live.js` - optional authenticated admin bridge for future Firebase reads/actions
+- `admin.js` - sample admin queue behavior plus auth-gated status and label action controls
+- `admin-live.js` - optional authenticated admin bridge for future Firebase reads/actions and guarded admin endpoint posts
 - `package.json` - static validation script entry point
 - `tools/check-static.mjs` - no-dependency static prototype checks
 - `tools/package-static.mjs` - allowlist-based static host package generator kept as a fallback/export path
@@ -93,7 +93,7 @@ Natural search phrases to keep in mind:
 
 - Current prices are placeholders and should be confirmed before launch.
 - Current cart is connected to live Shippo shipping-rate lookup, but not yet connected to payment processing, inventory, order persistence, email, or label purchase.
-- The admin shell has a disabled Firebase config/auth bridge for future authenticated reads and guarded admin actions. Keep it disabled until the production Firebase project, Auth users, and admin custom claims are configured.
+- The admin shell has a disabled Firebase config/auth bridge for future authenticated reads and guarded admin actions. Status and label controls stay inert until the live bridge confirms Firebase Auth admin access. Keep it disabled until the production Firebase project, Auth users, and admin custom claims are configured.
 - Keep `checkout-config.js` blank until a trusted backend endpoint is ready. For Firebase Hosting, set only the public checkout session URL there, never secrets.
 - Do not store raw payment information in the app. Use Stripe-hosted payment collection and Stripe customer/payment method IDs.
 - Public Firestore writes are limited to validated order request creation. Payment status and Stripe IDs should be written only by trusted backend code.

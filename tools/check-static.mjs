@@ -301,6 +301,9 @@ assert(adminScript.includes("trackingNumber"), "Admin shell should include trust
 assert(adminScript.includes("buildAdminLabelActionViewModel"), "Admin shell must centralize label action readiness before live wiring.");
 assert(adminScript.includes("/api/admin/shippo-labels"), "Admin shell label action must target the trusted backend endpoint.");
 assert(adminScript.includes("Auth required"), "Admin shell label action must stay gated until authenticated admin wiring exists.");
+assert(adminScript.includes("setAdminActions"), "Admin shell must expose an authenticated action bridge setter for live admin wiring.");
+assert(adminScript.includes("clearAdminActions"), "Admin shell must clear live admin actions on sign-out or denied reads.");
+assert(adminScript.includes("data-status-action"), "Admin shell must render guarded status action controls.");
 assert(!adminScript.includes("fetch("), "Admin shell must not call live backend endpoints before authenticated admin wiring exists.");
 assert(!adminScript.toLowerCase().includes("firebase"), "Admin shell must not connect to Firebase yet.");
 assert(adminLiveScript.includes("configuredFirebase"), "Admin live bridge must gate Firebase initialization behind config.");
@@ -308,6 +311,8 @@ assert(adminLiveScript.includes("getIdToken"), "Admin live bridge must use Fireb
 assert(adminLiveScript.includes("authorization"), "Admin live bridge must send Authorization headers to admin endpoints.");
 assert(adminLiveScript.includes("orderRequests"), "Admin live bridge must read the orderRequests collection after sign-in.");
 assert(adminLiveScript.includes("setOrders"), "Admin live bridge must hand authenticated reads to the existing renderer.");
+assert(adminLiveScript.includes("setActions({"), "Admin live bridge must pass signed-in action wiring to the admin renderer.");
+assert(adminLiveScript.includes("clearAdminActions()"), "Admin live bridge must clear action wiring when auth/read access fails.");
 assert(adminLiveScript.includes("postAdminJson"), "Admin live bridge must centralize guarded admin endpoint calls.");
 assert(!adminLiveScript.includes("body.admin"), "Admin live bridge must not send request-provided admin identity.");
 assert(!adminLiveScript.includes("sk_") && !adminLiveScript.includes("whsec_"), "Admin live bridge must not include secret-looking values.");
@@ -483,9 +488,69 @@ function createAdminHarness() {
   assert(elements.rows.innerHTML.includes('data-label-action="auth_required"'), "Admin rows should render auth-gated label actions for paid rated orders.");
   assert(elements.rows.innerHTML.includes('data-label-endpoint="/api/admin/shippo-labels"'), "Admin rows should keep label action routing on the trusted backend endpoint.");
   assert(elements.rows.innerHTML.includes('<button class="admin-action" type="button" disabled'), "Admin label action buttons should remain disabled in the static shell.");
+  assert(elements.rows.innerHTML.includes('data-status-action="update"'), "Admin rows should render guarded status action controls.");
+  assert(elements.rows.innerHTML.includes('data-status-endpoint="/api/admin/order-status"'), "Admin status controls should point at the trusted backend endpoint.");
   assert(elements.rows.innerHTML.includes("Tracking pending"), "Admin script should render label/tracking status in sample rows.");
   assert(elements.rows.innerHTML.includes("9400100000000000000000"), "Admin script should render trusted tracking numbers in sample rows.");
   assert(!elements.rows.innerHTML.includes("Â·"), "Admin rows should avoid mojibake separators.");
+}
+
+{
+  const { elements, helpers } = createAdminHarness();
+  const adminActionCalls = [];
+  helpers.setActions({
+    endpoints: {
+      labelPurchase: "/api/admin/shippo-labels",
+      statusUpdate: "/api/admin/order-status",
+    },
+    postAdminJson(request) {
+      adminActionCalls.push(request);
+      if (request.endpoint === "/api/admin/order-status") {
+        return Promise.resolve({ orderRequestId: request.body.orderRequestId, status: request.body.status });
+      }
+      return Promise.resolve({
+        orderRequestId: request.body.orderRequestId,
+        labelUrl: "https://example.com/live-label.pdf",
+        shippoTransactionId: "shippo_txn_live",
+        trackingNumber: "TRACK-LIVE",
+        trackingUrl: "https://carrier.example/TRACK-LIVE",
+      });
+    },
+    user: {
+      uid: "admin-user",
+    },
+  });
+
+  assert(helpers.hasActions(), "Admin helper should report live actions after authenticated wiring is set.");
+  assert(elements.rows.innerHTML.includes('<button class="admin-action" type="button" data-label-action="auth_required"'), "Auth-ready label buttons should be enabled only after live admin wiring is set.");
+  assert(!elements.rows.innerHTML.includes('data-current-status="ready_to_pack" data-status-endpoint="/api/admin/order-status" disabled'), "Auth-ready status controls should be enabled after live admin wiring is set.");
+
+  elements.rows.listeners.change[0]({
+    target: {
+      dataset: {
+        currentStatus: "ready_to_pack",
+        orderId: "REQ-1002",
+        statusAction: "update",
+      },
+      value: "packed",
+    },
+  });
+  await Promise.resolve();
+  assert(adminActionCalls.some((call) => call.endpoint === "/api/admin/order-status" && call.body.orderRequestId === "REQ-1002" && call.body.status === "packed"), "Admin status controls should call the trusted status endpoint through the live bridge.");
+
+  elements.rows.listeners.click[0]({
+    target: {
+      dataset: {
+        labelAction: "auth_required",
+        labelPayload: JSON.stringify({ orderRequestId: "REQ-1002", rateId: "rate_large_1" }),
+      },
+      disabled: false,
+    },
+  });
+  await Promise.resolve();
+  assert(adminActionCalls.some((call) => call.endpoint === "/api/admin/shippo-labels" && call.body.orderRequestId === "REQ-1002" && call.body.rateId === "rate_large_1"), "Admin label controls should call the trusted label endpoint through the live bridge.");
+  helpers.clearActions();
+  assert(!helpers.hasActions(), "Admin helper should clear live actions after sign-out or denied reads.");
 }
 
 {

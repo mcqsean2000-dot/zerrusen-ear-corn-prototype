@@ -26,6 +26,8 @@ The static admin shell now loads:
 - `admin-config.js`, which keeps Firebase live mode disabled with blank public config by default.
 - `admin-live.js`, which prepares Firebase Auth ID-token headers, Firestore `orderRequests` read specs, and guarded admin endpoint calls for the future authenticated dashboard.
 
+The admin UI now renders status transition controls and label purchase buttons as guarded controls. They remain disabled in sample mode and become clickable only after `admin-live.js` passes a signed-in Firebase admin action bridge to the renderer. Browser code still calls only the trusted admin endpoints with Firebase ID-token headers; it does not hold Shippo, Stripe, or Firebase Admin secrets.
+
 Keep `TheosAdminConfig.enabled` set to `false` until the production Firebase project ID, public web app config, Sean/Calvin Firebase Auth users, and `admin: true` custom claims are configured. The live bridge must derive admin identity from Firebase ID tokens; it must not send `body.admin`.
 
 ## Future Firestore Read Model

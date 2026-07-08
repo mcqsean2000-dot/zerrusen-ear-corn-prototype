@@ -316,10 +316,49 @@ function getAdminPackableOrders(orders) {
 
 const adminOrders = normalizeAdminOrders(sampleOrders);
 let currentAdminOrders = adminOrders;
+let currentAdminActions = null;
 
 function setAdminOrders(orders) {
   currentAdminOrders = normalizeAdminOrders(orders);
   render(currentAdminOrders);
+}
+
+function hasAdminActions() {
+  return Boolean(
+    currentAdminActions &&
+      typeof currentAdminActions.postAdminJson === "function" &&
+      currentAdminActions.user &&
+      currentAdminActions.endpoints &&
+      asText(currentAdminActions.endpoints.labelPurchase) &&
+      asText(currentAdminActions.endpoints.statusUpdate),
+  );
+}
+
+function setAdminActions(actions) {
+  currentAdminActions = actions && typeof actions.postAdminJson === "function" ? actions : null;
+  render(currentAdminOrders);
+}
+
+function clearAdminActions() {
+  currentAdminActions = null;
+  render(currentAdminOrders);
+}
+
+function updateCurrentAdminOrder(orderId, patch) {
+  currentAdminOrders = currentAdminOrders.map((order) => {
+    if (order.id !== orderId) return order;
+    const nextOrder = {
+      ...order,
+      ...patch,
+    };
+    if (patch.shipping) {
+      nextOrder.shipping = {
+        ...order.shipping,
+        ...patch.shipping,
+      };
+    }
+    return normalizeAdminOrder(nextOrder);
+  });
 }
 
 if (typeof window !== "undefined") {
@@ -337,7 +376,10 @@ if (typeof window !== "undefined") {
     buildLabelActionViewModel: buildAdminLabelActionViewModel,
     canTransitionStatus: canTransitionAdminStatus,
     getAllowedStatusTransitions: getAllowedAdminStatusTransitions,
+    clearActions: clearAdminActions,
+    hasActions: hasAdminActions,
     render,
+    setActions: setAdminActions,
     setOrders: setAdminOrders,
   };
 }
@@ -354,8 +396,15 @@ function renderSummary(orders) {
 }
 
 function renderRows(orders) {
+  const actionsEnabled = hasAdminActions();
   rows.innerHTML = normalizeAdminOrders(orders).map((order) => {
     const viewModel = buildAdminOrderViewModel(order);
+    const statusOptions = [viewModel.status].concat(viewModel.allowedNextStatuses);
+    const statusSelectMarkup = [
+      '<select class="admin-status-action" data-status-action="update" data-order-id="' + escapeHtml(viewModel.id) + '" data-current-status="' + escapeHtml(viewModel.status) + '" data-status-endpoint="/api/admin/order-status"' + (actionsEnabled ? "" : " disabled") + ">",
+      statusOptions.map((status) => '<option value="' + escapeHtml(status) + '"' + (status === viewModel.status ? " selected" : "") + ">" + escapeHtml(adminStatusLabels[status]) + "</option>").join(""),
+      "</select>",
+    ].join("");
     const trackingMarkup = viewModel.shipping.trackingUrl
       ? '<a class="admin-link" href="' + escapeHtml(viewModel.shipping.trackingUrl) + '" target="_blank" rel="noreferrer">' + escapeHtml(viewModel.shipping.trackingLabel) + "</a>"
       : escapeHtml(viewModel.shipping.trackingLabel);
@@ -363,17 +412,18 @@ function renderRows(orders) {
       ? '<a class="admin-link" href="' + escapeHtml(viewModel.shipping.labelUrl) + '" target="_blank" rel="noreferrer">Label ready</a>'
       : "Label pending";
     const actionPayload = viewModel.labelAction.requestBody ? JSON.stringify(viewModel.labelAction.requestBody) : "";
+    const labelButtonDisabled = viewModel.labelAction.disabled && !(actionsEnabled && viewModel.labelAction.state === "auth_required");
     const actionMarkup = [
-      '<button class="admin-action" type="button" disabled data-label-action="' + escapeHtml(viewModel.labelAction.state) + '" data-label-endpoint="' + escapeHtml(viewModel.labelAction.endpoint) + '" data-label-payload="' + escapeHtml(actionPayload) + '">',
+      '<button class="admin-action" type="button"' + (!actionsEnabled || labelButtonDisabled ? " disabled" : "") + ' data-label-action="' + escapeHtml(viewModel.labelAction.state) + '" data-label-endpoint="' + escapeHtml(viewModel.labelAction.endpoint) + '" data-label-payload="' + escapeHtml(actionPayload) + '">',
       escapeHtml(viewModel.labelAction.label),
       "</button>",
-      "<small>" + escapeHtml(viewModel.labelAction.reason) + "</small>",
+      "<small>" + escapeHtml(actionsEnabled && viewModel.labelAction.state === "auth_required" ? "Ready for admin action" : viewModel.labelAction.reason) + "</small>",
     ].join("");
     return [
       "<tr>",
       "<td><strong>" + escapeHtml(viewModel.customerName) + "</strong><small>" + escapeHtml(viewModel.id) + " - ZIP " + escapeHtml(viewModel.shippingZip) + "</small></td>",
       "<td>" + escapeHtml(viewModel.itemSummary) + "<small>" + escapeHtml(viewModel.subtotalLabel) + " estimated subtotal</small></td>",
-      '<td><span class="status-pill" data-status="' + escapeHtml(viewModel.status) + '">' + escapeHtml(viewModel.statusLabel) + "</span></td>",
+      '<td><span class="status-pill" data-status="' + escapeHtml(viewModel.status) + '">' + escapeHtml(viewModel.statusLabel) + "</span>" + statusSelectMarkup + "</td>",
       "<td><strong>" + escapeHtml(viewModel.shipping.carrierService) + "</strong><small>" + escapeHtml(viewModel.shipping.amountLabel) + " - " + escapeHtml(viewModel.shipping.packageLabel) + "</small><small>" + labelMarkup + " - " + trackingMarkup + "</small></td>",
       "<td>" + escapeHtml(viewModel.contact) + "<small>Prefers " + escapeHtml(viewModel.preferredContact) + "</small></td>",
       "<td>" + escapeHtml(viewModel.note) + "</td>",
@@ -400,5 +450,70 @@ function render(orders = currentAdminOrders) {
   renderPackingList(visibleOrders);
 }
 
+async function handleStatusAction(target) {
+  if (!hasAdminActions()) return;
+  const orderRequestId = asText(target?.dataset?.orderId);
+  const currentStatus = asText(target?.dataset?.currentStatus);
+  const status = asText(target?.value);
+  if (!orderRequestId || !canTransitionAdminStatus(currentStatus, status)) {
+    target.value = currentStatus;
+    return;
+  }
+
+  try {
+    const result = await currentAdminActions.postAdminJson({
+      endpoint: currentAdminActions.endpoints.statusUpdate,
+      user: currentAdminActions.user,
+      body: { orderRequestId, status },
+    });
+    updateCurrentAdminOrder(orderRequestId, { status: normalizeAdminStatus(result.status || status) });
+    render(currentAdminOrders);
+  } catch (error) {
+    target.value = currentStatus;
+  }
+}
+
+async function handleLabelAction(target) {
+  if (!hasAdminActions() || target.disabled || target.dataset.labelAction !== "auth_required") return;
+  const payloadText = asText(target.dataset.labelPayload);
+  let payload = null;
+  try {
+    payload = payloadText ? JSON.parse(payloadText) : null;
+  } catch (error) {
+    return;
+  }
+  if (!payload || !payload.orderRequestId || !payload.rateId) return;
+
+  target.disabled = true;
+  try {
+    const result = await currentAdminActions.postAdminJson({
+      endpoint: currentAdminActions.endpoints.labelPurchase,
+      user: currentAdminActions.user,
+      body: payload,
+    });
+    updateCurrentAdminOrder(payload.orderRequestId, {
+      shipping: {
+        labelUrl: result.labelUrl,
+        shippoTransactionId: result.shippoTransactionId,
+        trackingNumber: result.trackingNumber,
+        trackingUrl: result.trackingUrl,
+      },
+    });
+    render(currentAdminOrders);
+  } catch (error) {
+    target.disabled = false;
+  }
+}
+
 statusFilter.addEventListener("change", () => render());
+rows.addEventListener("change", (event) => {
+  if (event.target && event.target.dataset && event.target.dataset.statusAction === "update") {
+    handleStatusAction(event.target);
+  }
+});
+rows.addEventListener("click", (event) => {
+  if (event.target && event.target.dataset && event.target.dataset.labelAction) {
+    handleLabelAction(event.target);
+  }
+});
 render();

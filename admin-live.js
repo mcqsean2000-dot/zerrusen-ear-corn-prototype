@@ -85,6 +85,25 @@
     document.documentElement.toggleAttribute("data-admin-signed-in", Boolean(signedIn));
   }
 
+  function clearAdminActions() {
+    if (global.TheosAdminOrders && typeof global.TheosAdminOrders.clearActions === "function") {
+      global.TheosAdminOrders.clearActions();
+    }
+  }
+
+  function setAdminActions(user) {
+    if (global.TheosAdminOrders && typeof global.TheosAdminOrders.setActions === "function") {
+      global.TheosAdminOrders.setActions({
+        endpoints: {
+          labelPurchase: endpointFor("labelPurchase"),
+          statusUpdate: endpointFor("statusUpdate"),
+        },
+        postAdminJson,
+        user,
+      });
+    }
+  }
+
   async function loadFirebase(importModule) {
     const importer = importModule || ((specifier) => import(specifier));
     const [app, auth, firestore] = await Promise.all([
@@ -98,6 +117,7 @@
   async function initializeAdminLive(options = {}) {
     const config = adminConfig();
     if (!configuredFirebase(config)) {
+      clearAdminActions();
       setAuthState("Sample mode", false);
       return { enabled: false };
     }
@@ -110,6 +130,7 @@
 
     modules.auth.onAuthStateChanged(auth, async (user) => {
       if (!user) {
+        clearAdminActions();
         setAuthState("Sign in required", false);
         return;
       }
@@ -125,8 +146,10 @@
         if (global.TheosAdminOrders && typeof global.TheosAdminOrders.setOrders === "function") {
           global.TheosAdminOrders.setOrders(orders);
         }
+        setAdminActions(user);
         setAuthState("Signed in", true);
       } catch (error) {
+        clearAdminActions();
         setAuthState("Admin access denied", false);
       }
     });
@@ -147,13 +170,20 @@
     orderFromSnapshot,
     orderQuerySpec,
     postAdminJson,
+    setAdminActions,
   });
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
-      initializeAdminLive().catch(() => setAuthState("Sample mode", false));
+      initializeAdminLive().catch(() => {
+        clearAdminActions();
+        setAuthState("Sample mode", false);
+      });
     });
   } else {
-    initializeAdminLive().catch(() => setAuthState("Sample mode", false));
+    initializeAdminLive().catch(() => {
+      clearAdminActions();
+      setAuthState("Sample mode", false);
+    });
   }
 })(window);
