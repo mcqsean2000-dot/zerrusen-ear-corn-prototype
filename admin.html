@@ -35,8 +35,22 @@
       </section>
 
       <section class="admin-auth-panel" aria-label="Admin access" data-admin-auth-panel>
-        <strong data-admin-auth-status>Sample mode</strong>
-        <span>Firebase admin sign-in is not configured for this static preview.</span>
+        <div>
+          <strong data-admin-auth-status>Sample mode</strong>
+          <span data-admin-auth-help>Firebase admin sign-in is not configured for this static preview.</span>
+        </div>
+        <form class="admin-sign-in" data-admin-sign-in-form>
+          <label>
+            Email
+            <input type="email" autocomplete="username" data-admin-sign-in-email disabled>
+          </label>
+          <label>
+            Password
+            <input type="password" autocomplete="current-password" data-admin-sign-in-password disabled>
+          </label>
+          <button type="submit" data-admin-sign-in-submit disabled>Sign in</button>
+          <button type="button" data-admin-sign-out hidden>Sign out</button>
+        </form>
       </section>
       <p class="admin-action-status" role="status" aria-live="polite" data-admin-action-status></p>
 

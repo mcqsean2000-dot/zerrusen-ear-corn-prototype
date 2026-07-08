@@ -282,7 +282,12 @@ assert(admin.includes("admin-live.js"), "Admin shell must load the optional live
 assert(admin.indexOf("admin-config.js") < admin.indexOf("admin.js"), "Admin config must load before admin behavior.");
 assert(admin.indexOf("admin.js") < admin.indexOf("admin-live.js"), "Admin sample renderer must load before the live bridge.");
 assert(admin.includes("data-admin-auth-status"), "Admin shell must render auth state.");
+assert(admin.includes("data-admin-auth-help"), "Admin shell must render live admin sign-in helper copy.");
 assert(admin.includes("data-admin-action-status"), "Admin shell must render guarded action feedback.");
+assert(admin.includes("data-admin-sign-in-form"), "Admin shell must render a disabled Firebase admin sign-in form.");
+assert(admin.includes("data-admin-sign-in-email"), "Admin shell must render the admin sign-in email field.");
+assert(admin.includes("data-admin-sign-in-password"), "Admin shell must render the admin sign-in password field.");
+assert(admin.includes("data-admin-sign-out"), "Admin shell must render a sign-out control for configured live mode.");
 assert(adminConfigScript.includes("TheosAdminConfig"), "Admin config must expose the public admin config object.");
 assert(adminConfigScript.includes("enabled: false"), "Admin live mode must stay disabled until Firebase config is intentionally filled.");
 assert(adminConfigScript.includes("apiKey: \"\""), "Admin config must keep Firebase API key blank by default.");
@@ -310,6 +315,10 @@ assert(!adminScript.includes("fetch("), "Admin shell must not call live backend 
 assert(!adminScript.toLowerCase().includes("firebase"), "Admin shell must not connect to Firebase yet.");
 assert(adminLiveScript.includes("configuredFirebase"), "Admin live bridge must gate Firebase initialization behind config.");
 assert(adminLiveScript.includes("getIdToken"), "Admin live bridge must use Firebase ID tokens for admin endpoint calls.");
+assert(adminLiveScript.includes("signInWithEmailAndPassword"), "Admin live bridge must use Firebase Auth email/password sign-in when configured.");
+assert(adminLiveScript.includes("signOut"), "Admin live bridge must wire Firebase Auth sign-out when configured.");
+assert(adminLiveScript.includes("setSignInDisabled(true)"), "Admin live bridge must keep sign-in controls disabled when Firebase is not configured.");
+assert(adminLiveScript.includes("Sign in with a Firebase admin account"), "Admin live bridge must update helper copy when sign-in is configured.");
 assert(adminLiveScript.includes("authorization"), "Admin live bridge must send Authorization headers to admin endpoints.");
 assert(adminLiveScript.includes("orderRequests"), "Admin live bridge must read the orderRequests collection after sign-in.");
 assert(adminLiveScript.includes("setOrders"), "Admin live bridge must hand authenticated reads to the existing renderer.");
@@ -598,6 +607,12 @@ function flushAdminActions() {
 
 {
   const authStatus = createAdminFakeElement("authStatus");
+  const authHelp = createAdminFakeElement("authHelp");
+  const signInForm = createAdminFakeElement("signInForm");
+  const signInEmail = createAdminFakeElement("signInEmail", "admin@example.com");
+  const signInPassword = createAdminFakeElement("signInPassword", "password123");
+  const signInSubmit = createAdminFakeElement("signInSubmit");
+  const signOutButton = createAdminFakeElement("signOutButton");
   const documentElement = {
     attributes: new Set(),
     toggleAttribute(name, enabled) {
@@ -616,11 +631,23 @@ function flushAdminActions() {
     documentElement,
     addEventListener() {},
     querySelector(selector) {
-      return selector === "[data-admin-auth-status]" ? authStatus : null;
+      return {
+        "[data-admin-auth-status]": authStatus,
+        "[data-admin-auth-help]": authHelp,
+        "[data-admin-sign-in-form]": signInForm,
+        "[data-admin-sign-in-email]": signInEmail,
+        "[data-admin-sign-in-password]": signInPassword,
+        "[data-admin-sign-in-submit]": signInSubmit,
+        "[data-admin-sign-out]": signOutButton,
+      }[selector] || null;
     },
   };
   let authCallback = null;
   let liveOrders = null;
+  let signInEmailValue = "";
+  let signInPasswordValue = "";
+  let signOutCalled = false;
+  let signOutShouldReject = false;
   const sandbox = {
     Error,
     JSON,
@@ -668,6 +695,15 @@ function flushAdminActions() {
           onAuthStateChanged(auth, callback) {
             authCallback = callback;
           },
+          signInWithEmailAndPassword(auth, email, password) {
+            signInEmailValue = email;
+            signInPasswordValue = password;
+            return Promise.resolve({});
+          },
+          signOut() {
+            signOutCalled = true;
+            return signOutShouldReject ? Promise.reject(new Error("sign-out-failed")) : Promise.resolve();
+          },
         });
       }
       if (specifier.includes("firebase-firestore")) {
@@ -695,6 +731,15 @@ function flushAdminActions() {
       return Promise.reject(new Error("Unexpected import " + specifier));
     },
   });
+  assert(signInSubmit.disabled === false, "Configured admin live mode should enable the sign-in submit button.");
+  assert(authHelp.textContent.includes("Firebase admin account"), "Configured admin live mode should update sign-in helper copy.");
+  signInForm.listeners.submit[0]({
+    preventDefault() {},
+  });
+  await flushAdminActions();
+  assert(signInEmailValue === "admin@example.com", "Admin live sign-in should pass the trimmed email to Firebase Auth.");
+  assert(signInPasswordValue === "password123", "Admin live sign-in should pass the password to Firebase Auth.");
+  assert(signInPassword.value === "", "Admin live sign-in should clear the password after a successful sign-in call.");
   await authCallback({
     getIdToken() {
       return Promise.resolve("not-admin-token");
@@ -704,6 +749,13 @@ function flushAdminActions() {
   assert(authStatus.textContent === "Admin access denied", "Admin live bridge should fail closed when Firestore admin reads are denied.");
   assert(!documentElement.hasAttribute("data-admin-signed-in"), "Admin live bridge must not leave the page marked signed in after denied reads.");
   assert(liveOrders === null, "Denied admin reads must not replace sample orders.");
+  signOutShouldReject = true;
+  signOutButton.listeners.click[0]();
+  await flushAdminActions();
+  assert(signOutCalled, "Admin live sign-out should call Firebase Auth signOut.");
+  assert(authStatus.textContent === "Sign out failed", "Admin live sign-out should use generic failure feedback.");
+  assert(documentElement.hasAttribute("data-admin-signed-in"), "Admin live sign-out failure should preserve signed-in UI state.");
+  assert(signOutButton.hidden === false, "Admin live sign-out failure should leave the sign-out button available.");
 }
 
 const validOrderRequest = orderRequests.buildOrderRequest({

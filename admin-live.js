@@ -83,6 +83,13 @@
     const status = document.querySelector("[data-admin-auth-status]");
     if (status) status.textContent = message;
     document.documentElement.toggleAttribute("data-admin-signed-in", Boolean(signedIn));
+    const signOutButton = document.querySelector("[data-admin-sign-out]");
+    if (signOutButton) signOutButton.hidden = !signedIn;
+  }
+
+  function setAuthHelp(message) {
+    const help = document.querySelector("[data-admin-auth-help]");
+    if (help) help.textContent = message;
   }
 
   function clearAdminActions() {
@@ -114,10 +121,67 @@
     return { app, auth, firestore };
   }
 
+  function setSignInDisabled(disabled) {
+    [
+      "[data-admin-sign-in-email]",
+      "[data-admin-sign-in-password]",
+      "[data-admin-sign-in-submit]",
+    ].forEach((selector) => {
+      const element = document.querySelector(selector);
+      if (element) element.disabled = Boolean(disabled);
+    });
+  }
+
+  function configureSignInForm({ auth, authModule }) {
+    const form = document.querySelector("[data-admin-sign-in-form]");
+    const emailInput = document.querySelector("[data-admin-sign-in-email]");
+    const passwordInput = document.querySelector("[data-admin-sign-in-password]");
+    const signOutButton = document.querySelector("[data-admin-sign-out]");
+
+    if (!form || !emailInput || !passwordInput) return;
+
+    setSignInDisabled(false);
+    setAuthHelp("Sign in with a Firebase admin account to load live order requests.");
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const email = text(emailInput.value);
+      const password = passwordInput.value || "";
+      if (!email || !password || typeof authModule.signInWithEmailAndPassword !== "function") {
+        setAuthState("Sign in failed", false);
+        return;
+      }
+
+      setSignInDisabled(true);
+      setAuthState("Signing in...", false);
+      try {
+        await authModule.signInWithEmailAndPassword(auth, email, password);
+        passwordInput.value = "";
+      } catch (error) {
+        setAuthState("Sign in failed", false);
+      } finally {
+        setSignInDisabled(false);
+      }
+    });
+
+    if (signOutButton) {
+      signOutButton.addEventListener("click", async () => {
+        if (typeof authModule.signOut !== "function") return;
+        setAuthState("Signing out...", true);
+        try {
+          await authModule.signOut(auth);
+        } catch (error) {
+          setAuthState("Sign out failed", true);
+        }
+      });
+    }
+  }
+
   async function initializeAdminLive(options = {}) {
     const config = adminConfig();
     if (!configuredFirebase(config)) {
       clearAdminActions();
+      setSignInDisabled(true);
+      setAuthHelp("Firebase admin sign-in is not configured for this static preview.");
       setAuthState("Sample mode", false);
       return { enabled: false };
     }
@@ -127,6 +191,7 @@
     const auth = modules.auth.getAuth(app);
     const db = modules.firestore.getFirestore(app);
     const spec = orderQuerySpec();
+    configureSignInForm({ auth, authModule: modules.auth });
 
     modules.auth.onAuthStateChanged(auth, async (user) => {
       if (!user) {
