@@ -19,6 +19,8 @@
 .admin-panel h2 { margin: 0; font-size: 1.75rem; }
 .admin-filter { display: grid; gap: 6px; min-width: 180px; color: var(--muted); font-weight: 800; }
 .admin-filter select { min-height: 42px; border: 1px solid var(--line); border-radius: 7px; padding: 0 12px; color: var(--ink); background: #fbfaf6; }
+.admin-status-action { display: block; width: 100%; min-height: 34px; margin-top: 8px; border: 1px solid var(--line); border-radius: 7px; padding: 0 8px; color: var(--ink); background: #fbfaf6; font-weight: 800; }
+.admin-status-action:disabled { cursor: not-allowed; opacity: 0.72; }
 .admin-table-wrap { overflow-x: auto; }
 .admin-table { width: 100%; min-width: 760px; border-collapse: collapse; }
 .admin-table th, .admin-table td { padding: 14px 12px; border-top: 1px solid var(--line); text-align: left; vertical-align: top; }
