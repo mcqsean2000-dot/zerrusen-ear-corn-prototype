@@ -68,7 +68,7 @@ Natural search phrases to keep in mind:
 - `admin.html` - static admin fulfillment prototype
 - `admin.css` - admin shell styles
 - `admin-config.js` - disabled public admin Firebase config gate
-- `admin.js` - sample admin queue behavior plus auth-gated status and label action controls
+- `admin.js` - sample admin queue behavior plus auth-gated status, label action controls, and safe action feedback
 - `admin-live.js` - optional authenticated admin bridge for future Firebase reads/actions and guarded admin endpoint posts
 - `package.json` - static validation script entry point
 - `tools/check-static.mjs` - no-dependency static prototype checks

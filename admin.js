@@ -67,6 +67,7 @@ const summary = document.querySelector("[data-admin-summary]");
 const rows = document.querySelector("[data-order-rows]");
 const packingList = document.querySelector("[data-packing-list]");
 const statusFilter = document.querySelector("[data-status-filter]");
+const actionStatus = document.querySelector("[data-admin-action-status]");
 
 function asText(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -341,7 +342,18 @@ function setAdminActions(actions) {
 
 function clearAdminActions() {
   currentAdminActions = null;
+  setAdminActionStatus("");
   render(currentAdminOrders);
+}
+
+function setAdminActionStatus(message, tone = "") {
+  if (!actionStatus) return;
+  actionStatus.textContent = asText(message);
+  if (tone) {
+    actionStatus.dataset.tone = tone;
+  } else {
+    delete actionStatus.dataset.tone;
+  }
 }
 
 function updateCurrentAdminOrder(orderId, patch) {
@@ -457,19 +469,23 @@ async function handleStatusAction(target) {
   const status = asText(target?.value);
   if (!orderRequestId || !canTransitionAdminStatus(currentStatus, status)) {
     target.value = currentStatus;
+    setAdminActionStatus("That status change is not allowed.", "error");
     return;
   }
 
   try {
+    setAdminActionStatus("Updating order status...");
     const result = await currentAdminActions.postAdminJson({
       endpoint: currentAdminActions.endpoints.statusUpdate,
       user: currentAdminActions.user,
       body: { orderRequestId, status },
     });
     updateCurrentAdminOrder(orderRequestId, { status: normalizeAdminStatus(result.status || status) });
+    setAdminActionStatus("Order status updated.");
     render(currentAdminOrders);
   } catch (error) {
     target.value = currentStatus;
+    setAdminActionStatus("Status update failed. Check admin access and try again.", "error");
   }
 }
 
@@ -486,6 +502,7 @@ async function handleLabelAction(target) {
 
   target.disabled = true;
   try {
+    setAdminActionStatus("Buying shipping label...");
     const result = await currentAdminActions.postAdminJson({
       endpoint: currentAdminActions.endpoints.labelPurchase,
       user: currentAdminActions.user,
@@ -499,9 +516,11 @@ async function handleLabelAction(target) {
         trackingUrl: result.trackingUrl,
       },
     });
+    setAdminActionStatus("Shipping label saved.");
     render(currentAdminOrders);
   } catch (error) {
     target.disabled = false;
+    setAdminActionStatus("Label purchase failed. Check the paid order and selected rate.", "error");
   }
 }
 

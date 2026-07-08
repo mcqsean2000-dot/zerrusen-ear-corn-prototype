@@ -282,6 +282,7 @@ assert(admin.includes("admin-live.js"), "Admin shell must load the optional live
 assert(admin.indexOf("admin-config.js") < admin.indexOf("admin.js"), "Admin config must load before admin behavior.");
 assert(admin.indexOf("admin.js") < admin.indexOf("admin-live.js"), "Admin sample renderer must load before the live bridge.");
 assert(admin.includes("data-admin-auth-status"), "Admin shell must render auth state.");
+assert(admin.includes("data-admin-action-status"), "Admin shell must render guarded action feedback.");
 assert(adminConfigScript.includes("TheosAdminConfig"), "Admin config must expose the public admin config object.");
 assert(adminConfigScript.includes("enabled: false"), "Admin live mode must stay disabled until Firebase config is intentionally filled.");
 assert(adminConfigScript.includes("apiKey: \"\""), "Admin config must keep Firebase API key blank by default.");
@@ -303,6 +304,7 @@ assert(adminScript.includes("/api/admin/shippo-labels"), "Admin shell label acti
 assert(adminScript.includes("Auth required"), "Admin shell label action must stay gated until authenticated admin wiring exists.");
 assert(adminScript.includes("setAdminActions"), "Admin shell must expose an authenticated action bridge setter for live admin wiring.");
 assert(adminScript.includes("clearAdminActions"), "Admin shell must clear live admin actions on sign-out or denied reads.");
+assert(adminScript.includes("setAdminActionStatus"), "Admin shell must expose safe action feedback for guarded admin controls.");
 assert(adminScript.includes("data-status-action"), "Admin shell must render guarded status action controls.");
 assert(!adminScript.includes("fetch("), "Admin shell must not call live backend endpoints before authenticated admin wiring exists.");
 assert(!adminScript.toLowerCase().includes("firebase"), "Admin shell must not connect to Firebase yet.");
@@ -321,7 +323,9 @@ function createAdminFakeElement(name, value = "") {
   return {
     name,
     value,
+    dataset: {},
     innerHTML: "",
+    textContent: "",
     listeners: {},
     addEventListener(type, handler) {
       this.listeners[type] = this.listeners[type] || [];
@@ -336,6 +340,7 @@ function createAdminHarness() {
     rows: createAdminFakeElement("rows"),
     packingList: createAdminFakeElement("packingList"),
     statusFilter: createAdminFakeElement("statusFilter", "all"),
+    actionStatus: createAdminFakeElement("actionStatus"),
   };
   const document = {
     querySelector(selector) {
@@ -344,6 +349,7 @@ function createAdminHarness() {
         "[data-order-rows]": elements.rows,
         "[data-packing-list]": elements.packingList,
         "[data-status-filter]": elements.statusFilter,
+        "[data-admin-action-status]": elements.actionStatus,
         "[data-admin-auth-status]": createAdminFakeElement("authStatus"),
       }[selector] || null;
     },
@@ -363,6 +369,10 @@ function createAdminHarness() {
     elements,
     helpers: sandbox.window.TheosAdminOrders,
   };
+}
+
+function flushAdminActions() {
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 {
@@ -535,8 +545,9 @@ function createAdminHarness() {
       value: "packed",
     },
   });
-  await Promise.resolve();
+  await flushAdminActions();
   assert(adminActionCalls.some((call) => call.endpoint === "/api/admin/order-status" && call.body.orderRequestId === "REQ-1002" && call.body.status === "packed"), "Admin status controls should call the trusted status endpoint through the live bridge.");
+  assert(elements.actionStatus.textContent === "Order status updated.", "Admin status controls should announce successful status updates.");
 
   elements.rows.listeners.click[0]({
     target: {
@@ -547,10 +558,42 @@ function createAdminHarness() {
       disabled: false,
     },
   });
-  await Promise.resolve();
+  await flushAdminActions();
   assert(adminActionCalls.some((call) => call.endpoint === "/api/admin/shippo-labels" && call.body.orderRequestId === "REQ-1002" && call.body.rateId === "rate_large_1"), "Admin label controls should call the trusted label endpoint through the live bridge.");
+  assert(elements.actionStatus.textContent === "Shipping label saved.", "Admin label controls should announce successful label purchase.");
   helpers.clearActions();
+  assert(elements.actionStatus.textContent === "", "Admin helper should clear action feedback when live actions are cleared.");
   assert(!helpers.hasActions(), "Admin helper should clear live actions after sign-out or denied reads.");
+}
+
+{
+  const { elements, helpers } = createAdminHarness();
+  helpers.setActions({
+    endpoints: {
+      labelPurchase: "/api/admin/shippo-labels",
+      statusUpdate: "/api/admin/order-status",
+    },
+    postAdminJson() {
+      return Promise.reject(new Error("denied"));
+    },
+    user: {
+      uid: "admin-user",
+    },
+  });
+
+  elements.rows.listeners.change[0]({
+    target: {
+      dataset: {
+        currentStatus: "ready_to_pack",
+        orderId: "REQ-1002",
+        statusAction: "update",
+      },
+      value: "packed",
+    },
+  });
+  await flushAdminActions();
+  assert(elements.actionStatus.textContent === "Status update failed. Check admin access and try again.", "Admin status controls should announce a safe failure message.");
+  assert(elements.actionStatus.dataset.tone === "error", "Admin status failures should be marked with an error tone.");
 }
 
 {
