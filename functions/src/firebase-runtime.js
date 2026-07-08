@@ -1,9 +1,13 @@
 "use strict";
 
 const { getApps, initializeApp } = require("firebase-admin/app");
+const { getAuth } = require("firebase-admin/auth");
 const { FieldValue, getFirestore } = require("firebase-admin/firestore");
 const { onRequest } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
+const {
+  createFirebaseAdminAuthenticator,
+} = require("./admin-auth");
 const {
   createFirestoreAdapter,
 } = require("./firestore-adapter");
@@ -34,15 +38,25 @@ function serverTimestamp() {
 }
 
 function runtimeOptions(env = runtimeEnv()) {
+  const app = firebaseApp();
   const firestoreAdapter = createFirestoreAdapter({
-    firestore: getFirestore(firebaseApp()),
+    firestore: getFirestore(app),
     orderCollection: env.FIRESTORE_ORDER_COLLECTION,
     serverTimestamp,
   });
+  const authenticateAdminRequest = createFirebaseAdminAuthenticator({
+    verifyIdToken(token) {
+      return getAuth(app).verifyIdToken(token);
+    },
+  });
 
   return {
+    authenticateAdminRequest,
     env,
     serverTimestamp,
+    adminStatusDependencies: {
+      updateAdminOrderStatus: firestoreAdapter.updateAdminOrderStatus,
+    },
     shippingLabelDependencies: {
       prepareLabelPurchase: firestoreAdapter.prepareLabelPurchase,
       recordLabelPurchase: firestoreAdapter.recordLabelPurchase,

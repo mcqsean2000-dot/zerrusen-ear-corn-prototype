@@ -93,7 +93,7 @@ function buildCorsHeaders(req, env) {
     return {
       "access-control-allow-origin": origin,
       "access-control-allow-methods": "POST, OPTIONS",
-      "access-control-allow-headers": "content-type, stripe-signature",
+      "access-control-allow-headers": "authorization, content-type, stripe-signature",
       "access-control-max-age": "300",
       vary: "Origin",
     };
@@ -266,6 +266,61 @@ function resolveAdminStatusUpdater(options) {
   }
 
   return null;
+}
+
+function resolveAdminAuthenticator(options) {
+  if (typeof options.authenticateAdminRequest === "function") {
+    return options.authenticateAdminRequest;
+  }
+
+  return null;
+}
+
+async function requireAuthenticatedAdmin(req, res, options, corsHeaders) {
+  const authenticateAdminRequest = resolveAdminAuthenticator(options);
+  if (typeof authenticateAdminRequest !== "function") {
+    sendJson(res, 501, {
+      error: {
+        code: "admin_auth_dependency_missing",
+        message: "Admin actions require authenticated Firebase admin custom-claim verification.",
+      },
+      mock: true,
+      ...safeSetupDetails(options.env || process.env, ["authenticateAdminRequest"]),
+    }, corsHeaders);
+    return null;
+  }
+
+  try {
+    return await authenticateAdminRequest({ req });
+  } catch (error) {
+    if (error.code === "admin_auth_required") {
+      sendJson(res, 401, {
+        error: {
+          code: "admin_auth_required",
+          message: "Sign in with an authorized admin account before using admin actions.",
+        },
+      }, corsHeaders);
+      return null;
+    }
+
+    if (error.code === "admin_forbidden") {
+      sendJson(res, 403, {
+        error: {
+          code: "admin_forbidden",
+          message: "This account is not authorized for Theo's Farm admin actions.",
+        },
+      }, corsHeaders);
+      return null;
+    }
+
+    sendJson(res, 401, {
+      error: {
+        code: "admin_auth_invalid",
+        message: "Admin authentication could not be verified.",
+      },
+    }, corsHeaders);
+    return null;
+  }
 }
 
 function shippingEnvIsRequired(options = {}) {
@@ -634,6 +689,11 @@ async function adminShippingLabelsHandler(req, res, options = {}) {
     }, { allow: "POST, OPTIONS", ...corsHeaders });
   }
 
+  const admin = await requireAuthenticatedAdmin(req, res, options, corsHeaders);
+  if (!admin) {
+    return null;
+  }
+
   let body;
   try {
     body = await readJsonBody(req);
@@ -683,7 +743,7 @@ async function adminShippingLabelsHandler(req, res, options = {}) {
       ? options.serverTimestamp()
       : "FIRESTORE_SERVER_TIMESTAMP_REQUIRED";
     const result = await buyLabel({
-      admin: body.admin,
+      admin,
       orderRequestId: body.orderRequestId,
       rateId: body.rateId,
       serverTimestamp,
@@ -768,6 +828,11 @@ async function adminOrderStatusHandler(req, res, options = {}) {
     }, { allow: "POST, OPTIONS", ...corsHeaders });
   }
 
+  const admin = await requireAuthenticatedAdmin(req, res, options, corsHeaders);
+  if (!admin) {
+    return null;
+  }
+
   let body;
   try {
     body = await readJsonBody(req);
@@ -794,7 +859,7 @@ async function adminOrderStatusHandler(req, res, options = {}) {
 
   try {
     const result = await updateStatus({
-      admin: body.admin,
+      admin,
       orderRequestId: body.orderRequestId,
       status: body.status,
     });
@@ -1004,6 +1069,7 @@ module.exports = {
   resolveShippingRateCreator,
   resolveShippingLabelPurchaser,
   resolveAdminStatusUpdater,
+  resolveAdminAuthenticator,
   readJsonBody,
   readRawBody,
   routeRequest,
