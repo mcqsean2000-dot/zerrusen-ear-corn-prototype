@@ -31,6 +31,7 @@ const requiredFiles = [
   "docs/shippo-shipping-plan.md",
   "docs/godaddy-static-deploy.md",
   "tools/package-static.mjs",
+  "tools/serve-static.mjs",
   "tools/smoke-static-package.mjs",
   "functions/.env.example",
   "functions/package.json",
@@ -75,6 +76,7 @@ const adminFulfillment = await readFile("docs/admin-fulfillment-foundation.md", 
 const shippoPlan = await readFile("docs/shippo-shipping-plan.md", "utf8");
 const godaddyDeploy = await readFile("docs/godaddy-static-deploy.md", "utf8");
 const packageStaticScript = await readFile("tools/package-static.mjs", "utf8");
+const serveStaticScript = await readFile("tools/serve-static.mjs", "utf8");
 const smokeStaticPackageScript = await readFile("tools/smoke-static-package.mjs", "utf8");
 const functionsPackage = JSON.parse(await readFile("functions/package.json", "utf8"));
 const functionsEnvExample = await readFile("functions/.env.example", "utf8");
@@ -106,8 +108,14 @@ assert(gitignore.includes("!**/.env.example"), ".gitignore must allow safe examp
 assert(gitignore.includes("dist/"), ".gitignore must keep generated static deploy packages out of git.");
 assert(packageJson.scripts?.["package:static"] === "node tools/package-static.mjs", "Root package must include the static package script.");
 assert(packageJson.scripts?.["package:static:check"] === "node tools/package-static.mjs --check", "Root package must include the static package safety check.");
+assert(packageJson.scripts?.preview === "node tools/serve-static.mjs --port 4173", "Root package must include a local preview script.");
+assert(packageJson.scripts?.["preview:static"]?.includes("tools/serve-static.mjs --root dist/godaddy-static"), "Root package must include a packaged static preview script.");
 assert(packageJson.scripts?.["smoke:static"] === "node tools/smoke-static-package.mjs", "Root package must include the static package smoke check.");
 assert(packageJson.scripts?.check?.includes("package:static:check"), "Root check must include the static package safety check.");
+assert(serveStaticScript.includes("createServer"), "Local preview tool must serve files with Node HTTP.");
+assert(serveStaticScript.includes("allowedRoots"), "Local preview tool must constrain preview roots.");
+assert(serveStaticScript.includes("cache-control"), "Local preview tool must prevent stale local browser caching.");
+assert(serveStaticScript.includes("index.html"), "Local preview tool must serve index.html for the static storefront.");
 assert(hostingReadiness.includes("firebase emulators:start --only hosting"), "Hosting readiness doc must include local Firebase preview.");
 assert(hostingReadiness.includes("firebase hosting:channel:deploy preview"), "Hosting readiness doc must include preview channel deploy.");
 assert(hostingReadiness.includes("firebase deploy --only hosting"), "Hosting readiness doc must include hosting deploy command.");

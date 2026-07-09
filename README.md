@@ -73,6 +73,7 @@ Natural search phrases to keep in mind:
 - `package.json` - static validation script entry point
 - `tools/check-static.mjs` - no-dependency static prototype checks
 - `tools/package-static.mjs` - allowlist-based static host package generator kept as a fallback/export path
+- `tools/serve-static.mjs` - no-dependency local preview server for the repo root or generated static package
 - `functions/` - host-neutral trusted checkout and Stripe webhook scaffold, disabled by default
 - `firebase.json` - Firebase Hosting config and Firestore deploy targets for the chosen production path
 - `.firebaserc.example` - safe Firebase project alias template for local setup
@@ -104,6 +105,7 @@ Natural search phrases to keep in mind:
 ```bash
 npm run check
 npm run package:static
+npm run preview
 npm --prefix functions run check
 ```
 
@@ -112,6 +114,7 @@ On Windows PowerShell, use `npm.cmd` if the local execution policy blocks `npm.p
 ```powershell
 npm.cmd run check
 npm.cmd run package:static
+npm.cmd run preview
 npm.cmd --prefix functions run check
 ```
 
@@ -120,13 +123,25 @@ The static package scripts remain useful for smoke checks and emergency static e
 ## Local Preview
 
 ```bash
-python3 -m http.server 4173
+npm run preview
 ```
 
 Then open:
 
 ```text
 http://localhost:4173/
+```
+
+To preview the generated static host package instead:
+
+```bash
+npm run preview:static
+```
+
+Then open:
+
+```text
+http://localhost:4174/
 ```
 
 ## Firebase Hosting Preview
