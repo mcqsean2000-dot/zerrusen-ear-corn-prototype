@@ -172,8 +172,8 @@ async function assertDeploySafeConfig() {
   );
 
   assert(
-    sandbox.TheosCheckoutConfig?.checkoutEndpoint === "",
-    "Packaged checkout-config.js must keep checkoutEndpoint blank before trusted backend go-live.",
+    sandbox.TheosCheckoutConfig?.checkoutEndpoint === "/api/checkout-sessions",
+    "Packaged checkout-config.js must use the trusted Firebase Functions checkout route.",
   );
 }
 

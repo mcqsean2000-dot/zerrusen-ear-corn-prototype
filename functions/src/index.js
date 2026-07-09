@@ -566,6 +566,11 @@ async function checkoutSessionsHandler(req, res, options = {}) {
       checkoutUrl: result.checkoutUrl,
     }, corsHeaders);
   } catch (error) {
+    console.error("checkout_creation_failed", {
+      code: error && error.code || "unknown",
+      name: error && error.name || "Error",
+      message: error && error.message || "Checkout creation failed.",
+    });
     return sendJson(res, 502, {
       error: {
         code: "checkout_creation_failed",

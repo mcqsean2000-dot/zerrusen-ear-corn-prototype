@@ -281,7 +281,7 @@ function combineMatchingPackageRates(packageRateGroups) {
     const key = `${rate.provider}|${rate.serviceToken || rate.serviceName}`;
     combined.set(key, {
       ...rate,
-      rateId: JSON.stringify([rate.rateId]),
+      rateId: key,
       amountCents: rate.amountCents,
       packageRateIds: [rate.rateId],
       packageCount: 1,
@@ -305,7 +305,7 @@ function combineMatchingPackageRates(packageRateGroups) {
         durationTerms: rate.durationTerms || nextRate.durationTerms,
         packageRateIds: [...rate.packageRateIds, nextRate.rateId],
         packageCount: rate.packageCount + 1,
-        rateId: JSON.stringify([...rate.packageRateIds, nextRate.rateId]),
+        rateId: key,
       });
     }
   }
@@ -319,6 +319,20 @@ function getMissingShippingRateDependencies(dependencies = {}) {
   return [
     "createShippoShipment",
   ].filter((name) => typeof dependencies[name] !== "function");
+}
+
+function findSelectedShippingRate(rates, selectedShippingRate) {
+  const selectedRateId = cleanText(
+    selectedShippingRate && selectedShippingRate.rateId
+      ? selectedShippingRate.rateId
+      : selectedShippingRate,
+  );
+
+  if (!selectedRateId) {
+    return null;
+  }
+
+  return (Array.isArray(rates) ? rates : []).find((rate) => rate.rateId === selectedRateId) || null;
 }
 
 async function createShippingRates({ orderRequestDraft, shippingAddress, createShippoShipment, shipFromAddress }) {
@@ -381,6 +395,7 @@ module.exports = {
   buildShippoShipmentPayload,
   combineMatchingPackageRates,
   createShippingRates,
+  findSelectedShippingRate,
   filterCustomerRates,
   getMissingShippingRateDependencies,
   normalizeShipFromAddress,

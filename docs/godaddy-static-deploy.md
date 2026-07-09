@@ -58,23 +58,17 @@ After `npm run package:static`, run:
 npm run smoke:static
 ```
 
-The smoke check serves `dist/godaddy-static/` from a temporary local-only server, fetches the packaged page and referenced assets, verifies the packaged checkout config still has a blank `checkoutEndpoint`, and confirms forbidden paths such as `docs/`, `functions/`, admin files, Firebase files, repo metadata, and package tooling are not exposed. It does not contact GoDaddy, Stripe, Firebase, or any live backend.
+The smoke check serves `dist/godaddy-static/` from a temporary local-only server, fetches the packaged page and referenced assets, verifies the packaged checkout config points at the Firebase Functions checkout route, and confirms forbidden paths such as `docs/`, `functions/`, admin files, Firebase files, repo metadata, and package tooling are not exposed. It does not contact GoDaddy, Stripe, Firebase, or any live backend.
 
 ## Checkout Endpoint Setup
 
 Leave `checkout-config.js` as:
 
 ```js
-checkoutEndpoint: ""
+checkoutEndpoint: "/api/checkout-sessions"
 ```
 
-After the trusted backend is live, set only the public HTTPS checkout session URL, for example:
-
-```js
-checkoutEndpoint: "https://api.theos-farm.example/api/checkout-sessions"
-```
-
-The current package checks intentionally require a blank endpoint for the pre-backend static package. In the backend go-live slice, update those checks deliberately when the trusted API URL is approved.
+The current package checks intentionally require the Firebase Functions checkout route. Do not replace it with a Stripe key, Shippo key, Firebase secret, or any other private value.
 
 Do not put Stripe secret keys, webhook signing secrets, Firebase service account values, or private API tokens in this file. Google Pay, Apple Pay, and Link should be enabled through Stripe Checkout where available, not through static storefront secrets.
 

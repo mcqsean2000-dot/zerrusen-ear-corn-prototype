@@ -61,14 +61,14 @@ async function mustExist(filePath) {
   await access(filePath);
 }
 
-async function assertCheckoutConfigIsBlank() {
+async function assertCheckoutConfigUsesTrustedApi() {
   const checkoutConfig = await readFile("checkout-config.js", "utf8");
   const sandbox = {};
   new Script(checkoutConfig, { filename: "checkout-config.js" }).runInContext(createContext(sandbox));
 
   assert(
-    sandbox.TheosCheckoutConfig?.checkoutEndpoint === "",
-    "checkout-config.js must stay blank until a trusted backend checkout URL exists.",
+    sandbox.TheosCheckoutConfig?.checkoutEndpoint === "/api/checkout-sessions",
+    "checkout-config.js must use the trusted Firebase Functions checkout route.",
   );
 }
 
@@ -144,7 +144,7 @@ async function main() {
     await mustExist(file);
   }
   await mustExist(assetDir);
-  await assertCheckoutConfigIsBlank();
+  await assertCheckoutConfigUsesTrustedApi();
   await assertNoSecretsInPublicSources();
   await collectPublicAssets();
 

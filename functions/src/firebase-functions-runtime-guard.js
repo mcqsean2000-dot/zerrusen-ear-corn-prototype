@@ -89,6 +89,7 @@ function createFirebaseFunctionsRuntime(options = {}) {
 
   return {
     env: options.env,
+    shippingRateDependencies: options.shippingRateDependencies,
     ...createTrustedBackendComposition({
       firestore: options.firestore,
       stripe: options.stripe,
