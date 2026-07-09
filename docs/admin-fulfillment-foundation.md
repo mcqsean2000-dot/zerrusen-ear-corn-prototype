@@ -32,6 +32,8 @@ The admin UI now renders status transition controls and label purchase buttons a
 
 Keep `TheosAdminConfig.enabled` set to `false` until the production Firebase project ID, public web app config, Sean/Calvin Firebase Auth users, and `admin: true` custom claims are configured. The live bridge must derive admin identity from Firebase ID tokens; it must not send `body.admin`.
 
+For local admin testing only, copy `admin-config.local.example.js` to ignored `admin-config.local.js` and fill in the approved Firebase public web config. The committed `admin-config.js` remains disabled and blank, and the local override must not contain Stripe, Shippo, service-account, or webhook secrets.
+
 ## Future Firestore Read Model
 
 The authenticated admin dashboard should read from:
