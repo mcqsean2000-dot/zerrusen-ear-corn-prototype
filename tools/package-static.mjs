@@ -23,6 +23,8 @@ const disallowedOutputPaths = [
   ".git",
   "admin.css",
   "admin-config.js",
+  "admin-config.local.example.js",
+  "admin-config.local.js",
   "admin.html",
   "admin.js",
   "admin-live.js",

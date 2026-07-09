@@ -68,6 +68,7 @@ Natural search phrases to keep in mind:
 - `admin.html` - static admin fulfillment prototype
 - `admin.css` - admin shell styles
 - `admin-config.js` - disabled public admin Firebase config gate
+- `admin-config.local.example.js` - ignored local admin config override template for local Firebase admin testing
 - `admin.js` - sample admin queue behavior plus auth-gated status, label action controls, and safe action feedback
 - `admin-live.js` - optional authenticated admin bridge for future Firebase email/password sign-in, reads/actions, and guarded admin endpoint posts
 - `package.json` - static validation script entry point
@@ -95,6 +96,7 @@ Natural search phrases to keep in mind:
 - Current prices are placeholders and should be confirmed before launch.
 - Current cart is connected to live Shippo shipping-rate lookup, but not yet connected to payment processing, inventory, order persistence, email, or label purchase.
 - The admin shell has a disabled Firebase config/auth bridge for future authenticated reads and guarded admin actions. Sign-in fields, status controls, and label controls stay inert until the live bridge confirms Firebase Auth admin access. Keep it disabled until the production Firebase project, Auth users, and admin custom claims are configured.
+- For local admin testing only, copy `admin-config.local.example.js` to ignored `admin-config.local.js` and fill in approved Firebase public web config after Auth users and admin claims are ready. Do not commit the local override.
 - Keep `checkout-config.js` blank until a trusted backend endpoint is ready. For Firebase Hosting, set only the public checkout session URL there, never secrets.
 - Do not store raw payment information in the app. Use Stripe-hosted payment collection and Stripe customer/payment method IDs.
 - Public Firestore writes are limited to validated order request creation. Payment status and Stripe IDs should be written only by trusted backend code.

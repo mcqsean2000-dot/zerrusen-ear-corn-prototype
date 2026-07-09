@@ -14,6 +14,7 @@ const requiredFiles = [
   "admin.html",
   "admin.css",
   "admin-config.js",
+  "admin-config.local.example.js",
   "admin.js",
   "admin-live.js",
   "robots.txt",
@@ -67,6 +68,7 @@ const orderRequestScript = await readFile("order-request.js", "utf8");
 const checkoutConfigScript = await readFile("checkout-config.js", "utf8");
 const admin = await readFile("admin.html", "utf8");
 const adminConfigScript = await readFile("admin-config.js", "utf8");
+const adminLocalConfigExample = await readFile("admin-config.local.example.js", "utf8");
 const adminScript = await readFile("admin.js", "utf8");
 const adminLiveScript = await readFile("admin-live.js", "utf8");
 const gitignore = await readFile(".gitignore", "utf8");
@@ -95,6 +97,8 @@ assert(firebaseConfig.hosting?.ignore?.includes("docs/**"), "Firebase Hosting sh
 assert(firebaseConfig.hosting?.ignore?.includes("functions/**"), "Firebase Hosting should not publish backend function source.");
 assert(firebaseConfig.hosting?.ignore?.includes("admin.html"), "Firebase Hosting should not publish the unauthenticated admin prototype.");
 assert(firebaseConfig.hosting?.ignore?.includes("admin-config.js"), "Firebase Hosting should not publish admin config before admin launch.");
+assert(firebaseConfig.hosting?.ignore?.includes("admin-config.local.example.js"), "Firebase Hosting should not publish local admin config examples.");
+assert(firebaseConfig.hosting?.ignore?.includes("admin-config.local.js"), "Firebase Hosting should not publish local admin config overrides.");
 assert(firebaseConfig.hosting?.ignore?.includes("admin-live.js"), "Firebase Hosting should not publish admin live bridge before admin launch.");
 assert(firebaseConfig.hosting?.ignore?.includes("**/*.zip"), "Firebase Hosting should not publish local ZIP artifacts.");
 assert(firebaseConfig.hosting?.ignore?.includes("dist/**"), "Firebase Hosting should not publish generated package artifacts.");
@@ -106,6 +110,7 @@ assert(
 );
 assert(gitignore.includes(".firebaserc"), ".gitignore must keep local .firebaserc out of git.");
 assert(gitignore.includes(".firebase/"), ".gitignore must keep Firebase local cache out of git.");
+assert(gitignore.includes("admin-config.local.js"), ".gitignore must keep local admin config overrides out of git.");
 assert(gitignore.includes("!**/.env.example"), ".gitignore must allow safe example env files.");
 assert(gitignore.includes("dist/"), ".gitignore must keep generated static deploy packages out of git.");
 assert(packageJson.scripts?.["package:static"] === "node tools/package-static.mjs", "Root package must include the static package script.");
@@ -158,6 +163,7 @@ assert(jekyllConfig.includes("firebase.json"), "GitHub Pages preview must exclud
 assert(jekyllConfig.includes("firestore.rules"), "GitHub Pages preview must exclude Firestore rules.");
 assert(jekyllConfig.includes("admin.html"), "GitHub Pages preview must exclude the unauthenticated admin prototype.");
 assert(jekyllConfig.includes("admin-config.js"), "GitHub Pages preview must exclude admin config before admin launch.");
+assert(jekyllConfig.includes("admin-config.local.example.js"), "GitHub Pages preview must exclude local admin config examples.");
 assert(jekyllConfig.includes("admin-live.js"), "GitHub Pages preview must exclude admin live bridge before admin launch.");
 assert(packageStaticScript.includes("storefrontFiles"), "Static package script must use an explicit storefront file allowlist.");
 assert(packageStaticScript.includes("allowedAssetExtensions"), "Static package script must use an explicit asset type allowlist.");
@@ -289,9 +295,11 @@ assert(
   "Storefront must not collect or handle raw payment details.",
 );
 assert(admin.includes("admin-config.js"), "Admin shell must load the public admin config gate.");
+assert(admin.includes("admin-config.local.js"), "Admin shell must load the optional local admin config override.");
 assert(admin.includes("admin.js"), "Admin shell must load admin.js.");
 assert(admin.includes("admin-live.js"), "Admin shell must load the optional live admin bridge.");
-assert(admin.indexOf("admin-config.js") < admin.indexOf("admin.js"), "Admin config must load before admin behavior.");
+assert(admin.indexOf("admin-config.js") < admin.indexOf("admin-config.local.js"), "Local admin config override must load after the disabled default config.");
+assert(admin.indexOf("admin-config.local.js") < admin.indexOf("admin.js"), "Admin config override must load before admin behavior.");
 assert(admin.indexOf("admin.js") < admin.indexOf("admin-live.js"), "Admin sample renderer must load before the live bridge.");
 assert(admin.includes("data-admin-auth-status"), "Admin shell must render auth state.");
 assert(admin.includes("data-admin-auth-help"), "Admin shell must render live admin sign-in helper copy.");
@@ -307,6 +315,9 @@ assert(adminConfigScript.includes("projectId: \"\""), "Admin config must keep Fi
 assert(adminConfigScript.includes("/api/admin/order-status"), "Admin config must point status actions at the trusted backend endpoint.");
 assert(adminConfigScript.includes("/api/admin/shippo-labels"), "Admin config must point label actions at the trusted backend endpoint.");
 assert(!adminConfigScript.includes("sk_") && !adminConfigScript.includes("whsec_"), "Admin config must not include secret-looking values.");
+assert(adminLocalConfigExample.includes("replace-with-public-firebase-web-api-key"), "Local admin config example must use placeholder Firebase web config.");
+assert(adminLocalConfigExample.includes("enabled: true"), "Local admin config example must show how to intentionally enable local live mode.");
+assert(!adminLocalConfigExample.includes("sk_") && !adminLocalConfigExample.includes("whsec_"), "Local admin config example must not include secret-looking values.");
 assert(adminScript.includes("sampleOrders"), "Admin shell should use sample data only in this slice.");
 assert(adminScript.includes("normalizeAdminOrder"), "Admin shell must centralize order normalization for future authenticated reads.");
 assert(adminScript.includes("normalizeAdminShipping"), "Admin shell must centralize shipping normalization for future authenticated reads.");
