@@ -99,7 +99,7 @@ function runtimeOptions(env = runtimeEnv()) {
   };
 }
 
-exports.api = onRequest({
+const api = onRequest({
   region: "us-central1",
   secrets: [shippoApiToken, stripeSecretKey],
 }, (req, res) => {
@@ -107,6 +107,7 @@ exports.api = onRequest({
 });
 
 module.exports = {
+  api,
   firebaseApp,
   runtimeEnv,
   runtimeOptions,
