@@ -202,7 +202,8 @@ Build order:
 8. Build admin fulfillment dashboard.
    - Static admin planning shell now exists at `admin.html`.
    - Backend admin label/status routes now require Firebase Auth admin custom-claim verification.
-   - Next step is authenticated admin UI sign-in, Firestore reads, and guarded status/label controls.
+   - Disabled-by-default admin sign-in controls, Firestore read bridge, guarded status controls, label controls, and safe action feedback are scaffolded.
+   - Next step is production Firebase web config, Firebase Auth users, `admin: true` custom claims, emulator rule verification, and a reviewed live admin enablement plan.
 9. Add Shippo label purchase and tracking updates in admin.
 10. Add email notifications.
 11. Deploy the public storefront to Firebase Hosting.

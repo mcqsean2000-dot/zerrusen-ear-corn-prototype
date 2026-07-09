@@ -18,6 +18,7 @@ const requiredFiles = [
   "admin-live.js",
   "robots.txt",
   "sitemap.xml",
+  "ROADMAP.md",
   "_config.yml",
   ".firebaserc.example",
   "firebase.json",
@@ -59,6 +60,7 @@ const rules = await readFile("firestore.rules", "utf8");
 const storefront = await readFile("index.html", "utf8");
 const robots = await readFile("robots.txt", "utf8");
 const sitemap = await readFile("sitemap.xml", "utf8");
+const roadmap = await readFile("ROADMAP.md", "utf8");
 const jekyllConfig = await readFile("_config.yml", "utf8");
 const storefrontScript = await readFile("script.js", "utf8");
 const orderRequestScript = await readFile("order-request.js", "utf8");
@@ -116,6 +118,8 @@ assert(serveStaticScript.includes("createServer"), "Local preview tool must serv
 assert(serveStaticScript.includes("allowedRoots"), "Local preview tool must constrain preview roots.");
 assert(serveStaticScript.includes("cache-control"), "Local preview tool must prevent stale local browser caching.");
 assert(serveStaticScript.includes("index.html"), "Local preview tool must serve index.html for the static storefront.");
+assert(roadmap.includes("Disabled-by-default admin sign-in controls"), "Roadmap must reflect merged admin sign-in/control scaffolding.");
+assert(roadmap.includes("production Firebase web config"), "Roadmap must keep live admin Firebase setup as a remaining gate.");
 assert(hostingReadiness.includes("firebase emulators:start --only hosting"), "Hosting readiness doc must include local Firebase preview.");
 assert(hostingReadiness.includes("firebase hosting:channel:deploy preview"), "Hosting readiness doc must include preview channel deploy.");
 assert(hostingReadiness.includes("firebase deploy --only hosting"), "Hosting readiness doc must include hosting deploy command.");
