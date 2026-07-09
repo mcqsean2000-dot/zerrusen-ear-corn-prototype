@@ -2,6 +2,8 @@
 
 This plan defines the first Theo's Farm notification boundary. It does not add an email provider, install packages, send email, deploy anything, or introduce secrets.
 
+Approved farm/admin email account: `theosfeedfarm@gmail.com`. Use this account for business email setup and as the initial admin notification recipient once a provider and trusted backend send path are approved.
+
 ## Scope
 
 Version one should cover three notification jobs:
@@ -19,8 +21,8 @@ Use trusted backend or authenticated admin events only. Public storefront JavaSc
 | Event | Trigger owner | Timing | Recipient |
 | --- | --- | --- | --- |
 | `customer.order_confirmation` | Trusted checkout/webhook backend | After Stripe Checkout confirms payment and the matching order is updated to paid | Customer contact email, only when contact is a valid email address |
-| `admin.paid_order_created` | Trusted checkout/webhook backend | After Stripe Checkout confirms payment and the matching order is updated to paid | Farm/admin notification address |
-| `admin.daily_fulfillment_summary` | Scheduled trusted backend job | Once per operating day after order status updates settle | Farm/admin notification address |
+| `admin.paid_order_created` | Trusted checkout/webhook backend | After Stripe Checkout confirms payment and the matching order is updated to paid | Farm/admin notification address (`theosfeedfarm@gmail.com`) |
+| `admin.daily_fulfillment_summary` | Scheduled trusted backend job | Once per operating day after order status updates settle | Farm/admin notification address (`theosfeedfarm@gmail.com`) |
 
 For version one, send customer and admin order notifications after the trusted webhook marks the order paid. That avoids confirming or queueing an order that never completed Stripe Checkout. If the farm wants an earlier "request received" email for unpaid drafts, treat that as a separate `admin.order_request_received` event with different wording and no payment/fulfillment promise.
 

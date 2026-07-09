@@ -15,6 +15,9 @@ This repo currently contains a static prototype for the Theo's Farm direct-to-co
 - Fulfillment: shipping only. No local pickup.
 - Shipping direction: Shippo for live rates, address validation, labels, and tracking.
 - Payments direction: Stripe Checkout with Google Pay enabled through Stripe.
+- Farm/admin email account: `theosfeedfarm@gmail.com` for business account setup and future order notifications.
+- Facebook profile: `Theos Farm` for the farm's new Facebook presence tied to the email account.
+- Instagram account: `theosfeedfarm` for the farm's new Instagram presence tied to the email account.
 - Storefront flow: cart selections feed a shipping address form, live Shippo rate lookup, and customer-selected shipping option before the future Stripe Checkout handoff.
 - Public hosting direction: Firebase Hosting.
 - Firebase/Firestore/Functions are the selected production foundation because the same Firebase ecosystem is already used for EasiTask and Debris Locator.
@@ -94,7 +97,7 @@ Natural search phrases to keep in mind:
 ## Important Notes
 
 - Current prices are placeholders and should be confirmed before launch.
-- Current cart is connected to live Shippo shipping-rate lookup, but not yet connected to payment processing, inventory, order persistence, email, or label purchase.
+- Current cart is connected to live Shippo shipping-rate lookup, but not yet connected to payment processing, inventory, order persistence, live email sends, or label purchase.
 - The admin shell has a disabled Firebase config/auth bridge for future authenticated reads and guarded admin actions. Sign-in fields, status controls, and label controls stay inert until the live bridge confirms Firebase Auth admin access. Keep it disabled until the production Firebase project, Auth users, and admin custom claims are configured.
 - For local admin testing only, copy `admin-config.local.example.js` to ignored `admin-config.local.js` and fill in approved Firebase public web config after Auth users and admin claims are ready. Do not commit the local override.
 - Keep `checkout-config.js` blank until a trusted backend endpoint is ready. For Firebase Hosting, set only the public checkout session URL there, never secrets.
