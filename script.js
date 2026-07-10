@@ -21,6 +21,8 @@ const checkoutConfig = window.TheosCheckoutConfig || {};
 const orderSubmitButton = orderForm.querySelector('button[type="submit"]');
 const checkoutFailureMessage = "Checkout could not be started. Please try again or contact Theo's Farm.";
 const shippingRatesFailureMessage = "Shipping rates could not be calculated. Please check the address or contact Theo's Farm.";
+const shippingRatesButtonLabel = "Get shipping rates";
+const checkoutButtonLabel = "Proceed to checkout";
 let selectedShippingRate = null;
 
 const money = new Intl.NumberFormat("en-US", {
@@ -192,10 +194,16 @@ function getShippingRatesEndpoint() {
   return getTrustedEndpoint("shippingRatesEndpoint");
 }
 
+function setOrderSubmitButton(label, disabled = false) {
+  orderSubmitButton.textContent = label;
+  orderSubmitButton.disabled = disabled;
+}
+
 function clearSelectedShippingRate() {
   selectedShippingRate = null;
   shippingRatesContainer.hidden = true;
   shippingRatesContainer.innerHTML = "";
+  setOrderSubmitButton(shippingRatesButtonLabel);
 }
 
 function removeCartItem(sku) {
@@ -306,12 +314,14 @@ function renderShippingRates(rates) {
   ].join("");
 
   selectedShippingRate = rates[0] || null;
+  setOrderSubmitButton(selectedShippingRate ? checkoutButtonLabel : shippingRatesButtonLabel);
 
   shippingRatesContainer.querySelectorAll('input[name="shippingRate"]').forEach((input) => {
     input.addEventListener("change", () => {
       selectedShippingRate = rates.find((rate) => rate.rateId === input.value) || null;
       if (selectedShippingRate) {
-        orderStatus.textContent = shippingRateLabel(selectedShippingRate) + " selected. Stripe checkout will be enabled after the Stripe account is ready.";
+        setOrderSubmitButton(checkoutButtonLabel);
+        orderStatus.textContent = shippingRateLabel(selectedShippingRate) + " selected. Continue to secure Stripe Checkout when ready.";
       }
     });
   });
@@ -411,15 +421,16 @@ orderForm.addEventListener("submit", async (event) => {
       return;
     }
 
-    orderSubmitButton.disabled = true;
+    setOrderSubmitButton("Calculating rates...", true);
     orderStatus.textContent = "Calculating live shipping rates...";
 
     try {
       const payload = await requestShippingRates(shippingRatesEndpoint, result);
       renderShippingRates(payload.rates);
-      orderStatus.textContent = "Choose a shipping option. Stripe checkout will be enabled after the Stripe account is ready.";
+      orderStatus.textContent = "Choose a shipping option, then continue to secure Stripe Checkout.";
     } catch (error) {
       orderStatus.textContent = shippingRatesFailureMessage;
+      setOrderSubmitButton(shippingRatesButtonLabel);
     } finally {
       orderSubmitButton.disabled = false;
     }
@@ -428,11 +439,11 @@ orderForm.addEventListener("submit", async (event) => {
 
   const checkoutEndpoint = getCheckoutEndpoint();
   if (!checkoutEndpoint) {
-    orderStatus.textContent = shippingRateLabel(selectedShippingRate) + " selected. Stripe checkout will be enabled after the Stripe account is ready.";
+    orderStatus.textContent = shippingRateLabel(selectedShippingRate) + " selected. Stripe checkout is not connected yet.";
     return;
   }
 
-  orderSubmitButton.disabled = true;
+  setOrderSubmitButton("Starting checkout...", true);
   orderStatus.textContent = "Starting secure checkout...";
 
   try {
@@ -444,7 +455,7 @@ orderForm.addEventListener("submit", async (event) => {
     window.location.assign(handoff.checkoutUrl);
   } catch (error) {
     orderStatus.textContent = checkoutFailureMessage;
-    orderSubmitButton.disabled = false;
+    setOrderSubmitButton(checkoutButtonLabel);
   }
 });
 
