@@ -21,8 +21,9 @@ const checkoutConfig = window.TheosCheckoutConfig || {};
 const orderSubmitButton = orderForm.querySelector('button[type="submit"]');
 const checkoutFailureMessage = "Checkout could not be started. Please try again or contact Theo's Farm.";
 const shippingRatesFailureMessage = "Shipping rates could not be calculated. Please check the address or contact Theo's Farm.";
-const shippingRatesButtonLabel = "Get shipping rates";
+const shippingRatesButtonLabel = "Estimate shipping";
 const checkoutButtonLabel = "Proceed to checkout";
+const shippingAddressFieldNames = ["addressLine1", "addressLine2", "city", "state", "zip"];
 let selectedShippingRate = null;
 
 const money = new Intl.NumberFormat("en-US", {
@@ -145,10 +146,15 @@ function renderCart() {
         <div class="cart-line">
           <span>
             <strong>${item.name}</strong>
-            <small>Qty ${item.quantity} x ${formatCents(item.unitPriceCents)}</small>
+            <small>${formatCents(item.unitPriceCents)} each</small>
           </span>
           <span class="cart-line-actions">
             <strong>${formatCents(item.unitPriceCents * item.quantity)}</strong>
+            <span class="quantity-controls" aria-label="Quantity for ${item.name}">
+              <button type="button" data-adjust-cart-item="${item.sku}" data-cart-delta="-1" aria-label="Decrease ${item.name} quantity">-</button>
+              <b>${item.quantity}</b>
+              <button type="button" data-adjust-cart-item="${item.sku}" data-cart-delta="1" aria-label="Increase ${item.name} quantity">+</button>
+            </span>
             <button type="button" data-remove-cart-item="${item.sku}" aria-label="Remove ${item.name} from cart">Remove</button>
           </span>
         </div>
@@ -159,6 +165,12 @@ function renderCart() {
   cartItems.querySelectorAll("[data-remove-cart-item]").forEach((button) => {
     button.addEventListener("click", () => {
       removeCartItem(button.dataset.removeCartItem);
+    });
+  });
+
+  cartItems.querySelectorAll("[data-adjust-cart-item]").forEach((button) => {
+    button.addEventListener("click", () => {
+      adjustCartItem(button.dataset.adjustCartItem, Number(button.dataset.cartDelta));
     });
   });
 }
@@ -213,6 +225,23 @@ function removeCartItem(sku) {
   }
 
   cart.splice(index, 1);
+  clearSelectedShippingRate();
+  orderStatus.textContent = "";
+  renderCart();
+}
+
+function adjustCartItem(sku, delta) {
+  const item = cart.find((cartItem) => cartItem.sku === sku);
+  if (!item || !Number.isInteger(delta) || delta === 0) {
+    return;
+  }
+
+  item.quantity = Math.max(0, Math.min(50, item.quantity + delta));
+  if (item.quantity === 0) {
+    removeCartItem(sku);
+    return;
+  }
+
   clearSelectedShippingRate();
   orderStatus.textContent = "";
   renderCart();
@@ -421,19 +450,26 @@ orderForm.addEventListener("submit", async (event) => {
       return;
     }
 
-    setOrderSubmitButton("Calculating rates...", true);
-    orderStatus.textContent = "Calculating live shipping rates...";
+    setOrderSubmitButton("Estimating shipping...", true);
+    orderStatus.textContent = "Estimating shipping from ZIP...";
 
     try {
       const payload = await requestShippingRates(shippingRatesEndpoint, result);
       renderShippingRates(payload.rates);
-      orderStatus.textContent = "Choose a shipping option, then continue to secure Stripe Checkout.";
+      orderStatus.textContent = "Choose an estimated shipping option, then add the full address and contact details before checkout.";
     } catch (error) {
       orderStatus.textContent = shippingRatesFailureMessage;
       setOrderSubmitButton(shippingRatesButtonLabel);
     } finally {
       orderSubmitButton.disabled = false;
     }
+    return;
+  }
+
+  const checkoutRequest = orderRequests.buildCheckoutRequest(getOrderFormInput());
+
+  if (!checkoutRequest.ok) {
+    orderStatus.textContent = checkoutRequest.message;
     return;
   }
 
@@ -448,8 +484,8 @@ orderForm.addEventListener("submit", async (event) => {
 
   try {
     const handoff = await requestCheckoutSession(checkoutEndpoint, {
-      orderRequest: result.orderRequest,
-      shippingAddress: result.shippingAddress,
+      orderRequest: checkoutRequest.orderRequest,
+      shippingAddress: checkoutRequest.shippingAddress,
       selectedShippingRate,
     });
     window.location.assign(handoff.checkoutUrl);
@@ -463,8 +499,10 @@ orderForm.addEventListener("input", (event) => {
   if (event.target && event.target.name === "shippingRate") {
     return;
   }
-  clearSelectedShippingRate();
-  orderStatus.textContent = "";
+  if (event.target && shippingAddressFieldNames.includes(event.target.name)) {
+    clearSelectedShippingRate();
+    orderStatus.textContent = "";
+  }
 });
 
 cartDrawer.addEventListener("click", (event) => {

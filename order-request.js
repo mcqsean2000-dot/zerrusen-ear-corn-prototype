@@ -109,10 +109,7 @@
     return "";
   }
 
-  function buildOrderRequest(input) {
-    const cart = Array.isArray(input && input.cart) ? input.cart : [];
-    const customer = normalizeCustomer(input && input.customer);
-
+  function buildCartItems(cart) {
     if (!cart.length) {
       return {
         ok: false,
@@ -136,11 +133,6 @@
       items.push(normalized.item);
     }
 
-    const customerError = validateCustomer(customer);
-    if (customerError) {
-      return { ok: false, message: customerError };
-    }
-
     const subtotalCents = items.reduce(
       (total, item) => total + item.unitPriceCents * item.quantity,
       0
@@ -155,12 +147,33 @@
 
     return {
       ok: true,
+      items,
+      subtotalCents,
+    };
+  }
+
+  function buildOrderRequest(input) {
+    const cart = Array.isArray(input && input.cart) ? input.cart : [];
+    const customer = normalizeCustomer(input && input.customer);
+    const cartResult = buildCartItems(cart);
+
+    if (!cartResult.ok) {
+      return cartResult;
+    }
+
+    const customerError = validateCustomer(customer);
+    if (customerError) {
+      return { ok: false, message: customerError };
+    }
+
+    return {
+      ok: true,
       message: "Order request prepared. Live submission is disabled until Theo's Farm adds a trusted Stripe Checkout endpoint.",
       payload: {
         source: "static-storefront",
         status: "needs_review",
-        subtotalCents,
-        items,
+        subtotalCents: cartResult.subtotalCents,
+        items: cartResult.items,
         customer,
       },
       firestoreWrite: {
@@ -192,7 +205,17 @@
     return normalized;
   }
 
-  function validateShippingAddress(address) {
+  function validateShippingAddress(address, options) {
+    const estimateOnly = options && options.estimateOnly === true;
+
+    if (estimateOnly) {
+      if (!/^\d{5}$/.test(address.zip)) {
+        return "Enter a 5-digit shipping ZIP to estimate shipping.";
+      }
+
+      return "";
+    }
+
     if (!address.addressLine1 || !address.city || !address.state || !address.zip) {
       return "Add the full shipping address before calculating rates.";
     }
@@ -218,6 +241,52 @@
 
   function buildShippingRateRequest(input) {
     const shippingAddress = normalizeShippingAddress(input && input.shippingAddress);
+    const cartResult = buildCartItems(Array.isArray(input && input.cart) ? input.cart : []);
+
+    if (!cartResult.ok) {
+      return cartResult;
+    }
+
+    const addressError = validateShippingAddress(shippingAddress, { estimateOnly: true });
+    if (addressError) {
+      return {
+        ok: false,
+        message: addressError,
+      };
+    }
+
+    return {
+      ok: true,
+      orderRequest: {
+        source: "static-storefront",
+        status: "needs_review",
+        subtotalCents: cartResult.subtotalCents,
+        items: cartResult.items,
+        customer: {
+          name: "Shipping quote",
+          contact: "quote@example.invalid",
+          shippingZip: shippingAddress.zip,
+          preferredContact: "email",
+        },
+      },
+      shippingAddress: {
+        zip: shippingAddress.zip,
+        estimateOnly: true,
+      },
+    };
+  }
+
+  function buildCheckoutRequest(input) {
+    const shippingAddress = normalizeShippingAddress(input && input.shippingAddress);
+    const addressError = validateShippingAddress(shippingAddress);
+
+    if (addressError) {
+      return {
+        ok: false,
+        message: addressError,
+      };
+    }
+
     const orderResult = buildOrderRequest({
       cart: input && input.cart,
       customer: {
@@ -230,14 +299,6 @@
       return orderResult;
     }
 
-    const addressError = validateShippingAddress(shippingAddress);
-    if (addressError) {
-      return {
-        ok: false,
-        message: addressError,
-      };
-    }
-
     return {
       ok: true,
       orderRequest: orderResult.payload,
@@ -247,6 +308,7 @@
 
   return {
     PRODUCT_CATALOG,
+    buildCheckoutRequest,
     buildOrderRequest,
     buildShippingRateRequest,
   };

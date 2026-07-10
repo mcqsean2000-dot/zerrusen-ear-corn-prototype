@@ -83,6 +83,17 @@ test("rejects incomplete or unsupported shipping address fields", () => {
   assert(result.errors.length >= 3);
 });
 
+test("allows ZIP-only shipping address for estimate requests", () => {
+  const result = validateShippingAddress({
+    zip: "62704",
+    estimateOnly: true,
+  }, { estimateOnly: true });
+
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.address.zip, "62704");
+  assert.equal(result.address.addressLine1, "");
+});
+
 test("builds separate Shippo parcels for each ordered bag", () => {
   const parcels = buildParcels(validOrderRequest.items);
 
@@ -118,6 +129,29 @@ test("builds Shippo shipment payload with server-owned package specs", () => {
   assert.equal(payload.address_to.state, "IL");
   assert.equal(payload.parcels.length, 2);
   assert.equal(payload.async, false);
+});
+
+test("builds ZIP-only Shippo shipment payload for estimates", () => {
+  const payload = buildShippoShipmentPayload({
+    orderRequest: validOrderRequest,
+    shippingAddress: validateShippingAddress({
+      zip: "62704",
+      estimateOnly: true,
+    }, { estimateOnly: true }).address,
+    parcels: [],
+    shipFromAddress: {
+      street1: "456 Farm Road",
+      city: "Teutopolis",
+      state: "IL",
+      zip: "62467",
+    },
+  });
+
+  assert.equal(payload.address_to.zip, "62704");
+  assert.equal(payload.address_to.country, "US");
+  assert.equal(Object.prototype.hasOwnProperty.call(payload.address_to, "street1"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(payload.address_to, "city"), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(payload.address_to, "state"), false);
 });
 
 test("normalizes ship-from address with 62467 fallback", () => {

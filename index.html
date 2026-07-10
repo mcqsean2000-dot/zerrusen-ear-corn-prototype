@@ -259,9 +259,9 @@
 
       <section class="section delivery" id="delivery" aria-labelledby="delivery-title">
         <div>
-          <p class="eyebrow">Fulfillment concept</p>
-          <h2 id="delivery-title">Check shipping options before payment.</h2>
-          <p>This prototype now collects buyer intent, shipping details, and the cart subtotal before handing payment off to Stripe Checkout. Theo's Farm should not collect or store raw card details on this static site.</p>
+          <p class="eyebrow">Checkout</p>
+          <h2 id="delivery-title">Estimate shipping before payment.</h2>
+          <p>Start with the shipping ZIP and cart quantity. Theo's Farm verifies the full delivery address before handing payment off to secure Stripe Checkout.</p>
         </div>
         <form class="quote-form" data-order-form novalidate>
           <div class="order-summary" data-order-summary>
@@ -269,6 +269,10 @@
             <p>Add a bag to the cart and it will appear here before checkout.</p>
             <span>Estimated subtotal: <b data-order-subtotal>$0.00</b></span>
           </div>
+          <label>
+            Shipping ZIP
+            <input type="text" name="zip" inputmode="numeric" autocomplete="shipping postal-code" pattern="[0-9]{5}" placeholder="62401" required>
+          </label>
           <label>
             Name
             <input type="text" name="name" placeholder="Customer name" required>
@@ -296,10 +300,6 @@
             </label>
           </div>
           <label>
-            Shipping ZIP
-            <input type="text" name="zip" inputmode="numeric" autocomplete="shipping postal-code" pattern="[0-9]{5}" placeholder="62401" required>
-          </label>
-          <label>
             Preferred contact method
             <select name="contactMethod" required>
               <option value="">Select one</option>
@@ -313,8 +313,8 @@
             <textarea name="note" rows="4" placeholder="Timing, special instructions, or bulk quantity"></textarea>
           </label>
           <div class="shipping-rates" data-shipping-rates hidden></div>
-          <p class="payment-note">Shipping rates are calculated through Shippo from the farm's 62467 ship-from ZIP. Payment will be completed through Stripe Checkout after the Stripe account is ready.</p>
-          <button type="submit">Get shipping rates</button>
+          <p class="payment-note">ZIP-only shipping is an estimate from the farm's 62467 ship-from ZIP. Final shipping is checked again with the full address before Stripe Checkout.</p>
+          <button type="submit">Estimate shipping</button>
           <p class="form-status" data-order-status role="status" aria-live="polite"></p>
         </form>
       </section>

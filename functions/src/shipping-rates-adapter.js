@@ -35,6 +35,7 @@ const SHIPPING_ADDRESS_FIELDS = Object.freeze([
   "addressLine1",
   "addressLine2",
   "city",
+  "estimateOnly",
   "state",
   "zip",
 ]);
@@ -93,8 +94,9 @@ function normalizeShippingAddress(address) {
   return normalized;
 }
 
-function validateShippingAddress(address) {
+function validateShippingAddress(address, options = {}) {
   const errors = [];
+  const estimateOnly = options.estimateOnly === true;
 
   if (!isPlainObject(address)) {
     return {
@@ -109,6 +111,17 @@ function validateShippingAddress(address) {
   }
 
   const normalized = normalizeShippingAddress(address);
+
+  if (estimateOnly) {
+    if (!/^\d{5}$/.test(normalized.zip)) {
+      errors.push("Shipping ZIP must be a 5-digit ZIP code.");
+    }
+
+    return {
+      errors,
+      address: normalized,
+    };
+  }
 
   if (!normalized.addressLine1 || !normalized.city || !normalized.state || !normalized.zip) {
     errors.push("Street address, city, state, and ZIP are required before calculating shipping.");
@@ -175,6 +188,16 @@ function normalizeShipFromAddress(address = {}) {
 
 function buildShippoShipmentPayload({ orderRequest, shippingAddress, parcels, shipFromAddress }) {
   const normalizedShipFrom = normalizeShipFromAddress(shipFromAddress);
+  const addressTo = {
+    name: orderRequest.customer.name,
+    zip: shippingAddress.zip,
+    country: "US",
+  };
+
+  if (shippingAddress.addressLine1) addressTo.street1 = shippingAddress.addressLine1;
+  if (shippingAddress.addressLine2) addressTo.street2 = shippingAddress.addressLine2;
+  if (shippingAddress.city) addressTo.city = shippingAddress.city;
+  if (shippingAddress.state) addressTo.state = shippingAddress.state;
 
   return {
     address_from: {
@@ -186,15 +209,7 @@ function buildShippoShipmentPayload({ orderRequest, shippingAddress, parcels, sh
       zip: normalizedShipFrom.zip,
       country: normalizedShipFrom.country,
     },
-    address_to: {
-      name: orderRequest.customer.name,
-      street1: shippingAddress.addressLine1,
-      street2: shippingAddress.addressLine2 || "",
-      city: shippingAddress.city,
-      state: shippingAddress.state,
-      zip: shippingAddress.zip,
-      country: "US",
-    },
+    address_to: addressTo,
     parcels: parcels || buildParcels(orderRequest.items),
     async: false,
   };
@@ -343,7 +358,9 @@ async function createShippingRates({ orderRequestDraft, shippingAddress, createS
   }
 
   const orderValidation = validateOrderRequestDraft(orderRequestDraft);
-  const addressValidation = validateShippingAddress(shippingAddress);
+  const addressValidation = validateShippingAddress(shippingAddress, {
+    estimateOnly: shippingAddress && shippingAddress.estimateOnly === true,
+  });
   const errors = [
     ...(!orderValidation.ok ? orderValidation.errors : []),
     ...addressValidation.errors,

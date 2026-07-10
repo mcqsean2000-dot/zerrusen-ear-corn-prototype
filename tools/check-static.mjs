@@ -1111,7 +1111,7 @@ function createStorefrontHarness({ checkoutEndpoint = "", href = "https://theos.
   await harness.addFirstProductAndSubmit();
 
   assert(requestUrl === "https://theos.example/api/shipping-rates", "Configured shipping should call the trusted shipping rates endpoint before checkout.");
-  assert(harness.elements.orderStatus.textContent.includes("Choose a shipping option"), "Shipping-rate flow should ask the customer to choose a rate before checkout.");
+  assert(harness.elements.orderStatus.textContent.includes("estimated shipping option"), "Shipping-rate flow should ask the customer to choose an estimated rate before checkout.");
   assert(harness.location.assignedUrl === "", "Blank checkout config must not redirect.");
   assert(harness.elements.cartItems.innerHTML.includes("20 lb Ear Corn Bag"), "Blank checkout config must not clear the cart.");
 }
