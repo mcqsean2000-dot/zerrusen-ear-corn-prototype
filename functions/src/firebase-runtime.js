@@ -21,6 +21,7 @@ const {
 
 const shippoApiToken = defineSecret("SHIPPO_API_TOKEN");
 const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
+const stripeWebhookSigningSecret = defineSecret("STRIPE_WEBHOOK_SIGNING_SECRET");
 
 let stripeClient;
 
@@ -48,6 +49,7 @@ function runtimeEnv() {
     FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT,
     SHIPPO_API_TOKEN: shippoApiToken.value(),
     STRIPE_SECRET_KEY: stripeSecretKey.value(),
+    STRIPE_WEBHOOK_SIGNING_SECRET: stripeWebhookSigningSecret.value(),
     STRIPE_SUCCESS_URL: process.env.STRIPE_SUCCESS_URL || "https://theosfarm.com/?checkout=success&session_id={CHECKOUT_SESSION_ID}",
     STRIPE_CANCEL_URL: process.env.STRIPE_CANCEL_URL || "https://theosfarm.com/#delivery",
   };
@@ -101,7 +103,7 @@ function runtimeOptions(env = runtimeEnv()) {
 
 const api = onRequest({
   region: "us-central1",
-  secrets: [shippoApiToken, stripeSecretKey],
+  secrets: [shippoApiToken, stripeSecretKey, stripeWebhookSigningSecret],
 }, (req, res) => {
   return routeRequest(req, res, runtimeOptions());
 });
