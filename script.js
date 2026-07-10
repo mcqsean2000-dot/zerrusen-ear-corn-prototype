@@ -11,6 +11,7 @@ const orderForm = document.querySelector("[data-order-form]");
 const orderSummary = document.querySelector("[data-order-summary]");
 const orderStatus = document.querySelector("[data-order-status]");
 const shippingRatesContainer = document.querySelector("[data-shipping-rates]");
+const checkoutDetails = document.querySelector("[data-checkout-details]");
 const checkoutResult = document.querySelector("[data-checkout-result]");
 const checkoutResultKicker = document.querySelector("[data-checkout-result-kicker]");
 const checkoutResultTitle = document.querySelector("[data-checkout-result-title]");
@@ -152,7 +153,7 @@ function renderCart() {
             <strong>${formatCents(item.unitPriceCents * item.quantity)}</strong>
             <span class="quantity-controls" aria-label="Quantity for ${item.name}">
               <button type="button" data-adjust-cart-item="${item.sku}" data-cart-delta="-1" aria-label="Decrease ${item.name} quantity">-</button>
-              <b>${item.quantity}</b>
+              <input type="number" min="1" max="50" inputmode="numeric" value="${item.quantity}" data-cart-quantity="${item.sku}" aria-label="${item.name} quantity">
               <button type="button" data-adjust-cart-item="${item.sku}" data-cart-delta="1" aria-label="Increase ${item.name} quantity">+</button>
             </span>
             <button type="button" data-remove-cart-item="${item.sku}" aria-label="Remove ${item.name} from cart">Remove</button>
@@ -171,6 +172,12 @@ function renderCart() {
   cartItems.querySelectorAll("[data-adjust-cart-item]").forEach((button) => {
     button.addEventListener("click", () => {
       adjustCartItem(button.dataset.adjustCartItem, Number(button.dataset.cartDelta));
+    });
+  });
+
+  cartItems.querySelectorAll("[data-cart-quantity]").forEach((input) => {
+    input.addEventListener("change", () => {
+      setCartItemQuantity(input.dataset.cartQuantity, Number(input.value));
     });
   });
 }
@@ -211,10 +218,19 @@ function setOrderSubmitButton(label, disabled = false) {
   orderSubmitButton.disabled = disabled;
 }
 
+function setCheckoutDetailsVisible(isVisible) {
+  if (!checkoutDetails) {
+    return;
+  }
+
+  checkoutDetails.hidden = !isVisible;
+}
+
 function clearSelectedShippingRate() {
   selectedShippingRate = null;
   shippingRatesContainer.hidden = true;
   shippingRatesContainer.innerHTML = "";
+  setCheckoutDetailsVisible(false);
   setOrderSubmitButton(shippingRatesButtonLabel);
 }
 
@@ -242,6 +258,22 @@ function adjustCartItem(sku, delta) {
     return;
   }
 
+  clearSelectedShippingRate();
+  orderStatus.textContent = "";
+  renderCart();
+}
+
+function setCartItemQuantity(sku, quantity) {
+  const item = cart.find((cartItem) => cartItem.sku === sku);
+  if (!item) {
+    return;
+  }
+
+  if (!Number.isInteger(quantity) || quantity < 1) {
+    quantity = 1;
+  }
+
+  item.quantity = Math.min(50, quantity);
   clearSelectedShippingRate();
   orderStatus.textContent = "";
   renderCart();
@@ -344,11 +376,13 @@ function renderShippingRates(rates) {
 
   selectedShippingRate = rates[0] || null;
   setOrderSubmitButton(selectedShippingRate ? checkoutButtonLabel : shippingRatesButtonLabel);
+  setCheckoutDetailsVisible(Boolean(selectedShippingRate));
 
   shippingRatesContainer.querySelectorAll('input[name="shippingRate"]').forEach((input) => {
     input.addEventListener("change", () => {
       selectedShippingRate = rates.find((rate) => rate.rateId === input.value) || null;
       if (selectedShippingRate) {
+        setCheckoutDetailsVisible(true);
         setOrderSubmitButton(checkoutButtonLabel);
         orderStatus.textContent = shippingRateLabel(selectedShippingRate) + " selected. Continue to secure Stripe Checkout when ready.";
       }

@@ -530,6 +530,15 @@ h3 {
   gap: 12px;
 }
 
+.checkout-details {
+  display: grid;
+  gap: 14px;
+}
+
+.checkout-details[hidden] {
+  display: none;
+}
+
 .order-summary {
   display: grid;
   gap: 8px;
@@ -697,7 +706,7 @@ h3 {
 
 .quantity-controls {
   display: grid;
-  grid-template-columns: 34px 34px 34px;
+  grid-template-columns: 34px 58px 34px;
   align-items: center;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -713,12 +722,23 @@ h3 {
   background: transparent;
 }
 
-.quantity-controls b {
-  display: grid;
+.quantity-controls input {
   min-height: 34px;
-  place-items: center;
+  width: 58px;
+  padding: 0 4px;
   border-inline: 1px solid var(--line);
+  border-block: 0;
+  border-radius: 0;
+  color: var(--ink);
+  background: #fff;
   font-size: 0.92rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.quantity-controls input::-webkit-outer-spin-button,
+.quantity-controls input::-webkit-inner-spin-button {
+  margin: 0;
 }
 
 .cart-total {

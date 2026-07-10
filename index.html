@@ -273,45 +273,47 @@
             Shipping ZIP
             <input type="text" name="zip" inputmode="numeric" autocomplete="shipping postal-code" pattern="[0-9]{5}" placeholder="62401" required>
           </label>
-          <label>
-            Name
-            <input type="text" name="name" placeholder="Customer name" required>
-          </label>
-          <label>
-            Email or phone
-            <input type="text" name="contact" placeholder="Best contact" required>
-          </label>
-          <label>
-            Street address
-            <input type="text" name="addressLine1" autocomplete="shipping address-line1" placeholder="Street address" required>
-          </label>
-          <label>
-            Address line 2
-            <input type="text" name="addressLine2" autocomplete="shipping address-line2" placeholder="Apartment, suite, or delivery note">
-          </label>
-          <div class="address-grid">
+          <div class="checkout-details" data-checkout-details hidden>
             <label>
-              City
-              <input type="text" name="city" autocomplete="shipping address-level2" placeholder="City" required>
+              Name
+              <input type="text" name="name" placeholder="Customer name" required>
             </label>
             <label>
-              State
-              <input type="text" name="state" autocomplete="shipping address-level1" maxlength="2" placeholder="IL" required>
+              Email or phone
+              <input type="text" name="contact" placeholder="Best contact" required>
+            </label>
+            <label>
+              Street address
+              <input type="text" name="addressLine1" autocomplete="shipping address-line1" placeholder="Street address" required>
+            </label>
+            <label>
+              Address line 2
+              <input type="text" name="addressLine2" autocomplete="shipping address-line2" placeholder="Apartment, suite, or delivery note">
+            </label>
+            <div class="address-grid">
+              <label>
+                City
+                <input type="text" name="city" autocomplete="shipping address-level2" placeholder="City" required>
+              </label>
+              <label>
+                State
+                <input type="text" name="state" autocomplete="shipping address-level1" maxlength="2" placeholder="IL" required>
+              </label>
+            </div>
+            <label>
+              Preferred contact method
+              <select name="contactMethod" required>
+                <option value="">Select one</option>
+                <option>Email</option>
+                <option>Phone call</option>
+                <option>Text message</option>
+              </select>
+            </label>
+            <label>
+              Order note
+              <textarea name="note" rows="4" placeholder="Timing, special instructions, or bulk quantity"></textarea>
             </label>
           </div>
-          <label>
-            Preferred contact method
-            <select name="contactMethod" required>
-              <option value="">Select one</option>
-              <option>Email</option>
-              <option>Phone call</option>
-              <option>Text message</option>
-            </select>
-          </label>
-          <label>
-            Order note
-            <textarea name="note" rows="4" placeholder="Timing, special instructions, or bulk quantity"></textarea>
-          </label>
           <div class="shipping-rates" data-shipping-rates hidden></div>
           <p class="payment-note">ZIP-only shipping is an estimate from the farm's 62467 ship-from ZIP. Final shipping is checked again with the full address before Stripe Checkout.</p>
           <button type="submit">Estimate shipping</button>
