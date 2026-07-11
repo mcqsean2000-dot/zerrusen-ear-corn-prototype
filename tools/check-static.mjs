@@ -923,6 +923,9 @@ function createStorefrontHarness({ checkoutEndpoint = "", href = "https://theos.
     orderSummary: createFakeElement("orderSummary"),
     orderStatus: createFakeElement("orderStatus"),
     shippingRates: createFakeElement("shippingRates"),
+    shippingModal: createFakeElement("shippingModal"),
+    closeShippingModalButton: createFakeElement("closeShippingModalButton"),
+    continueToCheckoutButton: createFakeElement("continueToCheckoutButton"),
     checkoutDetails: createFakeElement("checkoutDetails"),
     checkoutResult: createFakeElement("checkoutResult"),
     checkoutResultKicker: createFakeElement("checkoutResultKicker"),
@@ -976,6 +979,9 @@ function createStorefrontHarness({ checkoutEndpoint = "", href = "https://theos.
         "[data-order-summary]": elements.orderSummary,
         "[data-order-status]": elements.orderStatus,
         "[data-shipping-rates]": elements.shippingRates,
+        "[data-shipping-modal]": elements.shippingModal,
+        "[data-close-shipping-modal]": elements.closeShippingModalButton,
+        "[data-continue-to-checkout]": elements.continueToCheckoutButton,
         "[data-checkout-details]": elements.checkoutDetails,
         "[data-checkout-result]": elements.checkoutResult,
         "[data-checkout-result-kicker]": elements.checkoutResultKicker,
@@ -1053,6 +1059,9 @@ function createStorefrontHarness({ checkoutEndpoint = "", href = "https://theos.
     async addFirstProductAndSubmit(values = {}) {
       addButtons[0].listeners.click[0]();
       await this.submitOrder(values);
+    },
+    continueFromShippingModal() {
+      elements.continueToCheckoutButton.listeners.click[0]();
     },
   };
 }
@@ -1158,6 +1167,7 @@ function createStorefrontHarness({ checkoutEndpoint = "", href = "https://theos.
   });
 
   await harness.addFirstProductAndSubmit();
+  harness.continueFromShippingModal();
   await harness.submitOrder();
 
   assert(requests.length === 2, "Storefront should request rates before requesting checkout.");

@@ -582,6 +582,59 @@ h3 {
   font-weight: 700;
 }
 
+.shipping-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(37, 33, 27, 0.46);
+}
+
+.shipping-modal[hidden] {
+  display: none;
+}
+
+.shipping-modal-panel {
+  display: grid;
+  gap: 16px;
+  width: min(560px, 100%);
+  max-height: calc(100vh - 36px);
+  overflow: auto;
+  padding: 22px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.shipping-modal-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.shipping-modal-head h2,
+.shipping-modal-head p {
+  margin: 0;
+}
+
+.shipping-modal-head button {
+  min-height: 0;
+  padding: 0;
+  color: var(--rust);
+  background: transparent;
+  border-radius: 0;
+  font-size: 0.86rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.shipping-modal-panel > button {
+  width: 100%;
+}
+
 .order-summary p,
 .payment-note,
 .form-status {

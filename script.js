@@ -11,6 +11,9 @@ const orderForm = document.querySelector("[data-order-form]");
 const orderSummary = document.querySelector("[data-order-summary]");
 const orderStatus = document.querySelector("[data-order-status]");
 const shippingRatesContainer = document.querySelector("[data-shipping-rates]");
+const shippingModal = document.querySelector("[data-shipping-modal]");
+const closeShippingModalButton = document.querySelector("[data-close-shipping-modal]");
+const continueToCheckoutButton = document.querySelector("[data-continue-to-checkout]");
 const checkoutDetails = document.querySelector("[data-checkout-details]");
 const checkoutResult = document.querySelector("[data-checkout-result]");
 const checkoutResultKicker = document.querySelector("[data-checkout-result-kicker]");
@@ -26,6 +29,7 @@ const shippingRatesButtonLabel = "Estimate shipping";
 const checkoutButtonLabel = "Proceed to checkout";
 const shippingAddressFieldNames = ["addressLine1", "addressLine2", "city", "state", "zip"];
 let selectedShippingRate = null;
+let latestShippingRates = [];
 
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -54,6 +58,40 @@ function openCart() {
 function closeCart() {
   cartDrawer.classList.remove("is-open");
   cartDrawer.setAttribute("aria-hidden", "true");
+}
+
+function openShippingModal() {
+  if (!shippingModal) {
+    return;
+  }
+
+  shippingModal.hidden = false;
+  shippingModal.classList.add("is-open");
+  shippingModal.setAttribute("aria-hidden", "false");
+  if (continueToCheckoutButton) {
+    continueToCheckoutButton.disabled = !selectedShippingRate;
+  }
+}
+
+function closeShippingModal() {
+  if (!shippingModal) {
+    return;
+  }
+
+  shippingModal.classList.remove("is-open");
+  shippingModal.setAttribute("aria-hidden", "true");
+  shippingModal.hidden = true;
+}
+
+function showCheckoutDetails() {
+  setCheckoutDetailsVisible(true);
+  setOrderSubmitButton(checkoutButtonLabel);
+  closeShippingModal();
+  document.querySelector("#delivery").scrollIntoView({ behavior: "smooth" });
+  const firstDetailInput = checkoutDetails && checkoutDetails.querySelector("input");
+  if (firstDetailInput) {
+    firstDetailInput.focus();
+  }
 }
 
 function getCheckoutReturnState() {
@@ -228,9 +266,10 @@ function setCheckoutDetailsVisible(isVisible) {
 
 function clearSelectedShippingRate() {
   selectedShippingRate = null;
-  shippingRatesContainer.hidden = true;
+  latestShippingRates = [];
   shippingRatesContainer.innerHTML = "";
   setCheckoutDetailsVisible(false);
+  closeShippingModal();
   setOrderSubmitButton(shippingRatesButtonLabel);
 }
 
@@ -359,9 +398,8 @@ function escapeHtml(value) {
 }
 
 function renderShippingRates(rates) {
-  shippingRatesContainer.hidden = false;
+  latestShippingRates = rates;
   shippingRatesContainer.innerHTML = [
-    "<strong>Choose shipping</strong>",
     ...rates.map((rate, index) => `
       <label class="shipping-rate-option">
         <input type="radio" name="shippingRate" value="${escapeHtml(rate.rateId)}" ${index === 0 ? "checked" : ""}>
@@ -375,16 +413,20 @@ function renderShippingRates(rates) {
   ].join("");
 
   selectedShippingRate = rates[0] || null;
-  setOrderSubmitButton(selectedShippingRate ? checkoutButtonLabel : shippingRatesButtonLabel);
-  setCheckoutDetailsVisible(Boolean(selectedShippingRate));
+  setOrderSubmitButton(selectedShippingRate ? "View shipping options" : shippingRatesButtonLabel);
+  if (continueToCheckoutButton) {
+    continueToCheckoutButton.disabled = !selectedShippingRate;
+  }
+  openShippingModal();
 
   shippingRatesContainer.querySelectorAll('input[name="shippingRate"]').forEach((input) => {
     input.addEventListener("change", () => {
       selectedShippingRate = rates.find((rate) => rate.rateId === input.value) || null;
+      if (continueToCheckoutButton) {
+        continueToCheckoutButton.disabled = !selectedShippingRate;
+      }
       if (selectedShippingRate) {
-        setCheckoutDetailsVisible(true);
-        setOrderSubmitButton(checkoutButtonLabel);
-        orderStatus.textContent = shippingRateLabel(selectedShippingRate) + " selected. Continue to secure Stripe Checkout when ready.";
+        orderStatus.textContent = shippingRateLabel(selectedShippingRate) + " selected. Continue to checkout to enter delivery details.";
       }
     });
   });
@@ -461,6 +503,20 @@ document.querySelectorAll("[data-add-to-cart]").forEach((button) => {
 
 openCartButton.addEventListener("click", openCart);
 closeCartButton.addEventListener("click", closeCart);
+if (closeShippingModalButton) {
+  closeShippingModalButton.addEventListener("click", closeShippingModal);
+}
+if (continueToCheckoutButton) {
+  continueToCheckoutButton.addEventListener("click", () => {
+    if (!selectedShippingRate) {
+      orderStatus.textContent = "Choose a shipping option before continuing to checkout.";
+      return;
+    }
+
+    orderStatus.textContent = shippingRateLabel(selectedShippingRate) + " selected. Add delivery details to continue to secure Stripe Checkout.";
+    showCheckoutDetails();
+  });
+}
 checkoutButton.addEventListener("click", () => {
   closeCart();
   document.querySelector("#delivery").scrollIntoView({ behavior: "smooth" });
@@ -490,13 +546,19 @@ orderForm.addEventListener("submit", async (event) => {
     try {
       const payload = await requestShippingRates(shippingRatesEndpoint, result);
       renderShippingRates(payload.rates);
-      orderStatus.textContent = "Choose an estimated shipping option, then add the full address and contact details before checkout.";
+      orderStatus.textContent = "Choose an estimated shipping option to continue checkout.";
     } catch (error) {
       orderStatus.textContent = shippingRatesFailureMessage;
       setOrderSubmitButton(shippingRatesButtonLabel);
     } finally {
       orderSubmitButton.disabled = false;
     }
+    return;
+  }
+
+  if (checkoutDetails && checkoutDetails.hidden && latestShippingRates.length) {
+    openShippingModal();
+    orderStatus.textContent = "Choose a shipping option to continue checkout.";
     return;
   }
 
