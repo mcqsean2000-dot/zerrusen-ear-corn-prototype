@@ -89,6 +89,7 @@ Natural search phrases to keep in mind:
 - `docs/stripe-checkout-handoff.md` - trusted backend contract for future Stripe Checkout session creation and webhook updates
 - `docs/shippo-shipping-plan.md` - Shippo rate, package, label, and tracking implementation plan
 - `docs/backend-checkout-scaffold.md` - local backend scaffold notes, validation helpers, and webhook boundary
+- `docs/stripe-webhook-incident-report.md` - current Stripe test webhook failure summary, blockers, and remediation checklist
 - `docs/godaddy-static-deploy.md` - legacy/fallback static upload checklist; not the preferred production path
 - `assets/theos-20lb-bag.jpg` - client photo of 20 lb bag
 - `assets/theos-40lb-bag.jpg` - client photo of 40 lb bag
