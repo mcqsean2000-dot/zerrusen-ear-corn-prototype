@@ -27,7 +27,7 @@ const checkoutFailureMessage = "Checkout could not be started. Please try again 
 const shippingRatesFailureMessage = "Shipping rates could not be calculated. Please check the address or contact Theo's Farm.";
 const shippingRatesButtonLabel = "Estimate shipping";
 const checkoutButtonLabel = "Proceed to checkout";
-const shippingAddressFieldNames = ["addressLine1", "addressLine2", "city", "state", "zip"];
+const estimateResetFieldNames = ["zip"];
 let selectedShippingRate = null;
 let latestShippingRates = [];
 
@@ -595,7 +595,7 @@ orderForm.addEventListener("input", (event) => {
   if (event.target && event.target.name === "shippingRate") {
     return;
   }
-  if (event.target && shippingAddressFieldNames.includes(event.target.name)) {
+  if (event.target && estimateResetFieldNames.includes(event.target.name)) {
     clearSelectedShippingRate();
     orderStatus.textContent = "";
   }
