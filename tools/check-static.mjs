@@ -1060,8 +1060,8 @@ function createStorefrontHarness({ checkoutEndpoint = "", href = "https://theos.
       addButtons[0].listeners.click[0]();
       await this.submitOrder(values);
     },
-    continueFromShippingModal() {
-      elements.continueToCheckoutButton.listeners.click[0]();
+    async continueFromShippingModal() {
+      await elements.continueToCheckoutButton.listeners.click[0]();
     },
   };
 }
@@ -1122,7 +1122,7 @@ function createStorefrontHarness({ checkoutEndpoint = "", href = "https://theos.
   await harness.addFirstProductAndSubmit();
 
   assert(requestUrl === "https://theos.example/api/shipping-rates", "Configured shipping should call the trusted shipping rates endpoint before checkout.");
-  assert(harness.elements.orderStatus.textContent.includes("estimated shipping option"), "Shipping-rate flow should ask the customer to choose an estimated rate before checkout.");
+  assert(harness.elements.orderStatus.textContent.includes("Review estimated shipping"), "Shipping-rate flow should show ZIP-only estimates before checkout details.");
   assert(harness.location.assignedUrl === "", "Blank checkout config must not redirect.");
   assert(harness.elements.cartItems.innerHTML.includes("20 lb Ear Corn Bag"), "Blank checkout config must not clear the cart.");
 }
@@ -1167,14 +1167,17 @@ function createStorefrontHarness({ checkoutEndpoint = "", href = "https://theos.
   });
 
   await harness.addFirstProductAndSubmit();
-  harness.continueFromShippingModal();
+  await harness.continueFromShippingModal();
   await harness.submitOrder();
+  await harness.continueFromShippingModal();
 
-  assert(requests.length === 2, "Storefront should request rates before requesting checkout.");
-  assert(requests[1].url === "https://theos.example/api/checkout-sessions", "Storefront should call the trusted checkout endpoint after rate selection.");
-  assert(requests[1].body.orderRequest.subtotalCents === 1795, "Checkout request must include the prepared order request.");
-  assert(requests[1].body.shippingAddress.zip === "62401", "Checkout request must include the shipping address used for re-rating.");
-  assert(requests[1].body.selectedShippingRate.rateId === "[\"rate_20\",\"rate_40\"]", "Checkout request must include the selected shipping rate id.");
+  assert(requests.length === 3, "Storefront should request ZIP estimates, full-address rates, then checkout.");
+  assert(requests[1].url === "https://theos.example/api/shipping-rates", "Storefront should re-rate with the full address before checkout.");
+  assert(requests[1].body.shippingAddress.addressLine1 === "123 Oak Street", "Full-address shipping request must include the street address.");
+  assert(requests[2].url === "https://theos.example/api/checkout-sessions", "Storefront should call the trusted checkout endpoint after final rate selection.");
+  assert(requests[2].body.orderRequest.subtotalCents === 1795, "Checkout request must include the prepared order request.");
+  assert(requests[2].body.shippingAddress.zip === "62401", "Checkout request must include the shipping address used for re-rating.");
+  assert(requests[2].body.selectedShippingRate.rateId === "[\"rate_20\",\"rate_40\"]", "Checkout request must include the selected shipping rate id.");
   assert(harness.location.assignedUrl === "https://checkout.stripe.com/c/pay/cs_test_123", "Valid checkout handoff should redirect to Stripe Checkout.");
 }
 

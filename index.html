@@ -325,13 +325,13 @@
       <div class="shipping-modal-panel" role="dialog" aria-modal="true">
         <div class="shipping-modal-head">
           <div>
-            <p class="eyebrow">Shipping estimate</p>
-            <h2 id="shipping-modal-title">Choose a shipping option</h2>
+            <p class="eyebrow" data-shipping-modal-kicker>Shipping estimate</p>
+            <h2 id="shipping-modal-title" data-shipping-modal-title>Estimated shipping</h2>
           </div>
-          <button type="button" data-close-shipping-modal aria-label="Close shipping options">Close</button>
+          <button type="button" data-close-shipping-modal aria-label="Close shipping options">Keep shopping</button>
         </div>
         <div class="shipping-rates" data-shipping-rates></div>
-        <p class="payment-note">These rates are estimated from ZIP only. Theo's Farm checks the final rate again with the full delivery address before Stripe Checkout.</p>
+        <p class="payment-note" data-shipping-modal-note>These rates are estimated from ZIP only. Theo's Farm checks the final rate again with the full delivery address before Stripe Checkout.</p>
         <button type="button" data-continue-to-checkout>Continue to checkout</button>
       </div>
     </aside>

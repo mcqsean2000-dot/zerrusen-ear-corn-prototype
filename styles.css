@@ -572,6 +572,10 @@ h3 {
   width: auto;
 }
 
+.shipping-rate-estimate {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .shipping-rate-option strong,
 .shipping-rate-option span {
   display: block;

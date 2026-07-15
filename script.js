@@ -26,10 +26,13 @@ const orderSubmitButton = orderForm.querySelector('button[type="submit"]');
 const checkoutFailureMessage = "Checkout could not be started. Please try again or contact Theo's Farm.";
 const shippingRatesFailureMessage = "Shipping rates could not be calculated. Please check the address or contact Theo's Farm.";
 const shippingRatesButtonLabel = "Estimate shipping";
-const checkoutButtonLabel = "Proceed to checkout";
+const checkoutButtonLabel = "Choose shipping method";
+const stripeCheckoutButtonLabel = "Continue to Stripe Checkout";
 const estimateResetFieldNames = ["zip"];
 let selectedShippingRate = null;
 let latestShippingRates = [];
+let shippingModalMode = "estimate";
+let pendingCheckoutRequest = null;
 
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -69,7 +72,7 @@ function openShippingModal() {
   shippingModal.classList.add("is-open");
   shippingModal.setAttribute("aria-hidden", "false");
   if (continueToCheckoutButton) {
-    continueToCheckoutButton.disabled = !selectedShippingRate;
+    continueToCheckoutButton.disabled = shippingModalMode === "method" && !selectedShippingRate;
   }
 }
 
@@ -86,6 +89,8 @@ function closeShippingModal() {
 function showCheckoutDetails() {
   setCheckoutDetailsVisible(true);
   setOrderSubmitButton(checkoutButtonLabel);
+  selectedShippingRate = null;
+  pendingCheckoutRequest = null;
   closeShippingModal();
   document.querySelector("#delivery").scrollIntoView({ behavior: "smooth" });
   const firstDetailInput = checkoutDetails && checkoutDetails.querySelector("input");
@@ -267,6 +272,8 @@ function setCheckoutDetailsVisible(isVisible) {
 function clearSelectedShippingRate() {
   selectedShippingRate = null;
   latestShippingRates = [];
+  pendingCheckoutRequest = null;
+  shippingModalMode = "estimate";
   shippingRatesContainer.innerHTML = "";
   setCheckoutDetailsVisible(false);
   closeShippingModal();
@@ -397,23 +404,71 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
-function renderShippingRates(rates) {
-  latestShippingRates = rates;
-  shippingRatesContainer.innerHTML = [
-    ...rates.map((rate, index) => `
-      <label class="shipping-rate-option">
-        <input type="radio" name="shippingRate" value="${escapeHtml(rate.rateId)}" ${index === 0 ? "checked" : ""}>
-        <span>
-          <strong>${escapeHtml(shippingRateLabel(rate))}</strong>
-          <small>${escapeHtml(rate.durationTerms || "Estimated delivery shown by carrier")}</small>
-        </span>
-        <strong>${formatCents(rate.amountCents)}</strong>
-      </label>
-    `),
-  ].join("");
+function setShippingModalCopy({ kicker, title, note, actionLabel, closeLabel }) {
+  const modalKicker = document.querySelector("[data-shipping-modal-kicker]");
+  const modalTitle = document.querySelector("[data-shipping-modal-title]");
+  const modalNote = document.querySelector("[data-shipping-modal-note]");
 
+  if (modalKicker) modalKicker.textContent = kicker;
+  if (modalTitle) modalTitle.textContent = title;
+  if (modalNote) modalNote.textContent = note;
+  if (continueToCheckoutButton) continueToCheckoutButton.textContent = actionLabel;
+  if (closeShippingModalButton) closeShippingModalButton.textContent = closeLabel;
+}
+
+function shippingRateMarkup(rate, options = {}) {
+  const selectable = options.selectable === true;
+  const index = Number(options.index || 0);
+  const input = selectable
+    ? `<input type="radio" name="shippingRate" value="${escapeHtml(rate.rateId)}" ${index === 0 ? "checked" : ""}>`
+    : "";
+
+  return `
+    <label class="shipping-rate-option ${selectable ? "" : "shipping-rate-estimate"}">
+      ${input}
+      <span>
+        <strong>${escapeHtml(shippingRateLabel(rate))}</strong>
+        <small>${escapeHtml(rate.durationTerms || "Estimated delivery shown by carrier")}</small>
+      </span>
+      <strong>${formatCents(rate.amountCents)}</strong>
+    </label>
+  `;
+}
+
+function renderShippingEstimates(rates) {
+  latestShippingRates = rates;
+  selectedShippingRate = null;
+  pendingCheckoutRequest = null;
+  shippingModalMode = "estimate";
+  shippingRatesContainer.innerHTML = rates.map((rate) => shippingRateMarkup(rate)).join("");
+  setShippingModalCopy({
+    kicker: "Shipping estimate",
+    title: "Estimated shipping",
+    note: "These rates are estimated from ZIP only. Final shipping is checked again with the full delivery address before Stripe Checkout.",
+    actionLabel: "Continue to checkout",
+    closeLabel: "Keep shopping",
+  });
+  setOrderSubmitButton("Continue to checkout");
+  if (continueToCheckoutButton) {
+    continueToCheckoutButton.disabled = false;
+  }
+  openShippingModal();
+}
+
+function renderShippingMethods(rates, checkoutRequest) {
+  latestShippingRates = rates;
+  pendingCheckoutRequest = checkoutRequest;
+  shippingModalMode = "method";
+  shippingRatesContainer.innerHTML = rates.map((rate, index) => shippingRateMarkup(rate, { selectable: true, index })).join("");
   selectedShippingRate = rates[0] || null;
-  setOrderSubmitButton(selectedShippingRate ? "View shipping options" : shippingRatesButtonLabel);
+  setShippingModalCopy({
+    kicker: "Shipping method",
+    title: "Choose shipping method",
+    note: "These rates use the full delivery address and will be included in Stripe Checkout.",
+    actionLabel: stripeCheckoutButtonLabel,
+    closeLabel: "Back to form",
+  });
+  setOrderSubmitButton(selectedShippingRate ? "View shipping methods" : checkoutButtonLabel);
   if (continueToCheckoutButton) {
     continueToCheckoutButton.disabled = !selectedShippingRate;
   }
@@ -426,7 +481,7 @@ function renderShippingRates(rates) {
         continueToCheckoutButton.disabled = !selectedShippingRate;
       }
       if (selectedShippingRate) {
-        orderStatus.textContent = shippingRateLabel(selectedShippingRate) + " selected. Continue to checkout to enter delivery details.";
+        orderStatus.textContent = shippingRateLabel(selectedShippingRate) + " selected. Continue to Stripe Checkout when ready.";
       }
     });
   });
@@ -481,6 +536,42 @@ async function requestCheckoutSession(endpoint, checkoutRequest) {
   return payload;
 }
 
+async function startStripeCheckout(checkoutRequest, shippingRate) {
+  const checkoutEndpoint = getCheckoutEndpoint();
+  if (!checkoutEndpoint) {
+    orderStatus.textContent = shippingRateLabel(shippingRate) + " selected. Stripe checkout is not connected yet.";
+    return;
+  }
+
+  if (!checkoutRequest || !shippingRate) {
+    orderStatus.textContent = "Choose a shipping method before starting checkout.";
+    return;
+  }
+
+  setOrderSubmitButton("Starting checkout...", true);
+  if (continueToCheckoutButton) {
+    continueToCheckoutButton.disabled = true;
+    continueToCheckoutButton.textContent = "Starting checkout...";
+  }
+  orderStatus.textContent = "Starting secure checkout...";
+
+  try {
+    const handoff = await requestCheckoutSession(checkoutEndpoint, {
+      orderRequest: checkoutRequest.orderRequest,
+      shippingAddress: checkoutRequest.shippingAddress,
+      selectedShippingRate: shippingRate,
+    });
+    window.location.assign(handoff.checkoutUrl);
+  } catch (error) {
+    orderStatus.textContent = checkoutFailureMessage;
+    setOrderSubmitButton(checkoutButtonLabel);
+    if (continueToCheckoutButton) {
+      continueToCheckoutButton.disabled = false;
+      continueToCheckoutButton.textContent = stripeCheckoutButtonLabel;
+    }
+  }
+}
+
 document.querySelectorAll("[data-add-to-cart]").forEach((button) => {
   button.addEventListener("click", () => {
     const sku = button.dataset.sku;
@@ -507,14 +598,19 @@ if (closeShippingModalButton) {
   closeShippingModalButton.addEventListener("click", closeShippingModal);
 }
 if (continueToCheckoutButton) {
-  continueToCheckoutButton.addEventListener("click", () => {
-    if (!selectedShippingRate) {
-      orderStatus.textContent = "Choose a shipping option before continuing to checkout.";
+  continueToCheckoutButton.addEventListener("click", async () => {
+    if (shippingModalMode === "estimate") {
+      orderStatus.textContent = "Add delivery details to get final shipping methods.";
+      showCheckoutDetails();
       return;
     }
 
-    orderStatus.textContent = shippingRateLabel(selectedShippingRate) + " selected. Add delivery details to continue to secure Stripe Checkout.";
-    showCheckoutDetails();
+    if (!selectedShippingRate) {
+      orderStatus.textContent = "Choose a shipping method before continuing to checkout.";
+      return;
+    }
+
+    await startStripeCheckout(pendingCheckoutRequest, selectedShippingRate);
   });
 }
 checkoutButton.addEventListener("click", () => {
@@ -526,15 +622,15 @@ checkoutButton.addEventListener("click", () => {
 orderForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
-  const result = orderRequests.buildShippingRateRequest(getOrderFormInput());
-
-  if (!result.ok) {
-    orderStatus.textContent = result.message;
-    return;
-  }
-
   const shippingRatesEndpoint = getShippingRatesEndpoint();
-  if (!selectedShippingRate) {
+  if (checkoutDetails && checkoutDetails.hidden) {
+    const result = orderRequests.buildShippingRateRequest(getOrderFormInput());
+
+    if (!result.ok) {
+      orderStatus.textContent = result.message;
+      return;
+    }
+
     if (!shippingRatesEndpoint) {
       orderStatus.textContent = "Shipping-rate lookup is not connected yet. Theo's Farm can still confirm shipping manually.";
       return;
@@ -545,20 +641,14 @@ orderForm.addEventListener("submit", async (event) => {
 
     try {
       const payload = await requestShippingRates(shippingRatesEndpoint, result);
-      renderShippingRates(payload.rates);
-      orderStatus.textContent = "Choose an estimated shipping option to continue checkout.";
+      renderShippingEstimates(payload.rates);
+      orderStatus.textContent = "Review estimated shipping, then continue to checkout for final rates.";
     } catch (error) {
       orderStatus.textContent = shippingRatesFailureMessage;
       setOrderSubmitButton(shippingRatesButtonLabel);
     } finally {
       orderSubmitButton.disabled = false;
     }
-    return;
-  }
-
-  if (checkoutDetails && checkoutDetails.hidden && latestShippingRates.length) {
-    openShippingModal();
-    orderStatus.textContent = "Choose a shipping option to continue checkout.";
     return;
   }
 
@@ -569,25 +659,23 @@ orderForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  const checkoutEndpoint = getCheckoutEndpoint();
-  if (!checkoutEndpoint) {
-    orderStatus.textContent = shippingRateLabel(selectedShippingRate) + " selected. Stripe checkout is not connected yet.";
+  if (!shippingRatesEndpoint) {
+    orderStatus.textContent = "Shipping-rate lookup is not connected yet. Theo's Farm can still confirm shipping manually.";
     return;
   }
 
-  setOrderSubmitButton("Starting checkout...", true);
-  orderStatus.textContent = "Starting secure checkout...";
+  setOrderSubmitButton("Finding shipping methods...", true);
+  orderStatus.textContent = "Checking final shipping methods from the full address...";
 
   try {
-    const handoff = await requestCheckoutSession(checkoutEndpoint, {
-      orderRequest: checkoutRequest.orderRequest,
-      shippingAddress: checkoutRequest.shippingAddress,
-      selectedShippingRate,
-    });
-    window.location.assign(handoff.checkoutUrl);
+    const payload = await requestShippingRates(shippingRatesEndpoint, checkoutRequest);
+    renderShippingMethods(payload.rates, checkoutRequest);
+    orderStatus.textContent = "Choose a shipping method to continue to Stripe Checkout.";
   } catch (error) {
-    orderStatus.textContent = checkoutFailureMessage;
+    orderStatus.textContent = shippingRatesFailureMessage;
     setOrderSubmitButton(checkoutButtonLabel);
+  } finally {
+    orderSubmitButton.disabled = false;
   }
 });
 
