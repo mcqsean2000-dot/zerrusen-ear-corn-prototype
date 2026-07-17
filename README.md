@@ -90,6 +90,7 @@ Natural search phrases to keep in mind:
 - `docs/shippo-shipping-plan.md` - Shippo rate, package, label, and tracking implementation plan
 - `docs/social-visibility-plan.md` - daily social post workflow, keyword themes, and starter post drafts
 - `docs/social-post-drafts.md` - reviewed social post drafts ready for manual publishing or scheduling
+- `docs/social-auto-publishing-plan.md` - no-daily-login Meta/Firebase publishing path and required setup
 - `docs/backend-checkout-scaffold.md` - local backend scaffold notes, validation helpers, and webhook boundary
 - `docs/stripe-webhook-incident-report.md` - current Stripe test webhook failure summary, blockers, and remediation checklist
 - `docs/godaddy-static-deploy.md` - legacy/fallback static upload checklist; not the preferred production path
