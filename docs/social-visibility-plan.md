@@ -69,13 +69,13 @@ Suggested image: 20 lb bag photo.
 
 ### Post 3
 
-Looking for squirrel corn, deer corn, or whole cob corn for wildlife feeders? Theo's Farm ships cleaned ear corn in 20 lb and 40 lb bags, packed to order from the farm.
+Looking for squirrel corn, deer corn, or whole cob corn for wildlife feeders? Theo's Farm ships cleaned whole ear corn on the cob in 20 lb and 40 lb bags, packed to order from the farm.
 
 Order online at https://theosfarm.com
 
-Hashtags: #SquirrelCorn #DeerCorn #WholeEarCorn #WildlifeCorn #TheosFarm
+Hashtags: #SquirrelCorn #DeerCorn #WholeEarCorn #CornOnTheCob #WildlifeCorn #TheosFarm
 
-Suggested image: pile of ears with both bags.
+Suggested image: pile of whole ears of corn on the cob in front of both Theo's Farm bags, not loose kernels.
 
 ### Post 4
 
