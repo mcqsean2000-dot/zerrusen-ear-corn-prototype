@@ -4,9 +4,10 @@ This plan supports Theo's Farm visibility by creating steady social posts that p
 
 ## Current Setup
 
-- Codex automation: `Theo's Farm Daily Social Post`
-- Schedule: daily at 8:30 AM
-- Output: draft copy for Facebook and Instagram, suggested hashtags, and a suggested image
+- Codex automation: `Theo's Farm Weekly Social Post Batch`
+- Schedule: Mondays at 8:30 AM
+- Output: seven draft posts for Facebook and Instagram, suggested hashtags, and suggested images
+- Review file: `docs/social-post-drafts.md`
 - Publishing: manual review and posting for now
 - Goal: build consistent brand and keyword signals around Theo's Farm whole ear corn
 
