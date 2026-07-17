@@ -88,6 +88,7 @@ Natural search phrases to keep in mind:
 - `docs/admin-fulfillment-foundation.md` - admin queue and fulfillment planning notes
 - `docs/stripe-checkout-handoff.md` - trusted backend contract for future Stripe Checkout session creation and webhook updates
 - `docs/shippo-shipping-plan.md` - Shippo rate, package, label, and tracking implementation plan
+- `docs/social-visibility-plan.md` - daily social post workflow, keyword themes, and starter post drafts
 - `docs/backend-checkout-scaffold.md` - local backend scaffold notes, validation helpers, and webhook boundary
 - `docs/stripe-webhook-incident-report.md` - current Stripe test webhook failure summary, blockers, and remediation checklist
 - `docs/godaddy-static-deploy.md` - legacy/fallback static upload checklist; not the preferred production path
