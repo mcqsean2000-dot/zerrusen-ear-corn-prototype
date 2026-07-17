@@ -5,6 +5,10 @@ https://mcqsean2000-dot.github.io/zerrusen-ear-corn-prototype/
 
 This repo currently contains a static prototype for the Theo's Farm direct-to-consumer ear corn website. It is intentionally simple: two products, real client-provided product photos, farm story copy, delivery/shipping-focused messaging, and a lightweight cart drawer for demo purposes.
 
+## Active Handoffs
+
+- `CALVIN_META_HANDOFF.md` - Meta/Facebook/Instagram setup tasks needed before no-daily-login social auto-publishing can be implemented.
+
 ## Current Direction
 
 - Brand: Theo's Farm
@@ -68,6 +72,7 @@ Natural search phrases to keep in mind:
 - `robots.txt` - crawl policy pointing search engines to the production sitemap
 - `sitemap.xml` - one-page production sitemap for the canonical Theo's Farm domain
 - `_config.yml` - GitHub Pages preview exclude list that keeps backend, docs, admin prototype, and tooling files out of the public Pages artifact
+- `CALVIN_META_HANDOFF.md` - Calvin-facing Meta setup checklist for social auto-publishing
 - `admin.html` - static admin fulfillment prototype
 - `admin.css` - admin shell styles
 - `admin-config.js` - disabled public admin Firebase config gate
