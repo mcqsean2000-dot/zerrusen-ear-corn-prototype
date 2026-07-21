@@ -910,7 +910,7 @@ function createFakeElement(name) {
   };
 }
 
-function createStorefrontHarness({ checkoutEndpoint = "", href = "https://theos.example/", shippingRatesEndpoint = "/api/shipping-rates", fetchImpl } = {}) {
+function createStorefrontHarness({ checkoutEndpoint = "", href = "https://theos.example/", shippingRatesEndpoint = "/api/shipping-rates", fetchImpl, storedCart = null } = {}) {
   const elements = {
     cartDrawer: createFakeElement("cartDrawer"),
     cartItems: createFakeElement("cartItems"),
@@ -1004,9 +1004,23 @@ function createStorefrontHarness({ checkoutEndpoint = "", href = "https://theos.
     },
   };
 
+  const storageValues = new Map();
+  if (storedCart !== null) {
+    storageValues.set("theos-farm-cart-v1", storedCart);
+  }
+  const localStorage = {
+    getItem(key) {
+      return storageValues.has(key) ? storageValues.get(key) : null;
+    },
+    setItem(key, value) {
+      storageValues.set(key, String(value));
+    },
+  };
+
   const window = {
     TheosCheckoutConfig: { checkoutEndpoint, shippingRatesEndpoint },
     TheosOrderRequests: orderRequests,
+    localStorage,
     location,
   };
 
@@ -1038,6 +1052,7 @@ function createStorefrontHarness({ checkoutEndpoint = "", href = "https://theos.
     addButtons,
     elements,
     location,
+    localStorage,
     async submitOrder(values = {}) {
       elements.orderForm.values = {
         name: "Customer Name",
@@ -1087,11 +1102,39 @@ function createStorefrontHarness({ checkoutEndpoint = "", href = "https://theos.
 {
   const harness = createStorefrontHarness({
     href: "https://theos.example/checkout/cancel",
+    storedCart: JSON.stringify([{ sku: "ear-corn-20lb", quantity: 2 }]),
   });
 
   assert(harness.elements.checkoutResult.hidden === false, "Checkout cancel return should reveal the status region.");
   assert(harness.elements.checkoutResultTitle.textContent.includes("cart is still here"), "Checkout cancel should tell the customer the cart can be reviewed.");
   assert(harness.elements.checkoutResultReference.hidden === true, "Checkout cancel should not show a Stripe reference.");
+  assert(harness.elements.cartCount.textContent === 2, "Checkout cancel should restore the saved cart quantity.");
+  assert(harness.elements.cartItems.innerHTML.includes("20 lb Ear Corn Bag"), "Checkout cancel should restore the saved product.");
+}
+
+{
+  const harness = createStorefrontHarness({
+    storedCart: JSON.stringify([
+      { sku: "ear-corn-20lb", name: "Tampered name", unitPriceCents: 1, quantity: 1 },
+      { sku: "ear-corn-20lb", quantity: 40 },
+      { sku: "unknown", quantity: 1 },
+    ]),
+  });
+
+  assert(harness.elements.cartItems.innerHTML.includes("20 lb Ear Corn Bag"), "Stored carts should restore product details from the trusted catalog.");
+  assert(!harness.elements.cartItems.innerHTML.includes("Tampered name"), "Stored carts must ignore customer-controlled product names.");
+  assert(harness.elements.cartTotal.textContent === "$17.95", "Stored carts must ignore customer-controlled prices.");
+  assert(harness.elements.cartCount.textContent === 1, "Stored carts should ignore duplicate and unknown product lines.");
+}
+
+{
+  const harness = createStorefrontHarness({
+    href: "https://theos.example/checkout/success?session_id=cs_test_clear_cart",
+    storedCart: JSON.stringify([{ sku: "ear-corn-40lb", quantity: 1 }]),
+  });
+
+  assert(harness.elements.cartCount.textContent === 0, "Valid checkout success returns should clear the saved cart.");
+  assert(harness.localStorage.getItem("theos-farm-cart-v1") === "[]", "Valid checkout success returns should persist the cleared cart.");
 }
 
 {

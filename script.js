@@ -1,4 +1,16 @@
-const cart = [];
+const CART_STORAGE_KEY = "theos-farm-cart-v1";
+const productButtons = Array.from(document.querySelectorAll("[data-add-to-cart]"));
+const productCatalog = new Map(
+  productButtons.map((button) => [
+    button.dataset.sku,
+    {
+      sku: button.dataset.sku,
+      name: button.dataset.name,
+      unitPriceCents: Number(button.dataset.priceCents),
+    },
+  ])
+);
+const cart = restoreCart();
 
 const cartDrawer = document.querySelector("[data-cart]");
 const cartItems = document.querySelector("[data-cart-items]");
@@ -33,6 +45,71 @@ let selectedShippingRate = null;
 let latestShippingRates = [];
 let shippingModalMode = "estimate";
 let pendingCheckoutRequest = null;
+
+function getCartStorage() {
+  try {
+    return window.localStorage || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function restoreCart() {
+  const storage = getCartStorage();
+  if (!storage) {
+    return [];
+  }
+
+  try {
+    const storedLines = JSON.parse(storage.getItem(CART_STORAGE_KEY) || "[]");
+    if (!Array.isArray(storedLines)) {
+      return [];
+    }
+
+    const restored = [];
+    const restoredSkus = new Set();
+    storedLines.forEach((line) => {
+      const product = productCatalog.get(String(line && line.sku || ""));
+      const quantity = Number(line && line.quantity);
+      if (
+        !product ||
+        restoredSkus.has(product.sku) ||
+        !Number.isInteger(quantity) ||
+        quantity < 1 ||
+        quantity > 50
+      ) {
+        return;
+      }
+
+      restoredSkus.add(product.sku);
+      restored.push({ ...product, quantity });
+    });
+    return restored;
+  } catch (error) {
+    return [];
+  }
+}
+
+function persistCart() {
+  const storage = getCartStorage();
+  if (!storage) {
+    return;
+  }
+
+  try {
+    storage.setItem(
+      CART_STORAGE_KEY,
+      JSON.stringify(cart.map(({ sku, quantity }) => ({ sku, quantity })))
+    );
+  } catch (error) {
+    // Storage can be unavailable in private browsing or restricted embeds.
+  }
+}
+
+function clearCart() {
+  cart.splice(0, cart.length);
+  persistCart();
+}
 
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -143,6 +220,9 @@ function renderCheckoutReturnState() {
   checkoutResult.focus({ preventScroll: true });
 
   if (state.type === "success") {
+    if (/^cs_/.test(state.sessionId)) {
+      clearCart();
+    }
     checkoutResultKicker.textContent = "Checkout received";
     checkoutResultTitle.textContent = "Thanks, your payment is being confirmed.";
     checkoutResultCopy.textContent = "Stripe has sent the checkout result back to Theo's Farm. The order will move into fulfillment after the trusted webhook confirms payment.";
@@ -173,6 +253,7 @@ function renderOrderSummary(subtotalCents) {
 
 function renderCart() {
   const { itemCount, subtotalCents } = getCartTotals();
+  persistCart();
 
   cartCount.textContent = itemCount;
   cartTotal.textContent = formatCents(subtotalCents);
@@ -572,7 +653,7 @@ async function startStripeCheckout(checkoutRequest, shippingRate) {
   }
 }
 
-document.querySelectorAll("[data-add-to-cart]").forEach((button) => {
+productButtons.forEach((button) => {
   button.addEventListener("click", () => {
     const sku = button.dataset.sku;
     const name = button.dataset.name;
