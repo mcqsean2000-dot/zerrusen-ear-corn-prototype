@@ -131,6 +131,14 @@ function trustedNotificationJob(job) {
   };
 }
 
+function storedNotificationJob(value) {
+  const data = value && typeof value === "object" ? value : {};
+  const job = Object.fromEntries(
+    NOTIFICATION_JOB_FIELDS.map((field) => [field, data[field]]),
+  );
+  return trustedNotificationJob({ ...job, status: "pending" });
+}
+
 function collectionRef(firestore, name) {
   const ref = firestore.collection(name);
 
@@ -712,8 +720,143 @@ function createFirestoreAdapter(options = {}) {
     };
   }
 
+  async function claimNotificationJob({ idempotencyKey, maxAttempts }) {
+    const id = cleanText(idempotencyKey);
+    const attemptLimit = Number(maxAttempts);
+    if (!id || id.length > 500 || id.includes("/")) {
+      const error = new Error("Notification claim requires a safe idempotency key.");
+      error.code = "notification_delivery_key_invalid";
+      throw error;
+    }
+    if (!Number.isInteger(attemptLimit) || attemptLimit < 1 || attemptLimit > 10) {
+      const error = new Error("Notification claim requires a bounded attempt limit.");
+      error.code = "notification_delivery_attempt_limit_invalid";
+      throw error;
+    }
+    if (!isFunction(firestore.runTransaction)) {
+      const error = new Error("Firestore-like backend must provide runTransaction() for notification claims.");
+      error.code = "firestore_transaction_missing";
+      throw error;
+    }
+
+    const ref = collectionRef(firestore, notificationOutboxCollectionName(options)).doc(id);
+    return firestore.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(ref);
+      const data = normalizeSnapshot(snapshot);
+      if (!data || !["pending", "retry_pending"].includes(data.status)) {
+        return null;
+      }
+
+      const previousAttempts = Number(data.attempts || 0);
+      if (!Number.isInteger(previousAttempts) || previousAttempts < 0 || previousAttempts >= attemptLimit) {
+        transaction.update(ref, {
+          status: "failed",
+          lastErrorCode: "attempt_limit_reached",
+          lastAttemptFinishedAt: timestamp(),
+        });
+        return null;
+      }
+
+      const attempt = previousAttempts + 1;
+      const job = storedNotificationJob(data);
+      transaction.update(ref, {
+        attempts: attempt,
+        maxAttempts: attemptLimit,
+        status: "processing",
+        lastAttemptAt: timestamp(),
+      });
+      return { attempt, job };
+    });
+  }
+
+  async function recordNotificationSuccess({ attempt, idempotencyKey, providerMessageId }) {
+    const id = cleanText(idempotencyKey);
+    const attemptNumber = Number(attempt);
+    const messageId = cleanText(providerMessageId);
+    if (!id || id.length > 500 || id.includes("/") || !Number.isInteger(attemptNumber) || attemptNumber < 1) {
+      const error = new Error("Notification success requires a safe key and attempt.");
+      error.code = "notification_delivery_result_invalid";
+      throw error;
+    }
+    if (!messageId || messageId.length > 200) {
+      const error = new Error("Notification success requires a bounded provider message ID.");
+      error.code = "notification_delivery_provider_id_invalid";
+      throw error;
+    }
+    if (!isFunction(firestore.runTransaction)) {
+      const error = new Error("Firestore-like backend must provide runTransaction() for notification results.");
+      error.code = "firestore_transaction_missing";
+      throw error;
+    }
+
+    const ref = collectionRef(firestore, notificationOutboxCollectionName(options)).doc(id);
+    return firestore.runTransaction(async (transaction) => {
+      const data = normalizeSnapshot(await transaction.get(ref));
+      if (data && data.status === "sent" && data.attempts === attemptNumber && data.providerMessageId === messageId) {
+        return true;
+      }
+      if (!data || data.status !== "processing" || data.attempts !== attemptNumber) {
+        const error = new Error("Notification success does not match the active delivery attempt.");
+        error.code = "notification_delivery_state_conflict";
+        throw error;
+      }
+
+      transaction.update(ref, {
+        lastAttemptFinishedAt: timestamp(),
+        lastErrorCode: null,
+        providerMessageId: messageId,
+        sentAt: timestamp(),
+        status: "sent",
+      });
+      return true;
+    });
+  }
+
+  async function recordNotificationFailure({ attempt, errorCode, idempotencyKey, retryable }) {
+    const id = cleanText(idempotencyKey);
+    const attemptNumber = Number(attempt);
+    const code = cleanText(errorCode);
+    if (
+      !id ||
+      id.length > 500 ||
+      id.includes("/") ||
+      !Number.isInteger(attemptNumber) ||
+      attemptNumber < 1 ||
+      !/^[A-Za-z0-9_.-]{1,80}$/.test(code) ||
+      typeof retryable !== "boolean"
+    ) {
+      const error = new Error("Notification failure requires safe bounded result fields.");
+      error.code = "notification_delivery_result_invalid";
+      throw error;
+    }
+    if (!isFunction(firestore.runTransaction)) {
+      const error = new Error("Firestore-like backend must provide runTransaction() for notification results.");
+      error.code = "firestore_transaction_missing";
+      throw error;
+    }
+
+    const ref = collectionRef(firestore, notificationOutboxCollectionName(options)).doc(id);
+    return firestore.runTransaction(async (transaction) => {
+      const data = normalizeSnapshot(await transaction.get(ref));
+      if (!data || data.status !== "processing" || data.attempts !== attemptNumber) {
+        const error = new Error("Notification failure does not match the active delivery attempt.");
+        error.code = "notification_delivery_state_conflict";
+        throw error;
+      }
+
+      const canRetry = retryable && attemptNumber < Number(data.maxAttempts || 0);
+      transaction.update(ref, {
+        lastAttemptFinishedAt: timestamp(),
+        lastErrorCode: code,
+        status: canRetry ? "retry_pending" : "failed",
+      });
+      return { retryable: canRetry };
+    });
+  }
+
   return {
     claimStripeEventProcessing,
+    claimNotificationJob,
     completePaidOrderEvent,
     createOrderRequest,
     enqueueNotificationJobs,
@@ -725,6 +868,8 @@ function createFirestoreAdapter(options = {}) {
     prepareAdminLabelPurchase,
     recordLabelPurchase: recordAdminLabelPurchase,
     recordAdminLabelPurchase,
+    recordNotificationFailure,
+    recordNotificationSuccess,
     updateAdminOrderStatus,
     updateOrderRequest,
   };

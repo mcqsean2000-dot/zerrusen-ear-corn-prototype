@@ -176,11 +176,12 @@ Implemented foundation:
 - Outbox payloads omit raw Stripe objects and free-form customer note text.
 - Completed Checkout processing now updates the paid order, creates its outbox jobs, and records the Stripe event in one Firestore transaction.
 - A provider-neutral delivery worker now handles claimed jobs, provider message IDs, sanitized failure codes, permanent failures, and a bounded retry limit.
+- Transactional Firestore delivery adapters now enforce one active attempt, stale-worker rejection, retry state, and terminal sent/failed states.
 
 Remaining:
 
 - Select and configure an email provider.
-- Connect the delivery worker to concrete Firestore claim/attempt adapters, an approved provider, and a trusted trigger.
+- Connect the delivery worker to an approved provider and a trusted trigger.
 - Add the scheduled daily fulfillment summary builder and trigger.
 
 Use `docs/notification-boundary-plan.md` for the first notification event and payload boundary before choosing a provider or adding live email sends.

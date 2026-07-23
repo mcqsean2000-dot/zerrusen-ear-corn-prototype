@@ -12,6 +12,9 @@ const {
   createTrustedBackendComposition,
   getMissingTrustedBackendClients,
 } = require("./trusted-backend-composition");
+const {
+  createNotificationDeliveryWorker,
+} = require("./notification-delivery");
 
 const validOrderRequest = {
   source: "static-storefront",
@@ -261,6 +264,11 @@ test("composition exposes the handler dependency shapes expected by index.js", (
   assert.equal(composition.serverTimestamp(), "SERVER_TIMESTAMP");
   assert.equal(typeof composition.verifyStripeWebhookEvent, "function");
   assert.equal(typeof composition.queuePaidOrderNotifications, "function");
+  assert.deepEqual(Object.keys(composition.notificationDeliveryPersistence).sort(), [
+    "claimNotificationJob",
+    "recordNotificationFailure",
+    "recordNotificationSuccess",
+  ].sort());
   assert.deepEqual(Object.keys(composition.checkoutAdapterDependencies).sort(), [
     "createOrderRequest",
     "createStripeCheckoutSession",
@@ -383,6 +391,40 @@ test("webhook handler verifies a fake event and updates fake storage through com
   assert.equal(notificationJobs.size, 2);
   assert.equal(notificationJobs.has("customer.order_confirmation:testOrders_1:evt_composed"), true);
   assert.equal(notificationJobs.has("admin.paid_order_created:testOrders_1:evt_composed"), true);
+});
+
+test("composition persistence moves a queued notification through delivery", async () => {
+  const firestore = new MemoryFirestore();
+  const composition = createTrustedBackendComposition({
+    firestore,
+    stripe: fakeStripe(),
+    serverTimestamp() {
+      return "SERVER_TIMESTAMP";
+    },
+  });
+  await composition.queuePaidOrderNotifications({
+    order: {
+      ...validOrderRequest,
+      id: "order_notify",
+      lastStripeEventId: "evt_notify",
+      paymentStatus: "paid",
+    },
+  });
+  const idempotencyKey = "admin.paid_order_created:order_notify:evt_notify";
+  const deliver = createNotificationDeliveryWorker({
+    ...composition.notificationDeliveryPersistence,
+    sendNotification(job) {
+      assert.equal(job.to, "theosfeedfarm@gmail.com");
+      return { providerMessageId: "message_notify" };
+    },
+  });
+
+  assert.equal((await deliver({ idempotencyKey })).action, "sent");
+  const stored = collectionDocs(firestore, "notificationOutbox").get(idempotencyKey);
+  assert.equal(stored.status, "sent");
+  assert.equal(stored.attempts, 1);
+  assert.equal(stored.providerMessageId, "message_notify");
+  assert.equal(stored.lastErrorCode, null);
 });
 
 test("missing injected clients fail before any SDK or network setup is attempted", () => {

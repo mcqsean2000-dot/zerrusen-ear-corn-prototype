@@ -69,6 +69,11 @@ function createTrustedBackendComposition(options = {}) {
     serverTimestamp,
     verifyStripeWebhookEvent: stripeAdapter.verifyStripeWebhookEvent,
     queuePaidOrderNotifications: notificationOutbox.queuePaidOrderNotifications,
+    notificationDeliveryPersistence: {
+      claimNotificationJob: firestoreAdapter.claimNotificationJob,
+      recordNotificationFailure: firestoreAdapter.recordNotificationFailure,
+      recordNotificationSuccess: firestoreAdapter.recordNotificationSuccess,
+    },
     checkoutAdapterDependencies: {
       createOrderRequest: firestoreAdapter.createOrderRequest,
       createStripeCheckoutSession: stripeAdapter.createStripeCheckoutSession,

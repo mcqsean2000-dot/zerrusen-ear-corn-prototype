@@ -167,6 +167,8 @@ Webhook updates should be idempotent. Store processed Stripe event IDs through a
 
 For `checkout.session.completed`, the Firestore adapter commits the trusted paid-order fields, deterministic customer/admin notification outbox jobs, and processed Stripe event record in one transaction. This prevents a partially handled payment from being marked complete without its notification jobs and makes repeated completed events safe no-ops.
 
+Notification delivery persistence uses separate Firestore transactions to claim one pending or retryable outbox job and to record its matching success or failure. Attempt numbers prevent stale workers from overwriting a newer result. A job whose provider send succeeded but whose success record failed remains `processing` for manual reconciliation rather than being automatically resent.
+
 ## Admin Shipping Label Handler
 
 `adminShippingLabelsHandler` expects authenticated admin tooling to send:

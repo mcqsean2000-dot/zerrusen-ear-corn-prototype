@@ -152,6 +152,21 @@ const trustedOrderRequest = {
   },
 };
 
+function notificationJob(overrides = {}) {
+  return {
+    eventName: "admin.paid_order_created",
+    idempotencyKey: "admin.paid_order_created:order_123:evt_123",
+    orderRequestId: "order_123",
+    paidEventId: "evt_123",
+    recipientCategory: "admin",
+    status: "pending",
+    subject: "Paid order",
+    text: "Trusted order summary",
+    to: "theosfeedfarm@gmail.com",
+    ...overrides,
+  };
+}
+
 test("creates order requests in the configured collection", async () => {
   const firestore = new MemoryFirestore();
   const adapter = createFirestoreAdapter({
@@ -710,6 +725,103 @@ test("enqueues notification jobs once with deterministic document ids", async ()
     ...jobs[0],
     createdAt: "SERVER_TIMESTAMP",
   });
+});
+
+test("claims one notification attempt and rejects concurrent claims", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({
+    firestore,
+    serverTimestamp() {
+      return "SERVER_TIMESTAMP";
+    },
+  });
+  const job = notificationJob();
+  await adapter.enqueueNotificationJobs({ jobs: [job] });
+
+  assert.deepEqual(await adapter.claimNotificationJob({
+    idempotencyKey: job.idempotencyKey,
+    maxAttempts: 3,
+  }), {
+    attempt: 1,
+    job,
+  });
+  assert.equal(await adapter.claimNotificationJob({
+    idempotencyKey: job.idempotencyKey,
+    maxAttempts: 3,
+  }), null);
+  assert.deepEqual(collectionDocs(firestore, "notificationOutbox").get(job.idempotencyKey), {
+    ...job,
+    attempts: 1,
+    createdAt: "SERVER_TIMESTAMP",
+    lastAttemptAt: "SERVER_TIMESTAMP",
+    maxAttempts: 3,
+    status: "processing",
+  });
+});
+
+test("records retry, rejects stale attempts, and records delivery success", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({
+    firestore,
+    serverTimestamp() {
+      return "SERVER_TIMESTAMP";
+    },
+  });
+  const job = notificationJob();
+  await adapter.enqueueNotificationJobs({ jobs: [job] });
+  await adapter.claimNotificationJob({ idempotencyKey: job.idempotencyKey, maxAttempts: 3 });
+  assert.deepEqual(await adapter.recordNotificationFailure({
+    attempt: 1,
+    errorCode: "rate_limited",
+    idempotencyKey: job.idempotencyKey,
+    retryable: true,
+  }), { retryable: true });
+  assert.equal(collectionDocs(firestore, "notificationOutbox").get(job.idempotencyKey).status, "retry_pending");
+
+  assert.equal((await adapter.claimNotificationJob({
+    idempotencyKey: job.idempotencyKey,
+    maxAttempts: 3,
+  })).attempt, 2);
+  await assert.rejects(
+    adapter.recordNotificationSuccess({
+      attempt: 1,
+      idempotencyKey: job.idempotencyKey,
+      providerMessageId: "message_stale",
+    }),
+    (error) => error.code === "notification_delivery_state_conflict",
+  );
+  assert.equal(await adapter.recordNotificationSuccess({
+    attempt: 2,
+    idempotencyKey: job.idempotencyKey,
+    providerMessageId: "message_123",
+  }), true);
+  assert.equal(await adapter.recordNotificationSuccess({
+    attempt: 2,
+    idempotencyKey: job.idempotencyKey,
+    providerMessageId: "message_123",
+  }), true);
+  const stored = collectionDocs(firestore, "notificationOutbox").get(job.idempotencyKey);
+  assert.equal(stored.status, "sent");
+  assert.equal(stored.providerMessageId, "message_123");
+  assert.equal(await adapter.claimNotificationJob({ idempotencyKey: job.idempotencyKey, maxAttempts: 3 }), null);
+});
+
+test("moves exhausted notification attempts to terminal failure", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({ firestore });
+  const job = notificationJob();
+  await adapter.enqueueNotificationJobs({ jobs: [job] });
+  await adapter.claimNotificationJob({ idempotencyKey: job.idempotencyKey, maxAttempts: 1 });
+
+  assert.deepEqual(await adapter.recordNotificationFailure({
+    attempt: 1,
+    errorCode: "provider_unavailable",
+    idempotencyKey: job.idempotencyKey,
+    retryable: true,
+  }), { retryable: false });
+  const stored = collectionDocs(firestore, "notificationOutbox").get(job.idempotencyKey);
+  assert.equal(stored.status, "failed");
+  assert.equal(stored.lastErrorCode, "provider_unavailable");
 });
 
 test("rejects unsupported notification job fields before persistence", async () => {
