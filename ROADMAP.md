@@ -175,11 +175,12 @@ Implemented foundation:
 - Deterministic Firestore outbox jobs prevent duplicate queue entries for repeated paid-event processing.
 - Outbox payloads omit raw Stripe objects and free-form customer note text.
 - Completed Checkout processing now updates the paid order, creates its outbox jobs, and records the Stripe event in one Firestore transaction.
+- A provider-neutral delivery worker now handles claimed jobs, provider message IDs, sanitized failure codes, permanent failures, and a bounded retry limit.
 
 Remaining:
 
 - Select and configure an email provider.
-- Add a trusted outbox sender, delivery-attempt logging, and retry policy.
+- Connect the delivery worker to concrete Firestore claim/attempt adapters, an approved provider, and a trusted trigger.
 - Add the scheduled daily fulfillment summary builder and trigger.
 
 Use `docs/notification-boundary-plan.md` for the first notification event and payload boundary before choosing a provider or adding live email sends.

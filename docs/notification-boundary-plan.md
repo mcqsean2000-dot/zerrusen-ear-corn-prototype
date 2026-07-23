@@ -16,10 +16,11 @@ Implemented:
 - `checkout.session.completed` handling builds notifications from the trusted stored order plus server-owned payment fields.
 - The paid order update, outbox writes, and Stripe event completion happen in one Firestore transaction. A repeated event returns as a replay without duplicating jobs.
 - The trusted backend composition also exposes `queuePaidOrderNotifications` for future trusted notification workflows.
+- `functions/src/notification-delivery.js` processes one claimed job through injected trusted persistence and provider functions. It records provider message IDs on success, sanitizes failure codes, caps retries, and stops retrying permanent failures.
 
 Not yet implemented:
 
-- Provider selection, credentials, live sends, attempt logs, or retries.
+- Provider selection, credentials, concrete Firestore claim/attempt adapters, a trusted trigger, or live sends.
 - Scheduled daily fulfillment summary generation.
 
 Firestore rules currently deny public reads and writes to `notificationOutbox`; only trusted backend Admin SDK code can use this boundary.
@@ -139,6 +140,7 @@ Current focused tests verify:
 - Unsupported outbox fields and mismatched deterministic keys fail closed.
 - Paid-order state, outbox jobs, and Stripe event completion commit together.
 - Replayed completed events do not update the order or duplicate notification jobs.
+- Delivery worker tests cover successful sends, skipped claims, sanitized retryable errors, permanent/exhausted failures, and success-recording failures.
 
 Future tests should verify:
 
