@@ -153,6 +153,9 @@ class MemoryFirestore {
       set(ref, value, options) {
         return ref.set(value, options);
       },
+      update(ref, fields) {
+        return ref.update(fields);
+      },
     });
   }
 }
@@ -266,6 +269,7 @@ test("composition exposes the handler dependency shapes expected by index.js", (
   ].sort());
   assert.deepEqual(Object.keys(composition.stripeWebhookAdapterDependencies).sort(), [
     "claimStripeEventProcessing",
+    "completePaidOrderEvent",
     "findOrderByCheckoutSessionId",
     "findOrderByPaymentIntentId",
     "markStripeEventProcessed",
@@ -368,6 +372,7 @@ test("webhook handler verifies a fake event and updates fake storage through com
   const body = parseJson(res);
   const order = collectionDocs(firestore, "testOrders").get("testOrders_1");
   const stripeEvent = collectionDocs(firestore, "stripeEvents").get("evt_composed");
+  const notificationJobs = collectionDocs(firestore, "notificationOutbox");
   assert.equal(res.statusCode, 200);
   assert.equal(body.received, true);
   assert.equal(order.paymentStatus, "paid");
@@ -375,6 +380,9 @@ test("webhook handler verifies a fake event and updates fake storage through com
   assert.equal(order.lastStripeEventId, "evt_composed");
   assert.equal(stripeEvent.status, "processed");
   assert.equal(stripeEvent.result.action, "updated_order");
+  assert.equal(notificationJobs.size, 2);
+  assert.equal(notificationJobs.has("customer.order_confirmation:testOrders_1:evt_composed"), true);
+  assert.equal(notificationJobs.has("admin.paid_order_created:testOrders_1:evt_composed"), true);
 });
 
 test("missing injected clients fail before any SDK or network setup is attempted", () => {

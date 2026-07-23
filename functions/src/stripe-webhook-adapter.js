@@ -1,6 +1,7 @@
 "use strict";
 
 const { TRUSTED_ORDER_FIELDS } = require("./order-validation");
+const { buildPaidOrderNotifications } = require("./notification-builder");
 
 const DEFAULT_ORDER_COLLECTION = "orderRequests";
 
@@ -43,6 +44,7 @@ function getMissingStripeWebhookAdapterDependencies(deps = {}) {
   if (!isFunction(deps.findOrderByCheckoutSessionId)) missing.push("findOrderByCheckoutSessionId");
   if (!isFunction(deps.findOrderByPaymentIntentId)) missing.push("findOrderByPaymentIntentId");
   if (!isFunction(deps.updateOrderRequest)) missing.push("updateOrderRequest");
+  if (!isFunction(deps.completePaidOrderEvent)) missing.push("completePaidOrderEvent");
 
   return missing;
 }
@@ -166,17 +168,41 @@ async function handleCheckoutSessionEvent({ deps, collection, event, timestamp }
     return { action: "retry_later", reason: "order_not_found_or_mismatched" };
   }
 
-  const claimed = await claimEvent({ deps, event });
-  if (!claimed) {
-    return { action: "replayed_event", eventId: event.id };
-  }
-
   const orderRequestId = normalizeOrderId(order);
   const fields = event.type === "checkout.session.completed"
     ? sessionCompletionFields({ event, session, timestamp })
     : sessionExpiredFields({ event, session, timestamp });
 
   assertTrustedFields(fields);
+
+  if (event.type === "checkout.session.completed") {
+    const result = { action: "updated_order", orderRequestId };
+    const jobs = buildPaidOrderNotifications({
+      order: { ...order, ...fields },
+      orderRequestId,
+      paidEventId: event.id,
+    });
+    const completed = await deps.completePaidOrderEvent({
+      collection,
+      eventId: event.id,
+      eventType: event.type,
+      fields,
+      jobs,
+      orderRequestId,
+      result,
+    });
+
+    if (completed === false) {
+      return { action: "replayed_event", eventId: event.id, processedAtomically: true };
+    }
+
+    return { ...result, processedAtomically: true };
+  }
+
+  const claimed = await claimEvent({ deps, event });
+  if (!claimed) {
+    return { action: "replayed_event", eventId: event.id };
+  }
 
   await deps.updateOrderRequest({
     collection,
@@ -252,11 +278,12 @@ function createStripeWebhookEventAdapter(deps = {}) {
       result = { action: "no_op", reason: "unsupported_event_type" };
     }
 
-    if (result.action !== "retry_later" && result.action !== "replayed_event") {
+    if (!result.processedAtomically && result.action !== "retry_later" && result.action !== "replayed_event") {
       await markProcessed({ deps, event, result });
     }
 
-    return { eventId: event.id, eventType: event.type, ...result };
+    const { processedAtomically, ...publicResult } = result;
+    return { eventId: event.id, eventType: event.type, ...publicResult };
   };
 }
 

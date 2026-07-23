@@ -174,10 +174,10 @@ Implemented foundation:
 - Customer confirmation is skipped when the trusted order has no valid email address.
 - Deterministic Firestore outbox jobs prevent duplicate queue entries for repeated paid-event processing.
 - Outbox payloads omit raw Stripe objects and free-form customer note text.
+- Completed Checkout processing now updates the paid order, creates its outbox jobs, and records the Stripe event in one Firestore transaction.
 
 Remaining:
 
-- Wire paid-order outbox creation into the reviewed Stripe webhook transaction/retry flow.
 - Select and configure an email provider.
 - Add a trusted outbox sender, delivery-attempt logging, and retry policy.
 - Add the scheduled daily fulfillment summary builder and trigger.
@@ -220,7 +220,7 @@ Build order:
    - The admin bridge uses Firebase Hosting public auto config and hides fulfillment data until a refreshed ID token contains `admin: true`.
    - Next step is enabling the Google provider, authorizing `theosfarm.com`, creating the approved admin account, granting its custom claim, and verifying rules and sign-in in a Firebase preview.
 9. Add Shippo label purchase and tracking updates in admin.
-10. Add email notifications.
+10. Add email notifications. Paid-order outbox queueing is implemented; provider sending remains.
 11. Deploy the public storefront to Firebase Hosting.
 12. Point production domain.
 13. Run test orders.

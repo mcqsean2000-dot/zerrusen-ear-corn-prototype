@@ -140,6 +140,9 @@ class MemoryFirestore {
       set(ref, value, options) {
         return ref.set(value, options);
       },
+      update(ref, fields) {
+        return ref.update(fields);
+      },
     });
   }
 }

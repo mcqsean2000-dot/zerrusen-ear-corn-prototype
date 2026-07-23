@@ -1,6 +1,6 @@
 # Notification Boundary Plan
 
-This plan defines the first Theo's Farm notification boundary. The provider-neutral paid-order builders and Firestore outbox persistence boundary are implemented. No email provider is installed, no email is sent, nothing is deployed by this work, and no secrets are introduced.
+This plan defines the first Theo's Farm notification boundary. Provider-neutral paid-order builders, Firestore outbox persistence, and the trusted paid-webhook integration are implemented. No email provider is installed, no email is sent, nothing is deployed by this work, and no secrets are introduced.
 
 Approved farm/admin email account: `theosfeedfarm@gmail.com`. Use this account for business email setup and as the initial admin notification recipient once a provider and trusted backend send path are approved.
 
@@ -13,11 +13,12 @@ Implemented:
 - Free-form customer note text and raw Stripe fields are excluded.
 - `functions/src/notification-outbox.js` delegates built jobs to trusted persistence.
 - `functions/src/firestore-adapter.js` creates backend-only `notificationOutbox` documents with deterministic idempotency keys and treats repeated keys as duplicates.
-- The trusted backend composition exposes `queuePaidOrderNotifications` for the future reviewed webhook integration.
+- `checkout.session.completed` handling builds notifications from the trusted stored order plus server-owned payment fields.
+- The paid order update, outbox writes, and Stripe event completion happen in one Firestore transaction. A repeated event returns as a replay without duplicating jobs.
+- The trusted backend composition also exposes `queuePaidOrderNotifications` for future trusted notification workflows.
 
 Not yet implemented:
 
-- Calling the outbox from the production Stripe webhook flow.
 - Provider selection, credentials, live sends, attempt logs, or retries.
 - Scheduled daily fulfillment summary generation.
 
@@ -136,6 +137,8 @@ Current focused tests verify:
 - Notification idempotency keys stay stable for repeated webhook deliveries.
 - Duplicate outbox keys do not create a second job.
 - Unsupported outbox fields and mismatched deterministic keys fail closed.
+- Paid-order state, outbox jobs, and Stripe event completion commit together.
+- Replayed completed events do not update the order or duplicate notification jobs.
 
 Future tests should verify:
 

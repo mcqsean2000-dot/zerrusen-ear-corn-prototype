@@ -165,6 +165,8 @@ After verification, `stripeWebhookHandler` can receive `stripeWebhookAdapterDepe
 
 Webhook updates should be idempotent. Store processed Stripe event IDs through a separate event log or an equivalent trusted backend mechanism. The adapter records no-op outcomes for unsupported events so replays do not repeatedly touch order records. Supported events that cannot yet map to a known order remain retryable instead of being marked processed.
 
+For `checkout.session.completed`, the Firestore adapter commits the trusted paid-order fields, deterministic customer/admin notification outbox jobs, and processed Stripe event record in one transaction. This prevents a partially handled payment from being marked complete without its notification jobs and makes repeated completed events safe no-ops.
+
 ## Admin Shipping Label Handler
 
 `adminShippingLabelsHandler` expects authenticated admin tooling to send:

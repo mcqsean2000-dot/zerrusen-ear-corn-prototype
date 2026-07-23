@@ -10,6 +10,25 @@ const env = {
   FIRESTORE_ORDER_COLLECTION: "orderRequests",
 };
 
+function orderFixture(id = "order_123") {
+  return {
+    id,
+    customer: {
+      contact: "customer@example.com",
+      name: "Customer Name",
+      preferredContact: "email",
+      shippingZip: "62401",
+    },
+    items: [{
+      sku: "ear-corn-20lb",
+      quantity: 1,
+      unitPriceCents: 1795,
+    }],
+    paymentStatus: "unpaid",
+    subtotalCents: 1795,
+  };
+}
+
 function baseDeps(overrides = {}) {
   const calls = [];
 
@@ -25,7 +44,7 @@ function baseDeps(overrides = {}) {
       },
       findOrderByCheckoutSessionId({ collection, stripeCheckoutSessionId, orderRequestId }) {
         calls.push({ type: "findOrderByCheckoutSessionId", collection, stripeCheckoutSessionId, orderRequestId });
-        return { id: orderRequestId || "order_123" };
+        return orderFixture(orderRequestId || "order_123");
       },
       findOrderByPaymentIntentId({ collection, stripePaymentIntentId }) {
         calls.push({ type: "findOrderByPaymentIntentId", collection, stripePaymentIntentId });
@@ -33,6 +52,10 @@ function baseDeps(overrides = {}) {
       },
       updateOrderRequest({ collection, orderRequestId, fields }) {
         calls.push({ type: "updateOrderRequest", collection, orderRequestId, fields });
+      },
+      completePaidOrderEvent(input) {
+        calls.push({ type: "completePaidOrderEvent", ...input });
+        return true;
       },
       ...overrides,
     },
@@ -75,6 +98,7 @@ test("webhook adapter is disabled without injected trusted dependencies", async 
         "findOrderByCheckoutSessionId",
         "findOrderByPaymentIntentId",
         "updateOrderRequest",
+        "completePaidOrderEvent",
       ]);
       return true;
     },
@@ -97,9 +121,12 @@ test("maps checkout.session.completed to trusted paid and complete fields", asyn
     action: "updated_order",
     orderRequestId: "order_123",
   });
-  assert.deepEqual(calls[2], {
-    type: "updateOrderRequest",
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[1], {
+    type: "completePaidOrderEvent",
     collection: "orderRequests",
+    eventId: "evt_checkout_session_completed",
+    eventType: "checkout.session.completed",
     orderRequestId: "order_123",
     fields: {
       stripeCheckoutSessionId: "cs_test_123",
@@ -114,7 +141,14 @@ test("maps checkout.session.completed to trusted paid and complete fields", asyn
       lastStripeEventAt: "SERVER_TIMESTAMP",
       trustedUpdatedAt: "SERVER_TIMESTAMP",
     },
+    jobs: calls[1].jobs,
+    result: {
+      action: "updated_order",
+      orderRequestId: "order_123",
+    },
   });
+  assert.deepEqual(calls[1].jobs.map((job) => job.recipientCategory), ["customer", "admin"]);
+  assert.equal(calls[1].jobs.every((job) => job.paidEventId === "evt_checkout_session_completed"), true);
 });
 
 test("maps checkout.session.expired to trusted expired and unpaid fields", async () => {
@@ -187,8 +221,8 @@ test("maps payment_intent.payment_failed to trusted failed fields when an order 
 
 test("replayed Stripe events do not update orders after an atomic claim miss", async () => {
   const { calls, deps } = baseDeps({
-    claimStripeEventProcessing({ eventId, eventType }) {
-      calls.push({ type: "claimStripeEventProcessing", eventId, eventType });
+    completePaidOrderEvent(input) {
+      calls.push({ type: "completePaidOrderEvent", ...input });
       return false;
     },
   });
@@ -212,9 +246,17 @@ test("replayed Stripe events do not update orders after an atomic claim miss", a
       orderRequestId: "order_123",
     },
     {
-      type: "claimStripeEventProcessing",
+      type: "completePaidOrderEvent",
+      collection: "orderRequests",
       eventId: "evt_checkout_session_completed",
       eventType: "checkout.session.completed",
+      fields: calls[1].fields,
+      jobs: calls[1].jobs,
+      orderRequestId: "order_123",
+      result: {
+        action: "updated_order",
+        orderRequestId: "order_123",
+      },
     },
   ]);
 });
@@ -279,7 +321,7 @@ test("adapter updates only trusted webhook-owned order fields", async () => {
     env,
   });
 
-  const updatedFields = Object.keys(calls.find((call) => call.type === "updateOrderRequest").fields);
+  const updatedFields = Object.keys(calls.find((call) => call.type === "completePaidOrderEvent").fields);
   assert.deepEqual(updatedFields.sort(), [
     "checkoutCompletedAt",
     "checkoutStatus",

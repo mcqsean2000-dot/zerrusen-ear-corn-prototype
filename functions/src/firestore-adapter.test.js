@@ -116,6 +116,9 @@ class MemoryFirestore {
       set(ref, value, options) {
         return ref.set(value, options);
       },
+      update(ref, fields) {
+        return ref.update(fields);
+      },
     });
   }
 }
@@ -576,6 +579,94 @@ test("marks Stripe events processed without losing claim data", async () => {
       reason: "unsupported_event_type",
     },
   });
+});
+
+test("atomically completes paid orders with notification jobs and event processing", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({
+    firestore,
+    serverTimestamp() {
+      return "SERVER_TIMESTAMP";
+    },
+  });
+  await adapter.createOrderRequest({ orderRequest: trustedOrderRequest });
+  const jobs = [{
+    eventName: "admin.paid_order_created",
+    idempotencyKey: "admin.paid_order_created:orderRequests_1:evt_paid_123",
+    orderRequestId: "orderRequests_1",
+    paidEventId: "evt_paid_123",
+    recipientCategory: "admin",
+    status: "pending",
+    subject: "Paid order",
+    text: "Trusted order summary",
+    to: "theosfeedfarm@gmail.com",
+  }];
+  const input = {
+    eventId: "evt_paid_123",
+    eventType: "checkout.session.completed",
+    fields: {
+      paymentStatus: "paid",
+      checkoutStatus: "complete",
+      lastStripeEventId: "evt_paid_123",
+      trustedUpdatedAt: "SERVER_TIMESTAMP",
+    },
+    jobs,
+    orderRequestId: "orderRequests_1",
+    result: {
+      action: "updated_order",
+      orderRequestId: "orderRequests_1",
+    },
+  };
+
+  assert.equal(await adapter.completePaidOrderEvent(input), true);
+  assert.equal(await adapter.completePaidOrderEvent(input), false);
+  assert.equal(collectionDocs(firestore, "orderRequests").get("orderRequests_1").paymentStatus, "paid");
+  assert.deepEqual(collectionDocs(firestore, "notificationOutbox").get(jobs[0].idempotencyKey), {
+    ...jobs[0],
+    createdAt: "SERVER_TIMESTAMP",
+  });
+  assert.deepEqual(collectionDocs(firestore, "stripeEvents").get("evt_paid_123"), {
+    eventId: "evt_paid_123",
+    eventType: "checkout.session.completed",
+    status: "processed",
+    processedAt: "SERVER_TIMESTAMP",
+    result: input.result,
+  });
+});
+
+test("rejects mismatched paid event jobs before changing Firestore", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({ firestore });
+  await adapter.createOrderRequest({ orderRequest: trustedOrderRequest });
+
+  await assert.rejects(
+    adapter.completePaidOrderEvent({
+      eventId: "evt_paid_123",
+      eventType: "checkout.session.completed",
+      fields: {
+        paymentStatus: "paid",
+        checkoutStatus: "complete",
+        lastStripeEventId: "evt_paid_123",
+      },
+      jobs: [{
+        eventName: "admin.paid_order_created",
+        idempotencyKey: "admin.paid_order_created:different_order:evt_paid_123",
+        orderRequestId: "different_order",
+        paidEventId: "evt_paid_123",
+        recipientCategory: "admin",
+        status: "pending",
+        subject: "Paid order",
+        text: "Trusted order summary",
+        to: "theosfeedfarm@gmail.com",
+      }],
+      orderRequestId: "orderRequests_1",
+      result: { action: "updated_order", orderRequestId: "orderRequests_1" },
+    }),
+    (error) => error.code === "paid_order_event_mismatch",
+  );
+  assert.equal(collectionDocs(firestore, "orderRequests").get("orderRequests_1").paymentStatus, "unpaid");
+  assert.equal(collectionDocs(firestore, "notificationOutbox").size, 0);
+  assert.equal(collectionDocs(firestore, "stripeEvents").size, 0);
 });
 
 test("enqueues notification jobs once with deterministic document ids", async () => {

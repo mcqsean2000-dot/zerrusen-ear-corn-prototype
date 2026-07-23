@@ -586,6 +586,87 @@ function createFirestoreAdapter(options = {}) {
     };
   }
 
+  async function completePaidOrderEvent({
+    collection,
+    eventId,
+    eventType,
+    fields,
+    jobs,
+    orderRequestId,
+    result,
+  }) {
+    const id = cleanText(eventId);
+    const orderId = cleanText(orderRequestId);
+    if (!/^[A-Za-z0-9_-]{1,160}$/.test(id) || !/^[A-Za-z0-9_-]{1,160}$/.test(orderId)) {
+      const error = new Error("Paid Stripe event completion requires bounded event and order IDs.");
+      error.code = "paid_order_event_identifier_invalid";
+      throw error;
+    }
+    if (eventType !== "checkout.session.completed") {
+      const error = new Error("Paid order completion requires a checkout.session.completed event.");
+      error.code = "paid_order_event_type_invalid";
+      throw error;
+    }
+    if (!Array.isArray(jobs) || jobs.length < 1 || jobs.length > 2) {
+      const error = new Error("Paid order completion requires one or two notification jobs.");
+      error.code = "notification_outbox_jobs_invalid";
+      throw error;
+    }
+    if (!isFunction(firestore.runTransaction)) {
+      const error = new Error("Firestore-like backend must provide runTransaction() for paid order completion.");
+      error.code = "firestore_transaction_missing";
+      throw error;
+    }
+
+    const updateFields = trustedUpdateFields(fields);
+    const notificationJobs = jobs.map(trustedNotificationJob);
+    if (
+      updateFields.paymentStatus !== "paid" ||
+      updateFields.checkoutStatus !== "complete" ||
+      updateFields.lastStripeEventId !== id ||
+      !result ||
+      result.action !== "updated_order" ||
+      result.orderRequestId !== orderId ||
+      notificationJobs.some((job) => job.orderRequestId !== orderId || job.paidEventId !== id)
+    ) {
+      const error = new Error("Paid order completion inputs do not describe the same trusted payment event.");
+      error.code = "paid_order_event_mismatch";
+      throw error;
+    }
+    const orderRef = collectionRef(firestore, orderCollectionName(options, collection)).doc(orderId);
+    const eventRef = collectionRef(firestore, eventCollectionName(options)).doc(id);
+    const outbox = collectionRef(firestore, notificationOutboxCollectionName(options));
+    const notificationRefs = notificationJobs.map((job) => outbox.doc(job.idempotencyKey));
+
+    return firestore.runTransaction(async (transaction) => {
+      const [eventSnapshot, ...notificationSnapshots] = await Promise.all([
+        transaction.get(eventRef),
+        ...notificationRefs.map((ref) => transaction.get(ref)),
+      ]);
+      if (eventSnapshot && eventSnapshot.exists) {
+        return false;
+      }
+
+      transaction.update(orderRef, updateFields);
+      notificationJobs.forEach((job, index) => {
+        if (!notificationSnapshots[index] || !notificationSnapshots[index].exists) {
+          transaction.set(notificationRefs[index], {
+            ...job,
+            createdAt: timestamp(),
+          });
+        }
+      });
+      transaction.set(eventRef, {
+        eventId: id,
+        eventType,
+        status: "processed",
+        processedAt: timestamp(),
+        result,
+      });
+      return true;
+    });
+  }
+
   async function enqueueNotificationJobs({ collection, jobs }) {
     if (!Array.isArray(jobs) || jobs.length < 1 || jobs.length > 2) {
       const error = new Error("Notification outbox requires one or two jobs.");
@@ -633,6 +714,7 @@ function createFirestoreAdapter(options = {}) {
 
   return {
     claimStripeEventProcessing,
+    completePaidOrderEvent,
     createOrderRequest,
     enqueueNotificationJobs,
     findOrderByCheckoutSessionId,

@@ -802,6 +802,7 @@ test("webhook handler reports incomplete injected webhook adapter setup", async 
     "findOrderByCheckoutSessionId",
     "findOrderByPaymentIntentId",
     "updateOrderRequest",
+    "completePaidOrderEvent",
   ]);
 });
 
@@ -870,13 +871,28 @@ test("webhook handler can use injected webhook adapter dependencies", async () =
       },
       markStripeEventProcessed() {},
       findOrderByCheckoutSessionId() {
-        return { id: "order_123" };
+        return {
+          id: "order_123",
+          customer: {
+            contact: "customer@example.com",
+            name: "Customer Name",
+            preferredContact: "email",
+            shippingZip: "62401",
+          },
+          items: [{ sku: "ear-corn-20lb", quantity: 1, unitPriceCents: 1795 }],
+          paymentStatus: "unpaid",
+          subtotalCents: 1795,
+        };
       },
       findOrderByPaymentIntentId() {
         throw new Error("payment intent lookup should not be used");
       },
       updateOrderRequest({ fields }) {
         updateFields = fields;
+      },
+      completePaidOrderEvent({ fields }) {
+        updateFields = fields;
+        return true;
       },
     },
   });
