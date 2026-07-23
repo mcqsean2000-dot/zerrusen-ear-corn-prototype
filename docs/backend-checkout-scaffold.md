@@ -169,6 +169,8 @@ For `checkout.session.completed`, the Firestore adapter commits the trusted paid
 
 Notification delivery persistence uses separate Firestore transactions to claim one pending or retryable outbox job and to record its matching success or failure. Attempt numbers prevent stale workers from overwriting a newer result. A job whose provider send succeeded but whose success record failed remains `processing` for manual reconciliation rather than being automatically resent.
 
+The Firebase runtime now exports a second-generation `notificationOutbox/{notificationId}` creation trigger. It binds `RESEND_API_KEY` through Firebase Secret Manager, requires `NOTIFICATION_DELIVERY_ENABLED=true` plus an approved sender address before calling Resend, and requests Firebase retries only when the trusted worker records `retry_pending`. The trigger has not been deployed or enabled by repository work.
+
 ## Admin Shipping Label Handler
 
 `adminShippingLabelsHandler` expects authenticated admin tooling to send:

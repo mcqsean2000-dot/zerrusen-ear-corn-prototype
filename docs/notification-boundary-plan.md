@@ -20,7 +20,9 @@ Implemented:
 - `functions/src/firestore-adapter.js` transactionally claims pending/retry jobs, increments attempts, prevents concurrent claims, rejects stale result writers, and records `sent`, `retry_pending`, or terminal `failed` state without storing provider error messages.
 - The trusted backend composition exposes these persistence functions separately from the provider sender, so production remains disabled until both a provider and trigger are intentionally wired.
 - `functions/src/resend-email-adapter.js` calls Resend's `POST /emails` endpoint with a stable `Idempotency-Key`, plain-text trusted payloads, and sanitized retry/permanent error classification.
-- `functions/src/notification-delivery-runtime.js` composes Resend with trusted persistence only when `NOTIFICATION_DELIVERY_ENABLED=true`, the sender and secret are injected, and every dependency is present. It does not export a Cloud Function or trigger.
+- `functions/src/notification-delivery-runtime.js` composes Resend with trusted persistence only when `NOTIFICATION_DELIVERY_ENABLED=true`, the sender and secret are injected, and every dependency is present.
+- `functions/src/firebase-notification-delivery-handler.js` validates trusted Firestore creation events, keeps disabled runs inert, and converts retryable delivery outcomes into sanitized Firebase retry requests.
+- `functions/src/firebase-runtime.js` exports a second-generation `notificationOutbox/{notificationId}` creation trigger with Firebase retries and function-scoped `RESEND_API_KEY` Secret Manager access. It remains disabled by environment configuration and has not been deployed by this work.
 - `functions/src/daily-fulfillment-summary.js` builds a deterministic admin summary from a bounded list of paid orders in the three supported fulfillment states, including supported bag totals and a capped needs-review list.
 - `functions/src/daily-fulfillment-outbox.js` obtains that bounded list through trusted Firestore composition and persists one deterministic daily outbox job. Repeated runs for the same date are duplicates rather than additional jobs.
 - `functions/src/daily-fulfillment-scheduler.js` derives the summary date in `America/Chicago` from a trusted clock and invokes the daily enqueue path only when `DAILY_FULFILLMENT_SUMMARY_ENABLED=true` and all configuration is valid.
@@ -30,8 +32,8 @@ Implemented:
 
 Not yet implemented:
 
-- Resend account credentials, verified sender-domain configuration, a trusted trigger, or live sends.
-- Production review, deployment, and explicit enablement of the scheduled summary trigger; live delivery trigger wiring remains separate.
+- Resend account credentials, verified sender-domain configuration, production review, deployment, explicit enablement, or live sends.
+- Production review, deployment, and explicit enablement of the scheduled summary and notification delivery triggers.
 
 Firestore rules currently deny public reads and writes to `notificationOutbox`; only trusted backend Admin SDK code can use this boundary.
 
@@ -160,7 +162,7 @@ Current focused tests verify:
 Future tests should verify:
 
 - The future Firebase scheduled function invokes the guarded dispatcher once per operating day without exposing a public HTTP route.
-- A future trusted trigger invokes only explicitly enabled delivery runtimes and handles retries without concurrent duplicate dispatch.
+- The Firestore trigger invokes only explicitly enabled delivery runtimes, rejects mismatched event IDs, requests retries only for retryable outcomes, and omits provider message IDs from logs.
 
 ## Non-Goals
 

@@ -97,5 +97,9 @@ test("Firebase runtime exports a disabled-by-default 8 AM Central schedule", () 
   assert.match(source, /timeZone: "America\/Chicago"/);
   assert.match(source, /dailyFulfillmentSummary,/);
   assert.match(source, /DAILY_FULFILLMENT_SUMMARY_ENABLED: process\.env\.DAILY_FULFILLMENT_SUMMARY_ENABLED/);
-  assert.equal(source.includes("secrets: [resend"), false);
+  const scheduleBlock = source.slice(
+    source.indexOf("const dailyFulfillmentSummary"),
+    source.indexOf("const notificationOutboxDelivery"),
+  );
+  assert.equal(scheduleBlock.includes("secrets:"), false);
 });

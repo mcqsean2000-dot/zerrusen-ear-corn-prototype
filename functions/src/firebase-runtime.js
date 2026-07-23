@@ -3,6 +3,7 @@
 const { getApps, initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { FieldValue, getFirestore } = require("firebase-admin/firestore");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { onRequest } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret } = require("firebase-functions/params");
@@ -20,13 +21,20 @@ const {
   createFirebaseDailySummaryHandler,
 } = require("./firebase-daily-summary-handler");
 const {
+  createFirebaseNotificationDeliveryHandler,
+} = require("./firebase-notification-delivery-handler");
+const {
   routeRequest,
 } = require("./index");
+const {
+  createNotificationDeliveryRuntime,
+} = require("./notification-delivery-runtime");
 const {
   createTrustedBackendComposition,
 } = require("./trusted-backend-composition");
 
 const shippoApiToken = defineSecret("SHIPPO_API_TOKEN");
+const resendApiKey = defineSecret("RESEND_API_KEY");
 const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
 const stripeWebhookSigningSecret = defineSecret("STRIPE_WEBHOOK_SIGNING_SECRET");
 
@@ -68,6 +76,15 @@ function dailySummaryEnv() {
     DAILY_FULFILLMENT_TIME_ZONE: "America/Chicago",
     FIRESTORE_ORDER_COLLECTION: process.env.FIRESTORE_ORDER_COLLECTION,
     NOTIFICATION_ADMIN_EMAIL: process.env.NOTIFICATION_ADMIN_EMAIL || "theosfeedfarm@gmail.com",
+  };
+}
+
+function notificationDeliveryEnv() {
+  return {
+    NOTIFICATION_DELIVERY_ENABLED: process.env.NOTIFICATION_DELIVERY_ENABLED,
+    NOTIFICATION_FROM_EMAIL: process.env.NOTIFICATION_FROM_EMAIL,
+    NOTIFICATION_REPLY_TO: process.env.NOTIFICATION_REPLY_TO,
+    RESEND_API_KEY: resendApiKey.value(),
   };
 }
 
@@ -150,11 +167,38 @@ const dailyFulfillmentSummary = onSchedule({
   console.info("daily_fulfillment_summary_schedule", result);
 });
 
+const notificationOutboxDelivery = onDocumentCreated({
+  document: "notificationOutbox/{notificationId}",
+  region: "us-central1",
+  retry: true,
+  secrets: [resendApiKey],
+}, async (event) => {
+  const app = firebaseApp();
+  const firestoreAdapter = createFirestoreAdapter({
+    firestore: getFirestore(app),
+    serverTimestamp,
+  });
+  const runtime = createNotificationDeliveryRuntime({
+    env: notificationDeliveryEnv(),
+    fetchImpl: globalThis.fetch,
+    persistence: {
+      claimNotificationJob: firestoreAdapter.claimNotificationJob,
+      recordNotificationFailure: firestoreAdapter.recordNotificationFailure,
+      recordNotificationSuccess: firestoreAdapter.recordNotificationSuccess,
+    },
+  });
+  const handler = createFirebaseNotificationDeliveryHandler({ runtime });
+  const result = await handler(event);
+  console.info("notification_outbox_delivery", result);
+});
+
 module.exports = {
   api,
   dailyFulfillmentSummary,
   dailySummaryEnv,
   firebaseApp,
+  notificationDeliveryEnv,
+  notificationOutboxDelivery,
   runtimeEnv,
   runtimeOptions,
   serverTimestamp,

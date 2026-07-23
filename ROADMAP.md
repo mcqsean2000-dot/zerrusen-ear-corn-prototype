@@ -178,7 +178,8 @@ Implemented foundation:
 - A provider-neutral delivery worker now handles claimed jobs, provider message IDs, sanitized failure codes, permanent failures, and a bounded retry limit.
 - Transactional Firestore delivery adapters now enforce one active attempt, stale-worker rejection, retry state, and terminal sent/failed states.
 - A Resend-compatible HTTP adapter now sends plain-text jobs with stable provider idempotency keys and sanitized error classification.
-- Delivery runtime composition fails closed behind an explicit enable flag and complete server-side configuration. No trusted trigger is exported yet.
+- Delivery runtime composition fails closed behind an explicit enable flag and complete server-side configuration.
+- The Firebase runtime exports a retrying Firestore outbox-created trigger with function-scoped Resend secret access. Its SDK-free adapter rejects mismatched event IDs and logs only safe delivery outcomes; it has not been deployed or enabled.
 - A provider-neutral daily fulfillment summary builder now counts the three supported fulfillment states and 20 lb/40 lb bags while omitting private notes, contact details, and Stripe fields.
 - Trusted Firestore composition now queries paid orders across supported fulfillment states and idempotently enqueues one daily summary job. The required payment/status compound index is included.
 - A scheduler-ready dispatcher derives the farm business date in Central Time, calls only the trusted daily enqueue path, and fails closed without an explicit enable flag and valid configuration.
@@ -187,7 +188,7 @@ Implemented foundation:
 Remaining:
 
 - Create and inject a restricted Resend sending key, verify the sender domain, and approve the sender/reply-to addresses.
-- Connect the guarded delivery runtime to an approved trusted Firestore trigger or scheduled dispatcher.
+- Create the Firebase Secret Manager `RESEND_API_KEY`, then review and deploy the guarded outbox trigger while `NOTIFICATION_DELIVERY_ENABLED=false`.
 - Review the 8:00 AM Central operating time, deploy the scheduled function and compound index, then explicitly enable the summary after production verification.
 
 Use `docs/notification-boundary-plan.md` for the first notification event and payload boundary before choosing a provider or adding live email sends.
@@ -228,7 +229,7 @@ Build order:
    - The admin bridge uses Firebase Hosting public auto config and hides fulfillment data until a refreshed ID token contains `admin: true`.
    - Next step is enabling the Google provider, authorizing `theosfarm.com`, creating the approved admin account, granting its custom claim, and verifying rules and sign-in in a Firebase preview.
 9. Add Shippo label purchase and tracking updates in admin.
-10. Add email notifications. Paid-order outbox queueing is implemented; provider sending remains.
+10. Add email notifications. Paid-order outbox queueing and guarded Firebase delivery wiring are implemented; provider account setup, deployment, and explicit enablement remain.
 11. Deploy the public storefront to Firebase Hosting.
 12. Point production domain.
 13. Run test orders.
