@@ -23,12 +23,13 @@ Implemented:
 - `functions/src/notification-delivery-runtime.js` composes Resend with trusted persistence only when `NOTIFICATION_DELIVERY_ENABLED=true`, the sender and secret are injected, and every dependency is present. It does not export a Cloud Function or trigger.
 - `functions/src/daily-fulfillment-summary.js` builds a deterministic admin summary from a bounded list of paid orders in the three supported fulfillment states, including supported bag totals and a capped needs-review list.
 - `functions/src/daily-fulfillment-outbox.js` obtains that bounded list through trusted Firestore composition and persists one deterministic daily outbox job. Repeated runs for the same date are duplicates rather than additional jobs.
+- `functions/src/daily-fulfillment-scheduler.js` derives the summary date in `America/Chicago` from a trusted clock and invokes the daily enqueue path only when `DAILY_FULFILLMENT_SUMMARY_ENABLED=true` and all configuration is valid.
 - `firestore.indexes.json` includes the `paymentStatus`/`status` compound index required by the trusted fulfillment query.
 
 Not yet implemented:
 
 - Resend account credentials, verified sender-domain configuration, a trusted trigger, or live sends.
-- Explicitly configured scheduled summary trigger and live delivery wiring.
+- Exported/deployed Firebase scheduled summary trigger and live delivery wiring.
 
 Firestore rules currently deny public reads and writes to `notificationOutbox`; only trusted backend Admin SDK code can use this boundary.
 
@@ -151,10 +152,11 @@ Current focused tests verify:
 - Firestore tests cover concurrent claims, retry transitions, stale-attempt rejection, idempotent success recording, terminal failure, and a composed queued-to-sent flow with a fake provider.
 - Daily summary tests cover supported fulfillment and bag totals, zero-state output, stable daily idempotency, bounded follow-up output, and omission of contact, note, and Stripe fields.
 - Trusted query/outbox tests cover compound paid/status filtering, bounded-result failure, calendar-date validation, duplicate daily enqueue, and composed Firestore persistence.
+- Scheduler tests cover Central Time date boundaries, explicit enablement, invalid configuration, trusted clock derivation, and one-call dispatch behavior.
 
 Future tests should verify:
 
-- The future scheduled trigger derives the intended business date and invokes the trusted enqueue path once per operating day.
+- The future Firebase scheduled function invokes the guarded dispatcher once per operating day without exposing a public HTTP route.
 - A future trusted trigger invokes only explicitly enabled delivery runtimes and handles retries without concurrent duplicate dispatch.
 
 ## Non-Goals

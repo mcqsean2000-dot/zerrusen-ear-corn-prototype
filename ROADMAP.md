@@ -181,12 +181,13 @@ Implemented foundation:
 - Delivery runtime composition fails closed behind an explicit enable flag and complete server-side configuration. No trusted trigger is exported yet.
 - A provider-neutral daily fulfillment summary builder now counts the three supported fulfillment states and 20 lb/40 lb bags while omitting private notes, contact details, and Stripe fields.
 - Trusted Firestore composition now queries paid orders across supported fulfillment states and idempotently enqueues one daily summary job. The required payment/status compound index is included.
+- A scheduler-ready dispatcher derives the farm business date in Central Time, calls only the trusted daily enqueue path, and fails closed without an explicit enable flag and valid configuration.
 
 Remaining:
 
 - Create and inject a restricted Resend sending key, verify the sender domain, and approve the sender/reply-to addresses.
 - Connect the guarded delivery runtime to an approved trusted Firestore trigger or scheduled dispatcher.
-- Add the explicitly configured scheduled trigger that invokes the guarded daily enqueue and delivery paths.
+- Export and deploy the explicitly configured Firebase scheduled function that invokes the guarded dispatcher.
 
 Use `docs/notification-boundary-plan.md` for the first notification event and payload boundary before choosing a provider or adding live email sends.
 
