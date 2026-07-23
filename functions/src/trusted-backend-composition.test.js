@@ -257,6 +257,7 @@ test("composition exposes the handler dependency shapes expected by index.js", (
   assert.equal(typeof composition.serverTimestamp, "function");
   assert.equal(composition.serverTimestamp(), "SERVER_TIMESTAMP");
   assert.equal(typeof composition.verifyStripeWebhookEvent, "function");
+  assert.equal(typeof composition.queuePaidOrderNotifications, "function");
   assert.deepEqual(Object.keys(composition.checkoutAdapterDependencies).sort(), [
     "createOrderRequest",
     "createStripeCheckoutSession",

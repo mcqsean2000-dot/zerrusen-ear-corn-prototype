@@ -1,8 +1,27 @@
 # Notification Boundary Plan
 
-This plan defines the first Theo's Farm notification boundary. It does not add an email provider, install packages, send email, deploy anything, or introduce secrets.
+This plan defines the first Theo's Farm notification boundary. The provider-neutral paid-order builders and Firestore outbox persistence boundary are implemented. No email provider is installed, no email is sent, nothing is deployed by this work, and no secrets are introduced.
 
 Approved farm/admin email account: `theosfeedfarm@gmail.com`. Use this account for business email setup and as the initial admin notification recipient once a provider and trusted backend send path are approved.
+
+## Implementation Status
+
+Implemented:
+
+- `functions/src/notification-builder.js` builds customer order confirmation and admin paid-order jobs only from trusted paid-order summaries.
+- Invalid or missing customer email addresses skip the customer job while preserving the admin job.
+- Free-form customer note text and raw Stripe fields are excluded.
+- `functions/src/notification-outbox.js` delegates built jobs to trusted persistence.
+- `functions/src/firestore-adapter.js` creates backend-only `notificationOutbox` documents with deterministic idempotency keys and treats repeated keys as duplicates.
+- The trusted backend composition exposes `queuePaidOrderNotifications` for the future reviewed webhook integration.
+
+Not yet implemented:
+
+- Calling the outbox from the production Stripe webhook flow.
+- Provider selection, credentials, live sends, attempt logs, or retries.
+- Scheduled daily fulfillment summary generation.
+
+Firestore rules currently deny public reads and writes to `notificationOutbox`; only trusted backend Admin SDK code can use this boundary.
 
 ## Scope
 
@@ -108,14 +127,19 @@ Store notification send attempts in a trusted backend collection or equivalent l
 
 Retry only from trusted backend code. Never ask public storefront JavaScript to retry or reconcile notification sends.
 
-## Future Checks
+## Checks
 
-When implementation begins, add tests that verify:
+Current focused tests verify:
 
 - Customer and admin builders omit Stripe secrets and raw payment payloads.
 - Invalid or missing customer email skips customer confirmation instead of sending to a malformed address.
-- Admin summary counts match the admin order data boundary for 20 lb and 40 lb bags.
 - Notification idempotency keys stay stable for repeated webhook deliveries.
+- Duplicate outbox keys do not create a second job.
+- Unsupported outbox fields and mismatched deterministic keys fail closed.
+
+Future tests should verify:
+
+- Admin summary counts match the admin order data boundary for 20 lb and 40 lb bags.
 - Provider adapter errors return safe messages without exposing secrets.
 
 ## Non-Goals

@@ -168,6 +168,20 @@ Minimum:
 - Admin new order notification
 - Admin daily fulfillment summary
 
+Implemented foundation:
+
+- Provider-neutral customer order confirmation and admin paid-order builders.
+- Customer confirmation is skipped when the trusted order has no valid email address.
+- Deterministic Firestore outbox jobs prevent duplicate queue entries for repeated paid-event processing.
+- Outbox payloads omit raw Stripe objects and free-form customer note text.
+
+Remaining:
+
+- Wire paid-order outbox creation into the reviewed Stripe webhook transaction/retry flow.
+- Select and configure an email provider.
+- Add a trusted outbox sender, delivery-attempt logging, and retry policy.
+- Add the scheduled daily fulfillment summary builder and trigger.
+
 Use `docs/notification-boundary-plan.md` for the first notification event and payload boundary before choosing a provider or adding live email sends.
 
 Later:

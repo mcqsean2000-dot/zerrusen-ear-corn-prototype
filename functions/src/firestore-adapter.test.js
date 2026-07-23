@@ -577,3 +577,97 @@ test("marks Stripe events processed without losing claim data", async () => {
     },
   });
 });
+
+test("enqueues notification jobs once with deterministic document ids", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({
+    firestore,
+    notificationOutboxCollection: "mailOutbox",
+    serverTimestamp() {
+      return "SERVER_TIMESTAMP";
+    },
+  });
+  const jobs = [{
+    eventName: "customer.order_confirmation",
+    idempotencyKey: "customer.order_confirmation:order_123:evt_123",
+    orderRequestId: "order_123",
+    paidEventId: "evt_123",
+    recipientCategory: "customer",
+    status: "pending",
+    subject: "Payment confirmed",
+    text: "Trusted order summary",
+    to: "customer@example.com",
+  }];
+
+  assert.deepEqual(await adapter.enqueueNotificationJobs({ jobs }), {
+    created: 1,
+    duplicates: 0,
+    results: [{
+      created: true,
+      idempotencyKey: "customer.order_confirmation:order_123:evt_123",
+    }],
+  });
+  assert.deepEqual(await adapter.enqueueNotificationJobs({ jobs }), {
+    created: 0,
+    duplicates: 1,
+    results: [{
+      created: false,
+      idempotencyKey: "customer.order_confirmation:order_123:evt_123",
+    }],
+  });
+  assert.deepEqual(collectionDocs(firestore, "mailOutbox").get(jobs[0].idempotencyKey), {
+    ...jobs[0],
+    createdAt: "SERVER_TIMESTAMP",
+  });
+});
+
+test("rejects unsupported notification job fields before persistence", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({ firestore });
+
+  await assert.rejects(
+    adapter.enqueueNotificationJobs({
+      jobs: [{
+        eventName: "admin.paid_order_created",
+        idempotencyKey: "admin.paid_order_created:order_123:evt_123",
+        orderRequestId: "order_123",
+        paidEventId: "evt_123",
+        rawStripeEvent: { secret: true },
+        recipientCategory: "admin",
+        status: "pending",
+        subject: "Paid order",
+        text: "Trusted order summary",
+        to: "theosfeedfarm@gmail.com",
+      }],
+    }),
+    (error) => {
+      assert.equal(error.code, "notification_outbox_untrusted_field");
+      assert.deepEqual(error.untrustedFields, ["rawStripeEvent"]);
+      return true;
+    },
+  );
+  assert.equal(collectionDocs(firestore, "notificationOutbox").size, 0);
+});
+
+test("rejects notification jobs with mismatched deterministic keys", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({ firestore });
+
+  await assert.rejects(
+    adapter.enqueueNotificationJobs({
+      jobs: [{
+        eventName: "admin.paid_order_created",
+        idempotencyKey: "admin.paid_order_created:other_order:evt_123",
+        orderRequestId: "order_123",
+        paidEventId: "evt_123",
+        recipientCategory: "admin",
+        status: "pending",
+        subject: "Paid order",
+        text: "Trusted order summary",
+        to: "theosfeedfarm@gmail.com",
+      }],
+    }),
+    (error) => error.code === "notification_outbox_job_invalid",
+  );
+  assert.equal(collectionDocs(firestore, "notificationOutbox").size, 0);
+});

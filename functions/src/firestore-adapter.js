@@ -4,7 +4,19 @@ const { TRUSTED_ORDER_FIELDS } = require("./order-validation");
 
 const DEFAULT_ORDER_COLLECTION = "orderRequests";
 const DEFAULT_STRIPE_EVENT_COLLECTION = "stripeEvents";
+const DEFAULT_NOTIFICATION_OUTBOX_COLLECTION = "notificationOutbox";
 const SERVER_TIMESTAMP_SENTINEL = "FIRESTORE_SERVER_TIMESTAMP_REQUIRED";
+const NOTIFICATION_JOB_FIELDS = Object.freeze([
+  "eventName",
+  "idempotencyKey",
+  "orderRequestId",
+  "paidEventId",
+  "recipientCategory",
+  "status",
+  "subject",
+  "text",
+  "to",
+]);
 const ADMIN_ORDER_STATUSES = Object.freeze([
   "needs_review",
   "ready_to_pack",
@@ -61,6 +73,62 @@ function orderCollectionName(options, override) {
 
 function eventCollectionName(options) {
   return cleanName(options.stripeEventCollection, DEFAULT_STRIPE_EVENT_COLLECTION);
+}
+
+function notificationOutboxCollectionName(options, override) {
+  return cleanName(override || options.notificationOutboxCollection, DEFAULT_NOTIFICATION_OUTBOX_COLLECTION);
+}
+
+function trustedNotificationJob(job) {
+  const cleaned = withoutUndefinedFields(job);
+  const unexpectedFields = Object.keys(cleaned).filter((field) => !NOTIFICATION_JOB_FIELDS.includes(field));
+  const idempotencyKey = cleanText(cleaned.idempotencyKey);
+  const orderRequestId = cleanText(cleaned.orderRequestId);
+  const paidEventId = cleanText(cleaned.paidEventId);
+  const subject = cleanText(cleaned.subject);
+  const text = cleanText(cleaned.text);
+  const to = cleanText(cleaned.to).toLowerCase();
+  const expectedRecipient = cleaned.eventName === "customer.order_confirmation" ? "customer" : "admin";
+  const expectedIdempotencyKey = `${cleaned.eventName}:${orderRequestId}:${paidEventId}`;
+
+  if (unexpectedFields.length) {
+    const error = new Error("Notification outbox job includes unsupported fields.");
+    error.code = "notification_outbox_untrusted_field";
+    error.untrustedFields = unexpectedFields;
+    throw error;
+  }
+
+  if (
+    !idempotencyKey ||
+    idempotencyKey.length > 500 ||
+    idempotencyKey.includes("/") ||
+    !["customer.order_confirmation", "admin.paid_order_created"].includes(cleaned.eventName) ||
+    cleaned.recipientCategory !== expectedRecipient ||
+    cleaned.status !== "pending" ||
+    !/^[A-Za-z0-9_-]{1,160}$/.test(orderRequestId) ||
+    !/^[A-Za-z0-9_-]{1,160}$/.test(paidEventId) ||
+    idempotencyKey !== expectedIdempotencyKey ||
+    to.length > 254 ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to) ||
+    !subject ||
+    subject.length > 200 ||
+    !text ||
+    text.length > 10000
+  ) {
+    const error = new Error("Notification outbox job is invalid.");
+    error.code = "notification_outbox_job_invalid";
+    throw error;
+  }
+
+  return {
+    ...cleaned,
+    idempotencyKey,
+    orderRequestId,
+    paidEventId,
+    subject,
+    text,
+    to,
+  };
 }
 
 function collectionRef(firestore, name) {
@@ -518,9 +586,55 @@ function createFirestoreAdapter(options = {}) {
     };
   }
 
+  async function enqueueNotificationJobs({ collection, jobs }) {
+    if (!Array.isArray(jobs) || jobs.length < 1 || jobs.length > 2) {
+      const error = new Error("Notification outbox requires one or two jobs.");
+      error.code = "notification_outbox_jobs_invalid";
+      throw error;
+    }
+
+    if (!isFunction(firestore.runTransaction)) {
+      const error = new Error("Firestore-like backend must provide runTransaction() for notification jobs.");
+      error.code = "firestore_transaction_missing";
+      throw error;
+    }
+
+    const outbox = collectionRef(firestore, notificationOutboxCollectionName(options, collection));
+    const results = [];
+
+    for (const rawJob of jobs) {
+      const job = trustedNotificationJob(rawJob);
+      const ref = outbox.doc(job.idempotencyKey);
+      const created = await firestore.runTransaction(async (transaction) => {
+        const snapshot = await transaction.get(ref);
+        if (snapshot && snapshot.exists) {
+          return false;
+        }
+
+        transaction.set(ref, {
+          ...job,
+          createdAt: timestamp(),
+        });
+        return true;
+      });
+
+      results.push({
+        created,
+        idempotencyKey: job.idempotencyKey,
+      });
+    }
+
+    return {
+      created: results.filter((result) => result.created).length,
+      duplicates: results.filter((result) => !result.created).length,
+      results,
+    };
+  }
+
   return {
     claimStripeEventProcessing,
     createOrderRequest,
+    enqueueNotificationJobs,
     findOrderByCheckoutSessionId,
     findOrderByPaymentIntentId,
     markCheckoutSessionFailed,
@@ -537,6 +651,7 @@ function createFirestoreAdapter(options = {}) {
 module.exports = {
   ADMIN_ORDER_STATUSES,
   ADMIN_STATUS_TRANSITIONS,
+  DEFAULT_NOTIFICATION_OUTBOX_COLLECTION,
   DEFAULT_ORDER_COLLECTION,
   DEFAULT_STRIPE_EVENT_COLLECTION,
   SERVER_TIMESTAMP_SENTINEL,

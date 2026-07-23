@@ -84,6 +84,8 @@ Natural search phrases to keep in mind:
 - `tools/package-static.mjs` - allowlist-based static host package generator kept as a fallback/export path
 - `tools/serve-static.mjs` - no-dependency local preview server for the repo root or generated static package
 - `functions/` - host-neutral trusted checkout and Stripe webhook scaffold, disabled by default
+- `functions/src/notification-builder.js` - provider-neutral paid-order customer/admin email job builders
+- `functions/src/notification-outbox.js` - trusted notification outbox boundary with deterministic job keys
 - `firebase.json` - Firebase Hosting config and Firestore deploy targets for the chosen production path
 - `.firebaserc.example` - safe Firebase project alias template for local setup
 - `firestore.rules` - initial Firestore rules for prototype order requests
@@ -107,6 +109,7 @@ Natural search phrases to keep in mind:
 
 - Current prices are placeholders and should be confirmed before launch.
 - Current cart is connected to live Shippo shipping-rate lookup, but not yet connected to payment processing, inventory, order persistence, live email sends, or label purchase.
+- Paid-order notification builders and a backend-only Firestore outbox boundary are implemented, but they are not yet invoked by the production webhook and no email provider sends are enabled.
 - The admin shell has a disabled Firebase config/auth bridge for future authenticated reads and guarded admin actions. Sign-in fields, status controls, and label controls stay inert until the live bridge confirms Firebase Auth admin access. Keep it disabled until the production Firebase project, Auth users, and admin custom claims are configured.
 - For local admin testing only, copy `admin-config.local.example.js` to ignored `admin-config.local.js` and fill in approved Firebase public web config after Auth users and admin claims are ready. Do not commit the local override.
 - Keep `checkout-config.js` blank until a trusted backend endpoint is ready. For Firebase Hosting, set only the public checkout session URL there, never secrets.

@@ -7,6 +7,9 @@ const {
 const {
   createStripeApiAdapter,
 } = require("./stripe-api-adapter");
+const {
+  createNotificationOutbox,
+} = require("./notification-outbox");
 
 function isFunction(value) {
   return typeof value === "function";
@@ -51,16 +54,21 @@ function createTrustedBackendComposition(options = {}) {
   const firestoreAdapter = createFirestoreAdapter({
     firestore: options.firestore,
     orderCollection: options.orderCollection,
+    notificationOutboxCollection: options.notificationOutboxCollection,
     stripeEventCollection: options.stripeEventCollection,
     serverTimestamp,
   });
   const stripeAdapter = createStripeApiAdapter({
     stripe: options.stripe,
   });
+  const notificationOutbox = createNotificationOutbox({
+    enqueueNotificationJobs: firestoreAdapter.enqueueNotificationJobs,
+  });
 
   return {
     serverTimestamp,
     verifyStripeWebhookEvent: stripeAdapter.verifyStripeWebhookEvent,
+    queuePaidOrderNotifications: notificationOutbox.queuePaidOrderNotifications,
     checkoutAdapterDependencies: {
       createOrderRequest: firestoreAdapter.createOrderRequest,
       createStripeCheckoutSession: stripeAdapter.createStripeCheckoutSession,
