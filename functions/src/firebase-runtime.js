@@ -4,6 +4,7 @@ const { getApps, initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { FieldValue, getFirestore } = require("firebase-admin/firestore");
 const { onRequest } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret } = require("firebase-functions/params");
 const Stripe = require("stripe");
 const {
@@ -12,6 +13,12 @@ const {
 const {
   createFirestoreAdapter,
 } = require("./firestore-adapter");
+const {
+  createDailyFulfillmentOutbox,
+} = require("./daily-fulfillment-outbox");
+const {
+  createFirebaseDailySummaryHandler,
+} = require("./firebase-daily-summary-handler");
 const {
   routeRequest,
 } = require("./index");
@@ -52,6 +59,15 @@ function runtimeEnv() {
     STRIPE_WEBHOOK_SIGNING_SECRET: stripeWebhookSigningSecret.value(),
     STRIPE_SUCCESS_URL: process.env.STRIPE_SUCCESS_URL || "https://theosfarm.com/?checkout=success&session_id={CHECKOUT_SESSION_ID}",
     STRIPE_CANCEL_URL: process.env.STRIPE_CANCEL_URL || "https://theosfarm.com/#delivery",
+  };
+}
+
+function dailySummaryEnv() {
+  return {
+    DAILY_FULFILLMENT_SUMMARY_ENABLED: process.env.DAILY_FULFILLMENT_SUMMARY_ENABLED,
+    DAILY_FULFILLMENT_TIME_ZONE: "America/Chicago",
+    FIRESTORE_ORDER_COLLECTION: process.env.FIRESTORE_ORDER_COLLECTION,
+    NOTIFICATION_ADMIN_EMAIL: process.env.NOTIFICATION_ADMIN_EMAIL || "theosfeedfarm@gmail.com",
   };
 }
 
@@ -108,8 +124,36 @@ const api = onRequest({
   return routeRequest(req, res, runtimeOptions());
 });
 
+const dailyFulfillmentSummary = onSchedule({
+  region: "us-central1",
+  schedule: "0 8 * * *",
+  timeZone: "America/Chicago",
+  retryCount: 2,
+  maxRetrySeconds: 900,
+}, async (event) => {
+  const env = dailySummaryEnv();
+  const app = firebaseApp();
+  const firestoreAdapter = createFirestoreAdapter({
+    firestore: getFirestore(app),
+    orderCollection: env.FIRESTORE_ORDER_COLLECTION,
+    serverTimestamp,
+  });
+  const outbox = createDailyFulfillmentOutbox({
+    enqueueNotificationJobs: firestoreAdapter.enqueueNotificationJobs,
+    listPaidFulfillmentOrders: firestoreAdapter.listPaidFulfillmentOrders,
+  });
+  const handler = createFirebaseDailySummaryHandler({
+    env,
+    queueDailyFulfillmentSummary: outbox.queueDailyFulfillmentSummary,
+  });
+  const result = await handler(event);
+  console.info("daily_fulfillment_summary_schedule", result);
+});
+
 module.exports = {
   api,
+  dailyFulfillmentSummary,
+  dailySummaryEnv,
   firebaseApp,
   runtimeEnv,
   runtimeOptions,

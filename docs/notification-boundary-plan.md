@@ -24,12 +24,14 @@ Implemented:
 - `functions/src/daily-fulfillment-summary.js` builds a deterministic admin summary from a bounded list of paid orders in the three supported fulfillment states, including supported bag totals and a capped needs-review list.
 - `functions/src/daily-fulfillment-outbox.js` obtains that bounded list through trusted Firestore composition and persists one deterministic daily outbox job. Repeated runs for the same date are duplicates rather than additional jobs.
 - `functions/src/daily-fulfillment-scheduler.js` derives the summary date in `America/Chicago` from a trusted clock and invokes the daily enqueue path only when `DAILY_FULFILLMENT_SUMMARY_ENABLED=true` and all configuration is valid.
+- `functions/src/firebase-daily-summary-handler.js` adapts Firebase schedule events to the guarded dispatcher without importing Firebase SDKs or reading secrets.
+- `functions/src/firebase-runtime.js` exports an 8:00 AM Central second-generation scheduled function with two bounded retries. It is disabled by environment configuration and has not been deployed by this work.
 - `firestore.indexes.json` includes the `paymentStatus`/`status` compound index required by the trusted fulfillment query.
 
 Not yet implemented:
 
 - Resend account credentials, verified sender-domain configuration, a trusted trigger, or live sends.
-- Exported/deployed Firebase scheduled summary trigger and live delivery wiring.
+- Production review, deployment, and explicit enablement of the scheduled summary trigger; live delivery trigger wiring remains separate.
 
 Firestore rules currently deny public reads and writes to `notificationOutbox`; only trusted backend Admin SDK code can use this boundary.
 
@@ -153,6 +155,7 @@ Current focused tests verify:
 - Daily summary tests cover supported fulfillment and bag totals, zero-state output, stable daily idempotency, bounded follow-up output, and omission of contact, note, and Stripe fields.
 - Trusted query/outbox tests cover compound paid/status filtering, bounded-result failure, calendar-date validation, duplicate daily enqueue, and composed Firestore persistence.
 - Scheduler tests cover Central Time date boundaries, explicit enablement, invalid configuration, trusted clock derivation, and one-call dispatch behavior.
+- Firebase schedule-handler tests cover disabled runs, trusted schedule-time conversion, idempotent retry results, malformed events, and static trigger configuration.
 
 Future tests should verify:
 

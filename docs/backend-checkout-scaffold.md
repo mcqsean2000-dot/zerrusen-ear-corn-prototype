@@ -249,3 +249,9 @@ node functions/src/index.js
 ```
 
 Then POST to `http://localhost:8787/api/checkout-sessions` or `http://localhost:8787/api/stripe/webhook`. Without real local configuration and adapters, the routes intentionally return disabled or not-implemented responses.
+
+## Daily Fulfillment Schedule
+
+The Firebase runtime exports `dailyFulfillmentSummary` as a second-generation scheduled function using `0 8 * * *` in `America/Chicago`. Cloud Scheduler retries are bounded to two attempts over 15 minutes, and the daily outbox idempotency key prevents a retry from creating a second summary job.
+
+The schedule is inert unless the trusted Functions environment sets `DAILY_FULFILLMENT_SUMMARY_ENABLED=true`. Keep it `false` through the first deployment, deploy the Firestore indexes with the function, verify the schedule and production order collection, then enable it deliberately. No public HTTP route can supply or override the summary date.

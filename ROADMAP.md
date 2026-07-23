@@ -182,12 +182,13 @@ Implemented foundation:
 - A provider-neutral daily fulfillment summary builder now counts the three supported fulfillment states and 20 lb/40 lb bags while omitting private notes, contact details, and Stripe fields.
 - Trusted Firestore composition now queries paid orders across supported fulfillment states and idempotently enqueues one daily summary job. The required payment/status compound index is included.
 - A scheduler-ready dispatcher derives the farm business date in Central Time, calls only the trusted daily enqueue path, and fails closed without an explicit enable flag and valid configuration.
+- The Firebase runtime exports a retry-safe 8:00 AM Central scheduled function that returns a safe disabled result until explicitly enabled. It has not been deployed by repository work.
 
 Remaining:
 
 - Create and inject a restricted Resend sending key, verify the sender domain, and approve the sender/reply-to addresses.
 - Connect the guarded delivery runtime to an approved trusted Firestore trigger or scheduled dispatcher.
-- Export and deploy the explicitly configured Firebase scheduled function that invokes the guarded dispatcher.
+- Review the 8:00 AM Central operating time, deploy the scheduled function and compound index, then explicitly enable the summary after production verification.
 
 Use `docs/notification-boundary-plan.md` for the first notification event and payload boundary before choosing a provider or adding live email sends.
 
