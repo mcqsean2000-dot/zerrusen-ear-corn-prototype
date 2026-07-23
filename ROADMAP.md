@@ -179,12 +179,13 @@ Implemented foundation:
 - Transactional Firestore delivery adapters now enforce one active attempt, stale-worker rejection, retry state, and terminal sent/failed states.
 - A Resend-compatible HTTP adapter now sends plain-text jobs with stable provider idempotency keys and sanitized error classification.
 - Delivery runtime composition fails closed behind an explicit enable flag and complete server-side configuration. No trusted trigger is exported yet.
+- A provider-neutral daily fulfillment summary builder now counts the three supported fulfillment states and 20 lb/40 lb bags while omitting private notes, contact details, and Stripe fields.
 
 Remaining:
 
 - Create and inject a restricted Resend sending key, verify the sender domain, and approve the sender/reply-to addresses.
 - Connect the guarded delivery runtime to an approved trusted Firestore trigger or scheduled dispatcher.
-- Add the scheduled daily fulfillment summary builder and trigger.
+- Add the trusted daily summary query, outbox enqueue step, and scheduled trigger.
 
 Use `docs/notification-boundary-plan.md` for the first notification event and payload boundary before choosing a provider or adding live email sends.
 

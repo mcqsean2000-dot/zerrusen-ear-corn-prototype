@@ -85,6 +85,7 @@ Natural search phrases to keep in mind:
 - `tools/serve-static.mjs` - no-dependency local preview server for the repo root or generated static package
 - `functions/` - host-neutral trusted checkout and Stripe webhook scaffold, disabled by default
 - `functions/src/notification-builder.js` - provider-neutral paid-order customer/admin email job builders
+- `functions/src/daily-fulfillment-summary.js` - provider-neutral daily fulfillment totals and bounded follow-up summary builder
 - `functions/src/notification-outbox.js` - trusted notification outbox boundary with deterministic job keys
 - `functions/src/notification-delivery.js` - provider-neutral claimed-job delivery and bounded retry worker
 - `functions/src/resend-email-adapter.js` - secret-injected Resend HTTP adapter with provider idempotency and sanitized failures

@@ -21,11 +21,12 @@ Implemented:
 - The trusted backend composition exposes these persistence functions separately from the provider sender, so production remains disabled until both a provider and trigger are intentionally wired.
 - `functions/src/resend-email-adapter.js` calls Resend's `POST /emails` endpoint with a stable `Idempotency-Key`, plain-text trusted payloads, and sanitized retry/permanent error classification.
 - `functions/src/notification-delivery-runtime.js` composes Resend with trusted persistence only when `NOTIFICATION_DELIVERY_ENABLED=true`, the sender and secret are injected, and every dependency is present. It does not export a Cloud Function or trigger.
+- `functions/src/daily-fulfillment-summary.js` builds a deterministic admin summary from a bounded list of paid orders in the three supported fulfillment states, including supported bag totals and a capped needs-review list.
 
 Not yet implemented:
 
 - Resend account credentials, verified sender-domain configuration, a trusted trigger, or live sends.
-- Scheduled daily fulfillment summary generation.
+- Trusted daily order query, outbox enqueue step, and scheduled summary trigger.
 
 Firestore rules currently deny public reads and writes to `notificationOutbox`; only trusted backend Admin SDK code can use this boundary.
 
@@ -146,10 +147,11 @@ Current focused tests verify:
 - Replayed completed events do not update the order or duplicate notification jobs.
 - Delivery worker tests cover successful sends, skipped claims, sanitized retryable errors, permanent/exhausted failures, and success-recording failures.
 - Firestore tests cover concurrent claims, retry transitions, stale-attempt rejection, idempotent success recording, terminal failure, and a composed queued-to-sent flow with a fake provider.
+- Daily summary tests cover supported fulfillment and bag totals, zero-state output, stable daily idempotency, bounded follow-up output, and omission of contact, note, and Stripe fields.
 
 Future tests should verify:
 
-- Admin summary counts match the admin order data boundary for 20 lb and 40 lb bags.
+- The future trusted daily query passes only the intended paid fulfillment queue into the summary builder.
 - A future trusted trigger invokes only explicitly enabled delivery runtimes and handles retries without concurrent duplicate dispatch.
 
 ## Non-Goals
