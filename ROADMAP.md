@@ -177,11 +177,13 @@ Implemented foundation:
 - Completed Checkout processing now updates the paid order, creates its outbox jobs, and records the Stripe event in one Firestore transaction.
 - A provider-neutral delivery worker now handles claimed jobs, provider message IDs, sanitized failure codes, permanent failures, and a bounded retry limit.
 - Transactional Firestore delivery adapters now enforce one active attempt, stale-worker rejection, retry state, and terminal sent/failed states.
+- A Resend-compatible HTTP adapter now sends plain-text jobs with stable provider idempotency keys and sanitized error classification.
+- Delivery runtime composition fails closed behind an explicit enable flag and complete server-side configuration. No trusted trigger is exported yet.
 
 Remaining:
 
-- Select and configure an email provider.
-- Connect the delivery worker to an approved provider and a trusted trigger.
+- Create and inject a restricted Resend sending key, verify the sender domain, and approve the sender/reply-to addresses.
+- Connect the guarded delivery runtime to an approved trusted Firestore trigger or scheduled dispatcher.
 - Add the scheduled daily fulfillment summary builder and trigger.
 
 Use `docs/notification-boundary-plan.md` for the first notification event and payload boundary before choosing a provider or adding live email sends.

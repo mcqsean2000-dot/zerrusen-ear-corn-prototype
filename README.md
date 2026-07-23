@@ -87,6 +87,8 @@ Natural search phrases to keep in mind:
 - `functions/src/notification-builder.js` - provider-neutral paid-order customer/admin email job builders
 - `functions/src/notification-outbox.js` - trusted notification outbox boundary with deterministic job keys
 - `functions/src/notification-delivery.js` - provider-neutral claimed-job delivery and bounded retry worker
+- `functions/src/resend-email-adapter.js` - secret-injected Resend HTTP adapter with provider idempotency and sanitized failures
+- `functions/src/notification-delivery-runtime.js` - explicit opt-in composition gate for Resend and trusted Firestore delivery persistence
 - `firebase.json` - Firebase Hosting config and Firestore deploy targets for the chosen production path
 - `.firebaserc.example` - safe Firebase project alias template for local setup
 - `firestore.rules` - initial Firestore rules for prototype order requests
@@ -110,7 +112,7 @@ Natural search phrases to keep in mind:
 
 - Current prices are placeholders and should be confirmed before launch.
 - Current cart is connected to live Shippo shipping-rate lookup, but not yet connected to payment processing, inventory, order persistence, live email sends, or label purchase.
-- Completed Stripe Checkout events atomically mark the order paid, create deterministic customer/admin Firestore outbox jobs, and mark the Stripe event processed. The provider-neutral delivery worker now has transactional Firestore claim and result adapters with stale-attempt and terminal-state protection, but no provider, trigger, or live sender is enabled yet.
+- Completed Stripe Checkout events atomically mark the order paid, create deterministic customer/admin Firestore outbox jobs, and mark the Stripe event processed. The delivery worker has transactional Firestore claim/result adapters plus a tested Resend HTTP adapter, but no trigger or live sender is exported. Runtime composition remains disabled unless `NOTIFICATION_DELIVERY_ENABLED=true` and all server-side configuration is injected.
 - The Firebase-hosted admin shell supports Google sign-in plus an email/password fallback. Fulfillment content and actions remain hidden until Firebase Auth returns an `admin: true` custom claim; signing in with an ordinary Google account does not grant access.
 - Production admin config is loaded from Firebase Hosting's public `/__/firebase/init.json` endpoint. Enable the Google provider, authorize the production domain, create the approved admin account, and grant its custom claim before launch.
 - For local admin testing only, copy `admin-config.local.example.js` to ignored `admin-config.local.js` and fill in approved Firebase public web config after Auth users and admin claims are ready. Do not commit the local override.

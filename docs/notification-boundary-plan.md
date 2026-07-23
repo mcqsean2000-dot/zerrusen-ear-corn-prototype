@@ -1,6 +1,6 @@
 # Notification Boundary Plan
 
-This plan defines the first Theo's Farm notification boundary. Provider-neutral paid-order builders, Firestore outbox persistence, and the trusted paid-webhook integration are implemented. No email provider is installed, no email is sent, nothing is deployed by this work, and no secrets are introduced.
+This plan defines the first Theo's Farm notification boundary. Paid-order builders, Firestore outbox persistence, trusted paid-webhook integration, and a Resend-compatible HTTP adapter are implemented. No email is sent, nothing is deployed by this work, and no secrets are introduced.
 
 Approved farm/admin email account: `theosfeedfarm@gmail.com`. Use this account for business email setup and as the initial admin notification recipient once a provider and trusted backend send path are approved.
 
@@ -19,10 +19,12 @@ Implemented:
 - `functions/src/notification-delivery.js` processes one claimed job through injected trusted persistence and provider functions. It records provider message IDs on success, sanitizes failure codes, caps retries, and stops retrying permanent failures.
 - `functions/src/firestore-adapter.js` transactionally claims pending/retry jobs, increments attempts, prevents concurrent claims, rejects stale result writers, and records `sent`, `retry_pending`, or terminal `failed` state without storing provider error messages.
 - The trusted backend composition exposes these persistence functions separately from the provider sender, so production remains disabled until both a provider and trigger are intentionally wired.
+- `functions/src/resend-email-adapter.js` calls Resend's `POST /emails` endpoint with a stable `Idempotency-Key`, plain-text trusted payloads, and sanitized retry/permanent error classification.
+- `functions/src/notification-delivery-runtime.js` composes Resend with trusted persistence only when `NOTIFICATION_DELIVERY_ENABLED=true`, the sender and secret are injected, and every dependency is present. It does not export a Cloud Function or trigger.
 
 Not yet implemented:
 
-- Provider selection, credentials, a trusted trigger, or live sends.
+- Resend account credentials, verified sender-domain configuration, a trusted trigger, or live sends.
 - Scheduled daily fulfillment summary generation.
 
 Firestore rules currently deny public reads and writes to `notificationOutbox`; only trusted backend Admin SDK code can use this boundary.
@@ -148,11 +150,11 @@ Current focused tests verify:
 Future tests should verify:
 
 - Admin summary counts match the admin order data boundary for 20 lb and 40 lb bags.
-- Provider adapter errors return safe messages without exposing secrets.
+- A future trusted trigger invokes only explicitly enabled delivery runtimes and handles retries without concurrent duplicate dispatch.
 
 ## Non-Goals
 
-- No email provider package installation
+- No email provider SDK installation
 - No live email sends
 - No Firebase, Stripe, or provider secrets
 - No changes to Firestore rules, indexes, hosting, or deploy settings
