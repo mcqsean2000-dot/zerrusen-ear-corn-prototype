@@ -22,11 +22,13 @@ Implemented:
 - `functions/src/resend-email-adapter.js` calls Resend's `POST /emails` endpoint with a stable `Idempotency-Key`, plain-text trusted payloads, and sanitized retry/permanent error classification.
 - `functions/src/notification-delivery-runtime.js` composes Resend with trusted persistence only when `NOTIFICATION_DELIVERY_ENABLED=true`, the sender and secret are injected, and every dependency is present. It does not export a Cloud Function or trigger.
 - `functions/src/daily-fulfillment-summary.js` builds a deterministic admin summary from a bounded list of paid orders in the three supported fulfillment states, including supported bag totals and a capped needs-review list.
+- `functions/src/daily-fulfillment-outbox.js` obtains that bounded list through trusted Firestore composition and persists one deterministic daily outbox job. Repeated runs for the same date are duplicates rather than additional jobs.
+- `firestore.indexes.json` includes the `paymentStatus`/`status` compound index required by the trusted fulfillment query.
 
 Not yet implemented:
 
 - Resend account credentials, verified sender-domain configuration, a trusted trigger, or live sends.
-- Trusted daily order query, outbox enqueue step, and scheduled summary trigger.
+- Explicitly configured scheduled summary trigger and live delivery wiring.
 
 Firestore rules currently deny public reads and writes to `notificationOutbox`; only trusted backend Admin SDK code can use this boundary.
 
@@ -148,10 +150,11 @@ Current focused tests verify:
 - Delivery worker tests cover successful sends, skipped claims, sanitized retryable errors, permanent/exhausted failures, and success-recording failures.
 - Firestore tests cover concurrent claims, retry transitions, stale-attempt rejection, idempotent success recording, terminal failure, and a composed queued-to-sent flow with a fake provider.
 - Daily summary tests cover supported fulfillment and bag totals, zero-state output, stable daily idempotency, bounded follow-up output, and omission of contact, note, and Stripe fields.
+- Trusted query/outbox tests cover compound paid/status filtering, bounded-result failure, calendar-date validation, duplicate daily enqueue, and composed Firestore persistence.
 
 Future tests should verify:
 
-- The future trusted daily query passes only the intended paid fulfillment queue into the summary builder.
+- The future scheduled trigger derives the intended business date and invokes the trusted enqueue path once per operating day.
 - A future trusted trigger invokes only explicitly enabled delivery runtimes and handles retries without concurrent duplicate dispatch.
 
 ## Non-Goals

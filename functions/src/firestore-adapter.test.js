@@ -48,22 +48,26 @@ class MemoryDocRef {
 }
 
 class MemoryQuery {
-  constructor(collection, field, value, size) {
+  constructor(collection, filters = [], size = Infinity) {
     this.collection = collection;
-    this.field = field;
-    this.value = value;
-    this.size = size || Infinity;
+    this.filters = filters;
+    this.size = size;
+  }
+
+  where(field, op, value) {
+    assert.equal(op, "==");
+    return new MemoryQuery(this.collection, [...this.filters, [field, value]], this.size);
   }
 
   limit(size) {
-    return new MemoryQuery(this.collection, this.field, this.value, size);
+    return new MemoryQuery(this.collection, this.filters, size);
   }
 
   async get() {
     const docs = [];
 
     for (const [id, value] of this.collection.docs.entries()) {
-      if (value[this.field] === this.value) {
+      if (this.filters.every(([field, expected]) => value[field] === expected)) {
         docs.push(new MemoryDocSnapshot(id, value));
       }
 
@@ -90,8 +94,7 @@ class MemoryCollection {
   }
 
   where(field, op, value) {
-    assert.equal(op, "==");
-    return new MemoryQuery(this, field, value);
+    return new MemoryQuery(this).where(field, op, value);
   }
 }
 
@@ -162,6 +165,20 @@ function notificationJob(overrides = {}) {
     status: "pending",
     subject: "Paid order",
     text: "Trusted order summary",
+    to: "theosfeedfarm@gmail.com",
+    ...overrides,
+  };
+}
+
+function dailySummaryJob(overrides = {}) {
+  return {
+    eventName: "admin.daily_fulfillment_summary",
+    idempotencyKey: "admin.daily_fulfillment_summary:2026-07-23",
+    recipientCategory: "admin",
+    status: "pending",
+    subject: "Daily fulfillment summary",
+    summaryDate: "2026-07-23",
+    text: "Trusted daily fulfillment totals",
     to: "theosfeedfarm@gmail.com",
     ...overrides,
   };
@@ -725,6 +742,58 @@ test("enqueues notification jobs once with deterministic document ids", async ()
     ...jobs[0],
     createdAt: "SERVER_TIMESTAMP",
   });
+});
+
+test("enqueues one deterministic daily summary and rejects malformed summary identity", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({ firestore, serverTimestamp: "SERVER_TIMESTAMP" });
+  const job = dailySummaryJob();
+
+  assert.equal((await adapter.enqueueNotificationJobs({ jobs: [job] })).created, 1);
+  assert.equal((await adapter.enqueueNotificationJobs({ jobs: [job] })).duplicates, 1);
+  assert.deepEqual(collectionDocs(firestore, "notificationOutbox").get(job.idempotencyKey), {
+    ...job,
+    createdAt: "SERVER_TIMESTAMP",
+  });
+
+  for (const invalidJob of [
+    dailySummaryJob({ summaryDate: "2026-02-30", idempotencyKey: "admin.daily_fulfillment_summary:2026-02-30" }),
+    dailySummaryJob({ orderRequestId: "order_123" }),
+    dailySummaryJob({ idempotencyKey: "admin.daily_fulfillment_summary:2026-07-24" }),
+  ]) {
+    await assert.rejects(
+      adapter.enqueueNotificationJobs({ jobs: [invalidJob] }),
+      (error) => error.code === "notification_outbox_job_invalid",
+    );
+  }
+});
+
+test("lists a bounded paid fulfillment queue across supported statuses", async () => {
+  const firestore = new MemoryFirestore();
+  const orders = firestore.collection("orderRequests");
+  await orders.doc("order_review").set({ ...trustedOrderRequest, paymentStatus: "paid", status: "needs_review" });
+  await orders.doc("order_pack").set({ ...trustedOrderRequest, paymentStatus: "paid", status: "ready_to_pack" });
+  await orders.doc("order_packed").set({ ...trustedOrderRequest, paymentStatus: "paid", status: "packed" });
+  await orders.doc("order_unpaid").set({ ...trustedOrderRequest, paymentStatus: "unpaid", status: "needs_review" });
+  await orders.doc("order_shipped").set({ ...trustedOrderRequest, paymentStatus: "paid", status: "shipped" });
+  const adapter = createFirestoreAdapter({ firestore });
+
+  const result = await adapter.listPaidFulfillmentOrders();
+  assert.deepEqual(result.map((order) => order.id).sort(), [
+    "order_pack",
+    "order_packed",
+    "order_review",
+  ]);
+  assert.equal(result.every((order) => order.paymentStatus === "paid"), true);
+
+  await assert.rejects(
+    adapter.listPaidFulfillmentOrders({ limit: 2 }),
+    (error) => error.code === "fulfillment_query_result_limit_exceeded",
+  );
+  await assert.rejects(
+    adapter.listPaidFulfillmentOrders({ limit: 0 }),
+    (error) => error.code === "fulfillment_query_limit_invalid",
+  );
 });
 
 test("claims one notification attempt and rejects concurrent claims", async () => {

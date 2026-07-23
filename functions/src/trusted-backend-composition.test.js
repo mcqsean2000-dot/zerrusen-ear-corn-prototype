@@ -88,22 +88,26 @@ class MemoryDocRef {
 }
 
 class MemoryQuery {
-  constructor(collection, field, value, size) {
+  constructor(collection, filters = [], size = Infinity) {
     this.collection = collection;
-    this.field = field;
-    this.value = value;
-    this.size = size || Infinity;
+    this.filters = filters;
+    this.size = size;
+  }
+
+  where(field, op, value) {
+    assert.equal(op, "==");
+    return new MemoryQuery(this.collection, [...this.filters, [field, value]], this.size);
   }
 
   limit(size) {
-    return new MemoryQuery(this.collection, this.field, this.value, size);
+    return new MemoryQuery(this.collection, this.filters, size);
   }
 
   async get() {
     const docs = [];
 
     for (const [id, value] of this.collection.docs.entries()) {
-      if (value[this.field] === this.value) {
+      if (this.filters.every(([field, expected]) => value[field] === expected)) {
         docs.push(new MemoryDocSnapshot(id, value));
       }
 
@@ -130,8 +134,7 @@ class MemoryCollection {
   }
 
   where(field, op, value) {
-    assert.equal(op, "==");
-    return new MemoryQuery(this, field, value);
+    return new MemoryQuery(this).where(field, op, value);
   }
 }
 
@@ -264,6 +267,7 @@ test("composition exposes the handler dependency shapes expected by index.js", (
   assert.equal(composition.serverTimestamp(), "SERVER_TIMESTAMP");
   assert.equal(typeof composition.verifyStripeWebhookEvent, "function");
   assert.equal(typeof composition.queuePaidOrderNotifications, "function");
+  assert.equal(typeof composition.queueDailyFulfillmentSummary, "function");
   assert.deepEqual(Object.keys(composition.notificationDeliveryPersistence).sort(), [
     "claimNotificationJob",
     "recordNotificationFailure",
@@ -425,6 +429,29 @@ test("composition persistence moves a queued notification through delivery", asy
   assert.equal(stored.attempts, 1);
   assert.equal(stored.providerMessageId, "message_notify");
   assert.equal(stored.lastErrorCode, null);
+});
+
+test("composition queries and idempotently queues a daily fulfillment summary", async () => {
+  const firestore = new MemoryFirestore();
+  await firestore.collection("orderRequests").doc("order_daily").set({
+    ...validOrderRequest,
+    paymentStatus: "paid",
+    status: "needs_review",
+  });
+  const composition = createTrustedBackendComposition({
+    firestore,
+    stripe: fakeStripe(),
+    serverTimestamp: "SERVER_TIMESTAMP",
+  });
+
+  const first = await composition.queueDailyFulfillmentSummary({ summaryDate: "2026-07-23" });
+  const second = await composition.queueDailyFulfillmentSummary({ summaryDate: "2026-07-23" });
+  assert.equal(first.created, 1);
+  assert.equal(second.duplicates, 1);
+  assert.equal(first.job.idempotencyKey, "admin.daily_fulfillment_summary:2026-07-23");
+  const stored = collectionDocs(firestore, "notificationOutbox").get(first.job.idempotencyKey);
+  assert.equal(stored.summaryDate, "2026-07-23");
+  assert.match(stored.text, /Needs review: 1/);
 });
 
 test("missing injected clients fail before any SDK or network setup is attempted", () => {

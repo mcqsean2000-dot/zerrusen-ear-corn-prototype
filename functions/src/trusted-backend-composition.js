@@ -10,6 +10,9 @@ const {
 const {
   createNotificationOutbox,
 } = require("./notification-outbox");
+const {
+  createDailyFulfillmentOutbox,
+} = require("./daily-fulfillment-outbox");
 
 function isFunction(value) {
   return typeof value === "function";
@@ -64,11 +67,16 @@ function createTrustedBackendComposition(options = {}) {
   const notificationOutbox = createNotificationOutbox({
     enqueueNotificationJobs: firestoreAdapter.enqueueNotificationJobs,
   });
+  const dailyFulfillmentOutbox = createDailyFulfillmentOutbox({
+    enqueueNotificationJobs: firestoreAdapter.enqueueNotificationJobs,
+    listPaidFulfillmentOrders: firestoreAdapter.listPaidFulfillmentOrders,
+  });
 
   return {
     serverTimestamp,
     verifyStripeWebhookEvent: stripeAdapter.verifyStripeWebhookEvent,
     queuePaidOrderNotifications: notificationOutbox.queuePaidOrderNotifications,
+    queueDailyFulfillmentSummary: dailyFulfillmentOutbox.queueDailyFulfillmentSummary,
     notificationDeliveryPersistence: {
       claimNotificationJob: firestoreAdapter.claimNotificationJob,
       recordNotificationFailure: firestoreAdapter.recordNotificationFailure,

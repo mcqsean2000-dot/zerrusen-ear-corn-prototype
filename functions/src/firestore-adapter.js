@@ -14,6 +14,7 @@ const NOTIFICATION_JOB_FIELDS = Object.freeze([
   "recipientCategory",
   "status",
   "subject",
+  "summaryDate",
   "text",
   "to",
 ]);
@@ -39,6 +40,12 @@ function cleanName(value, fallback) {
 
 function cleanText(value) {
   return String(value || "").trim();
+}
+
+function isCalendarDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
 function withoutUndefinedFields(value) {
@@ -88,8 +95,17 @@ function trustedNotificationJob(job) {
   const subject = cleanText(cleaned.subject);
   const text = cleanText(cleaned.text);
   const to = cleanText(cleaned.to).toLowerCase();
+  const summaryDate = cleanText(cleaned.summaryDate);
+  const isDailySummary = cleaned.eventName === "admin.daily_fulfillment_summary";
   const expectedRecipient = cleaned.eventName === "customer.order_confirmation" ? "customer" : "admin";
-  const expectedIdempotencyKey = `${cleaned.eventName}:${orderRequestId}:${paidEventId}`;
+  const expectedIdempotencyKey = isDailySummary
+    ? `${cleaned.eventName}:${summaryDate}`
+    : `${cleaned.eventName}:${orderRequestId}:${paidEventId}`;
+  const validEventFields = isDailySummary
+    ? isCalendarDate(summaryDate) && !orderRequestId && !paidEventId
+    : /^[A-Za-z0-9_-]{1,160}$/.test(orderRequestId) &&
+      /^[A-Za-z0-9_-]{1,160}$/.test(paidEventId) &&
+      !summaryDate;
 
   if (unexpectedFields.length) {
     const error = new Error("Notification outbox job includes unsupported fields.");
@@ -102,11 +118,10 @@ function trustedNotificationJob(job) {
     !idempotencyKey ||
     idempotencyKey.length > 500 ||
     idempotencyKey.includes("/") ||
-    !["customer.order_confirmation", "admin.paid_order_created"].includes(cleaned.eventName) ||
+    !["customer.order_confirmation", "admin.paid_order_created", "admin.daily_fulfillment_summary"].includes(cleaned.eventName) ||
     cleaned.recipientCategory !== expectedRecipient ||
     cleaned.status !== "pending" ||
-    !/^[A-Za-z0-9_-]{1,160}$/.test(orderRequestId) ||
-    !/^[A-Za-z0-9_-]{1,160}$/.test(paidEventId) ||
+    !validEventFields ||
     idempotencyKey !== expectedIdempotencyKey ||
     to.length > 254 ||
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to) ||
@@ -123,8 +138,8 @@ function trustedNotificationJob(job) {
   return {
     ...cleaned,
     idempotencyKey,
-    orderRequestId,
-    paidEventId,
+    ...(!isDailySummary ? { orderRequestId, paidEventId } : {}),
+    ...(summaryDate ? { summaryDate } : {}),
     subject,
     text,
     to,
@@ -330,6 +345,35 @@ async function queryFirstByField(collection, field, value) {
   }
 
   return normalizeSnapshot(firstQuerySnapshot(await limitedQuery.get()));
+}
+
+async function queryByFields(collection, filters, limit) {
+  if (!isFunction(collection.where) || !Array.isArray(filters) || !filters.length) {
+    const error = new Error("Firestore-like collection reference must provide where(field, op, value).");
+    error.code = "firestore_query_missing";
+    throw error;
+  }
+
+  let query = collection;
+  for (const [field, value] of filters) {
+    if (!query || !isFunction(query.where)) {
+      const error = new Error("Firestore-like compound query must provide where(field, op, value).");
+      error.code = "firestore_query_missing";
+      throw error;
+    }
+    query = query.where(field, "==", value);
+  }
+  const limitedQuery = query && isFunction(query.limit) ? query.limit(limit) : query;
+  if (!limitedQuery || !isFunction(limitedQuery.get)) {
+    const error = new Error("Firestore-like query must provide get().");
+    error.code = "firestore_query_get_missing";
+    throw error;
+  }
+
+  const snapshot = await limitedQuery.get();
+  return Array.isArray(snapshot && snapshot.docs)
+    ? snapshot.docs.map(normalizeSnapshot).filter(Boolean)
+    : [];
 }
 
 async function findByDocumentId(collection, id) {
@@ -592,6 +636,32 @@ function createFirestoreAdapter(options = {}) {
     return {
       id,
     };
+  }
+
+  async function listPaidFulfillmentOrders({ collection, limit = 500 } = {}) {
+    const resultLimit = Number(limit);
+    if (!Number.isInteger(resultLimit) || resultLimit < 1 || resultLimit > 500) {
+      const error = new Error("Paid fulfillment query requires a limit from 1 to 500.");
+      error.code = "fulfillment_query_limit_invalid";
+      throw error;
+    }
+
+    const orders = collectionRef(firestore, orderCollectionName(options, collection));
+    const groups = await Promise.all(ADMIN_ORDER_STATUSES.map((status) => (
+      queryByFields(orders, [
+        ["paymentStatus", "paid"],
+        ["status", status],
+      ], resultLimit + 1)
+    )));
+    const paidOrders = groups.flat()
+      .map((order) => ({ ...order, id: cleanText(order.id || order.orderRequestId) }));
+
+    if (paidOrders.length > resultLimit) {
+      const error = new Error("Paid fulfillment query exceeded its bounded result limit.");
+      error.code = "fulfillment_query_result_limit_exceeded";
+      throw error;
+    }
+    return paidOrders;
   }
 
   async function completePaidOrderEvent({
@@ -862,6 +932,7 @@ function createFirestoreAdapter(options = {}) {
     enqueueNotificationJobs,
     findOrderByCheckoutSessionId,
     findOrderByPaymentIntentId,
+    listPaidFulfillmentOrders,
     markCheckoutSessionFailed,
     markStripeEventProcessed,
     prepareLabelPurchase: prepareAdminLabelPurchase,
