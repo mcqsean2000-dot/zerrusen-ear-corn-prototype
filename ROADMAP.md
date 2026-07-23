@@ -216,8 +216,9 @@ Build order:
 8. Build admin fulfillment dashboard.
    - Static admin planning shell now exists at `admin.html`.
    - Backend admin label/status routes now require Firebase Auth admin custom-claim verification.
-   - Disabled-by-default admin sign-in controls, Firestore read bridge, guarded status controls, label controls, and safe action feedback are scaffolded.
-   - Next step is production Firebase web config, Firebase Auth users, `admin: true` custom claims, emulator rule verification, and a reviewed live admin enablement plan.
+   - The storefront footer links to the Firebase-hosted admin page, with Google and email/password sign-in controls.
+   - The admin bridge uses Firebase Hosting public auto config and hides fulfillment data until a refreshed ID token contains `admin: true`.
+   - Next step is enabling the Google provider, authorizing `theosfarm.com`, creating the approved admin account, granting its custom claim, and verifying rules and sign-in in a Firebase preview.
 9. Add Shippo label purchase and tracking updates in admin.
 10. Add email notifications.
 11. Deploy the public storefront to Firebase Hosting.

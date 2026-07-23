@@ -1,6 +1,6 @@
 # Admin Fulfillment Foundation
 
-This document tracks the static admin planning shell and the disabled authenticated-admin readiness scaffold. The current repo does not deploy the admin shell, create Firebase Auth users, grant admin claims, change order data, or collect payment details.
+This document tracks the authenticated admin shell and its fulfillment boundary. The repo publishes the admin route through Firebase Hosting, but it does not create Firebase Auth users, grant admin claims, change production order data, or collect payment details.
 
 ## Static Admin Shell
 
@@ -23,16 +23,16 @@ The shell uses sample order requests to model the first admin workflows:
 
 The static admin shell now loads:
 
-- `admin-config.js`, which keeps Firebase live mode disabled with blank public config by default.
-- `admin-live.js`, which prepares Firebase Auth ID-token headers, Firestore `orderRequests` read specs, and guarded admin endpoint calls for the future authenticated dashboard.
+- `admin-config.js`, which enables Firebase Hosting public auto config without committing project secrets.
+- `admin-live.js`, which supports Google popup sign-in, email/password fallback, refreshed custom-claim checks, Firebase Auth ID-token headers, Firestore `orderRequests` reads, and guarded admin endpoint calls.
 
-The static admin page includes disabled Firebase email/password sign-in fields and a sign-out control. `admin-live.js` enables those controls only after live Firebase public config is intentionally provided. Sign-in failure messages are generic, and passwords are cleared after a successful Firebase Auth sign-in call.
+The admin page includes Google sign-in, email/password fallback, and a sign-out control. On Firebase Hosting, `admin-live.js` loads the public app config from `/__/firebase/init.json`. Fulfillment content remains hidden until a refreshed ID token contains `admin: true`. Sign-in failure messages are generic, and passwords are cleared after a successful Firebase Auth sign-in call.
 
 The admin UI now renders status transition controls and label purchase buttons as guarded controls. They remain disabled in sample mode and become clickable only after `admin-live.js` passes a signed-in Firebase admin action bridge to the renderer. Browser code still calls only the trusted admin endpoints with Firebase ID-token headers; it does not hold Shippo, Stripe, or Firebase Admin secrets. Guarded actions write only safe progress, success, or retry-oriented failure feedback into the admin page.
 
-Keep `TheosAdminConfig.enabled` set to `false` until the production Firebase project ID, public web app config, Sean/Calvin Firebase Auth users, and `admin: true` custom claims are configured. The live bridge must derive admin identity from Firebase ID tokens; it must not send `body.admin`.
+Google identity alone does not grant admin access. A trusted Firebase Admin SDK process must grant `admin: true`, and the live bridge must derive admin identity from the resulting ID token; it must not send `body.admin` or grant claims from browser code.
 
-For local admin testing only, copy `admin-config.local.example.js` to ignored `admin-config.local.js` and fill in the approved Firebase public web config. The committed `admin-config.js` remains disabled and blank, and the local override must not contain Stripe, Shippo, service-account, or webhook secrets.
+For local admin testing outside Firebase Hosting, copy `admin-config.local.example.js` to ignored `admin-config.local.js` and fill in the approved Firebase public web config. The local override must not contain Stripe, Shippo, service-account, or webhook secrets.
 
 ## Future Firestore Read Model
 
@@ -52,13 +52,13 @@ Later statuses can follow the roadmap: paid, needs shipping rate, shipped, deliv
 
 ## Security Boundary
 
-The static sample shell is not a secure admin surface by itself. It must not be published as a live admin dashboard until Firebase Auth sign-in, admin custom claims, and Firestore rules are verified in the selected production project.
+The public HTML route is not the security boundary. Firebase Auth sign-in, the `admin: true` custom claim, Firestore rules, and backend token verification must all be verified in the selected production project before live order data is used.
 
 See `docs/admin-auth-firestore-plan.md` for the proposed Firebase Auth custom-claim model, admin-editable fields, Firestore rule implications, and emulator test plan.
 
 Expected production boundary:
 
-1. Admin signs in through Firebase Auth or another selected provider.
+1. Admin signs in through the approved Google account or Firebase email/password fallback.
 2. Trusted backend/admin tooling grants an `admin: true` custom claim.
 3. Firestore rules allow admin reads and constrained updates only to authenticated admins.
 4. Stripe payment status and Stripe IDs are written by trusted backend/webhook code, not by public storefront JavaScript.
@@ -78,9 +78,9 @@ Current backend scaffold behavior:
 
 ## Non-Goals For This Slice
 
-- No live Firebase reads or writes
+- No unauthenticated Firebase reads or writes
 - No customer payment collection
 - No inventory mutation
 - No deploy
-- No live admin authentication configuration
+- No Firebase Console provider, user, domain, or custom-claim changes from this repo
 - No browser-side Shippo label purchase

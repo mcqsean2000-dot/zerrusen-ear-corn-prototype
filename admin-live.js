@@ -13,15 +13,42 @@
     return global.TheosAdminConfig || {};
   }
 
-  function configuredFirebase(config = adminConfig()) {
-    const firebase = config.firebase || {};
+  function completeFirebaseConfig(firebase) {
     return Boolean(
-      config.enabled === true &&
-        text(firebase.apiKey) &&
+      text(firebase.apiKey) &&
         text(firebase.appId) &&
         text(firebase.authDomain) &&
         text(firebase.projectId),
     );
+  }
+
+  function configuredFirebase(config = adminConfig()) {
+    const firebase = config.firebase || {};
+    return config.enabled === true && (firebase.autoConfig === true || completeFirebaseConfig(firebase));
+  }
+
+  async function resolveFirebaseConfig(config = adminConfig(), fetchImpl = fetch) {
+    const firebase = config.firebase || {};
+    if (completeFirebaseConfig(firebase)) {
+      return firebase;
+    }
+
+    if (config.enabled !== true || firebase.autoConfig !== true || typeof fetchImpl !== "function") {
+      throw new Error("Firebase admin configuration is unavailable.");
+    }
+
+    const response = await fetchImpl("/__/firebase/init.json", {
+      headers: { accept: "application/json" },
+    });
+    if (!response || !response.ok) {
+      throw new Error("Firebase Hosting configuration could not be loaded.");
+    }
+
+    const hostedConfig = await response.json();
+    if (!completeFirebaseConfig(hostedConfig || {})) {
+      throw new Error("Firebase Hosting returned an incomplete public configuration.");
+    }
+    return hostedConfig;
   }
 
   function endpointFor(name, config = adminConfig()) {
@@ -79,12 +106,17 @@
     return payload;
   }
 
-  function setAuthState(message, signedIn) {
+  function setAuthState(message, authorized, authenticated = authorized) {
     const status = document.querySelector("[data-admin-auth-status]");
     if (status) status.textContent = message;
-    document.documentElement.toggleAttribute("data-admin-signed-in", Boolean(signedIn));
+    document.documentElement.toggleAttribute("data-admin-signed-in", Boolean(authorized));
     const signOutButton = document.querySelector("[data-admin-sign-out]");
-    if (signOutButton) signOutButton.hidden = !signedIn;
+    if (signOutButton) signOutButton.hidden = !authenticated;
+    if (typeof document.querySelectorAll === "function") {
+      document.querySelectorAll("[data-admin-content]").forEach((element) => {
+        element.hidden = !authorized;
+      });
+    }
   }
 
   function setAuthHelp(message) {
@@ -126,6 +158,7 @@
       "[data-admin-sign-in-email]",
       "[data-admin-sign-in-password]",
       "[data-admin-sign-in-submit]",
+      "[data-admin-google-sign-in]",
     ].forEach((selector) => {
       const element = document.querySelector(selector);
       if (element) element.disabled = Boolean(disabled);
@@ -136,12 +169,41 @@
     const form = document.querySelector("[data-admin-sign-in-form]");
     const emailInput = document.querySelector("[data-admin-sign-in-email]");
     const passwordInput = document.querySelector("[data-admin-sign-in-password]");
+    const googleButton = document.querySelector("[data-admin-google-sign-in]");
     const signOutButton = document.querySelector("[data-admin-sign-out]");
 
     if (!form || !emailInput || !passwordInput) return;
 
     setSignInDisabled(false);
-    setAuthHelp("Sign in with a Firebase admin account to load live order requests.");
+    setAuthHelp("Sign in with Google or a Firebase admin account to load live order requests.");
+
+    if (googleButton) {
+      googleButton.addEventListener("click", async () => {
+        if (
+          typeof authModule.GoogleAuthProvider !== "function" ||
+          typeof authModule.signInWithPopup !== "function"
+        ) {
+          setAuthState("Google sign in unavailable", false);
+          return;
+        }
+
+        const provider = new authModule.GoogleAuthProvider();
+        if (typeof provider.setCustomParameters === "function") {
+          provider.setCustomParameters({ prompt: "select_account" });
+        }
+
+        setSignInDisabled(true);
+        setAuthState("Opening Google sign in...", false);
+        try {
+          await authModule.signInWithPopup(auth, provider);
+        } catch (error) {
+          setAuthState("Google sign in failed", false);
+        } finally {
+          setSignInDisabled(false);
+        }
+      });
+    }
+
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const email = text(emailInput.value);
@@ -186,8 +248,9 @@
       return { enabled: false };
     }
 
+    const firebaseConfig = await resolveFirebaseConfig(config, options.fetchImpl);
     const modules = await loadFirebase(options.importModule);
-    const app = modules.app.initializeApp(config.firebase);
+    const app = modules.app.initializeApp(firebaseConfig);
     const auth = modules.auth.getAuth(app);
     const db = modules.firestore.getFirestore(app);
     const spec = orderQuerySpec();
@@ -201,6 +264,14 @@
       }
 
       try {
+        if (typeof user.getIdTokenResult !== "function") {
+          throw new Error("Admin claim verification is unavailable.");
+        }
+        const tokenResult = await user.getIdTokenResult(true);
+        if (!tokenResult || !tokenResult.claims || tokenResult.claims.admin !== true) {
+          throw new Error("Authenticated account does not have admin access.");
+        }
+
         const queryRef = modules.firestore.query(
           modules.firestore.collection(db, spec.collectionName),
           modules.firestore.orderBy(spec.orderBy[0], spec.orderBy[1]),
@@ -215,7 +286,7 @@
         setAuthState("Signed in", true);
       } catch (error) {
         clearAdminActions();
-        setAuthState("Admin access denied", false);
+        setAuthState("Admin access denied", false, true);
       }
     });
 
@@ -235,6 +306,7 @@
     orderFromSnapshot,
     orderQuerySpec,
     postAdminJson,
+    resolveFirebaseConfig,
     setAdminActions,
   });
 

@@ -1,7 +1,8 @@
 (function exposeAdminConfig(global) {
   global.TheosAdminConfig = Object.freeze({
-    enabled: false,
+    enabled: true,
     firebase: Object.freeze({
+      autoConfig: true,
       apiKey: "",
       appId: "",
       authDomain: "",

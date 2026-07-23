@@ -80,6 +80,6 @@ Before production deploy, verify:
 - `git diff --check` passes.
 - `firebase emulators:start --only hosting` serves `index.html` and `admin.html`.
 - The storefront still routes payment to the planned Stripe Checkout handoff and does not collect card numbers, CVV, bank data, or raw payment details.
-- The static admin shell still uses sample data only and is not connected to live Firebase.
+- The hosted admin route loads Firebase public auto config and offers Google sign-in, but fulfillment content stays hidden unless the refreshed ID token carries `admin: true`.
 - Firestore public writes remain limited to validated `orderRequests` creation.
-- Admin reads and status updates remain reserved for a future authenticated admin build.
+- Admin reads and status updates remain protected by Firestore rules and backend Firebase ID-token verification.

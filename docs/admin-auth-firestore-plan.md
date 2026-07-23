@@ -220,7 +220,9 @@ Functional emulator checks should cover:
 For Sean and Calvin, without secrets:
 
 - Confirm the production Firebase project ID out of band.
-- Create Firebase Auth users for Sean and Calvin using their approved business emails.
+- Enable Google as a Firebase Authentication sign-in provider.
+- Add `theosfarm.com` and each intended Firebase Hosting preview/production hostname to Firebase Authentication authorized domains.
+- Sign in once with the approved Theo's Farm account, `theosfeedfarm@gmail.com`, so Firebase creates the user record.
 - Grant `admin: true` custom claims with a trusted Admin SDK script or console-safe backend task.
 - Ask each admin to sign out and back in after claims are granted.
 - Verify each admin can load the admin dashboard and read only admin-appropriate order fields.

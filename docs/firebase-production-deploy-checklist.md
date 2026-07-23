@@ -22,7 +22,7 @@ Do not use this checklist to rotate secrets, delete data, migrate order records,
 5. Confirm Google Pay, Apple Pay, and Link settings are managed in Stripe Checkout, not in storefront JavaScript.
 6. Confirm the trusted checkout endpoint and webhook are implemented, reviewed, and intentionally enabled before taking payments.
 7. Confirm Firestore public writes are still limited to validated `orderRequests` creation and trusted payment fields are backend-owned.
-8. Confirm the static admin shell is not connected to live Firebase unless authenticated admin access has been implemented.
+8. Confirm Google sign-in is enabled, the production domain is authorized, and only approved users carry the `admin: true` custom claim.
 
 ## Local Project Targeting
 
@@ -144,7 +144,7 @@ Immediately after deploy:
 5. In Stripe test mode, complete a test Checkout and verify the webhook updates the matching Firestore order only through trusted backend code.
 6. Verify Firestore rejects public reads, updates, deletes, and client-supplied Stripe fields.
 7. Verify Firestore indexes are building or ready for the intended order queue queries.
-8. Confirm the admin prototype is not exposing live order data unless authenticated admin access has shipped.
+8. Confirm the admin route hides order data for signed-out and non-admin users, while an approved claimed admin can load it.
 9. Check Firebase Functions logs for checkout/webhook errors without exposing secrets in shared notes.
 10. Check Stripe webhook delivery status and retry details.
 

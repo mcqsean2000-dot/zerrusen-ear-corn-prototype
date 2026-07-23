@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Theo's Farm Admin Prototype</title>
-    <meta name="description" content="Static fulfillment admin prototype for Theo's Farm order requests.">
+    <title>Theo's Farm Admin</title>
+    <meta name="description" content="Authenticated fulfillment administration for Theo's Farm.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -17,7 +17,7 @@
         <span class="brand-mark">TF</span>
         <span>
           <strong>Theo's Farm</strong>
-          <small>Admin prototype</small>
+          <small>Admin</small>
         </span>
       </a>
       <nav aria-label="Admin navigation">
@@ -29,9 +29,9 @@
 
     <main class="admin-main">
       <section class="admin-title" aria-labelledby="admin-title">
-        <p class="eyebrow">Fulfillment foundation</p>
+        <p class="eyebrow">Fulfillment</p>
         <h1 id="admin-title">Order requests, packing counts, and follow-up cues.</h1>
-        <p>This admin shell stays in sample mode until Firebase public config and admin custom-claim sign-in are enabled.</p>
+        <p>Sign in with the approved Theo's Farm Google account to access live fulfillment tools.</p>
       </section>
 
       <section class="admin-auth-panel" aria-label="Admin access" data-admin-auth-panel>
@@ -40,6 +40,7 @@
           <span data-admin-auth-help>Firebase admin sign-in is not configured for this static preview.</span>
         </div>
         <form class="admin-sign-in" data-admin-sign-in-form>
+          <button class="admin-google-sign-in" type="button" data-admin-google-sign-in disabled>Continue with Google</button>
           <label>
             Email
             <input type="email" autocomplete="username" data-admin-sign-in-email disabled>
@@ -54,9 +55,9 @@
       </section>
       <p class="admin-action-status" role="status" aria-live="polite" data-admin-action-status></p>
 
-      <section class="admin-metrics" aria-label="Fulfillment summary" data-admin-summary></section>
+      <section class="admin-metrics" aria-label="Fulfillment summary" data-admin-summary data-admin-content hidden></section>
 
-      <section class="admin-layout" id="orders" aria-labelledby="orders-title">
+      <section class="admin-layout" id="orders" aria-labelledby="orders-title" data-admin-content hidden>
         <div class="admin-panel">
           <div class="admin-panel-head">
             <div>

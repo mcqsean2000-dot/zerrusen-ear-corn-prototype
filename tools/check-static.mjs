@@ -95,11 +95,13 @@ assert(firebaseConfig.hosting?.ignore?.includes("**/.*"), "Firebase Hosting shou
 assert(firebaseConfig.hosting?.ignore?.includes("**/*.md"), "Firebase Hosting should not publish Markdown planning docs.");
 assert(firebaseConfig.hosting?.ignore?.includes("docs/**"), "Firebase Hosting should not publish planning docs.");
 assert(firebaseConfig.hosting?.ignore?.includes("functions/**"), "Firebase Hosting should not publish backend function source.");
-assert(firebaseConfig.hosting?.ignore?.includes("admin.html"), "Firebase Hosting should not publish the unauthenticated admin prototype.");
-assert(firebaseConfig.hosting?.ignore?.includes("admin-config.js"), "Firebase Hosting should not publish admin config before admin launch.");
+assert(!firebaseConfig.hosting?.ignore?.includes("admin.html"), "Firebase Hosting should publish the authenticated admin entry page.");
+assert(!firebaseConfig.hosting?.ignore?.includes("admin.css"), "Firebase Hosting should publish admin styles.");
+assert(!firebaseConfig.hosting?.ignore?.includes("admin-config.js"), "Firebase Hosting should publish the public admin config gate.");
 assert(firebaseConfig.hosting?.ignore?.includes("admin-config.local.example.js"), "Firebase Hosting should not publish local admin config examples.");
 assert(firebaseConfig.hosting?.ignore?.includes("admin-config.local.js"), "Firebase Hosting should not publish local admin config overrides.");
-assert(firebaseConfig.hosting?.ignore?.includes("admin-live.js"), "Firebase Hosting should not publish admin live bridge before admin launch.");
+assert(!firebaseConfig.hosting?.ignore?.includes("admin.js"), "Firebase Hosting should publish the admin renderer.");
+assert(!firebaseConfig.hosting?.ignore?.includes("admin-live.js"), "Firebase Hosting should publish the authenticated admin bridge.");
 assert(firebaseConfig.hosting?.ignore?.includes("**/*.zip"), "Firebase Hosting should not publish local ZIP artifacts.");
 assert(firebaseConfig.hosting?.ignore?.includes("dist/**"), "Firebase Hosting should not publish generated package artifacts.");
 assert(firebaseConfig.firestore?.rules === "firestore.rules", "Firebase config must point at firestore.rules.");
@@ -123,8 +125,8 @@ assert(serveStaticScript.includes("createServer"), "Local preview tool must serv
 assert(serveStaticScript.includes("allowedRoots"), "Local preview tool must constrain preview roots.");
 assert(serveStaticScript.includes("cache-control"), "Local preview tool must prevent stale local browser caching.");
 assert(serveStaticScript.includes("index.html"), "Local preview tool must serve index.html for the static storefront.");
-assert(roadmap.includes("Disabled-by-default admin sign-in controls"), "Roadmap must reflect merged admin sign-in/control scaffolding.");
-assert(roadmap.includes("production Firebase web config"), "Roadmap must keep live admin Firebase setup as a remaining gate.");
+assert(roadmap.includes("Google and email/password sign-in controls"), "Roadmap must reflect the hosted admin sign-in controls.");
+assert(roadmap.includes("granting its custom claim"), "Roadmap must keep the trusted admin claim setup as a remaining gate.");
 assert(hostingReadiness.includes("firebase emulators:start --only hosting"), "Hosting readiness doc must include local Firebase preview.");
 assert(hostingReadiness.includes("firebase hosting:channel:deploy preview"), "Hosting readiness doc must include preview channel deploy.");
 assert(hostingReadiness.includes("firebase deploy --only hosting"), "Hosting readiness doc must include hosting deploy command.");
@@ -248,6 +250,8 @@ assert(storefront.includes('"@type": "Organization"'), "Structured data must des
 assert(storefront.includes('"@type": "Product"'), "Structured data must describe the two ear corn products.");
 assert(storefront.includes('"sku": "ear-corn-20lb"'), "Structured data must include the 20 lb SKU.");
 assert(storefront.includes('"sku": "ear-corn-40lb"'), "Structured data must include the 40 lb SKU.");
+assert(storefront.includes('class="footer-admin-link"'), "Storefront footer must include the admin sign-in entry point.");
+assert(storefront.includes('href="admin.html"'), "Storefront admin entry point must link to the hosted admin page.");
 assert(robots.includes("Sitemap: https://theosfarm.com/sitemap.xml"), "robots.txt must point crawlers at the production sitemap.");
 assert(sitemap.includes("<loc>https://theosfarm.com/</loc>"), "sitemap.xml must list the production storefront URL.");
 assert(storefront.includes("data-order-form"), "Storefront purchase request form is missing.");
@@ -304,12 +308,15 @@ assert(admin.indexOf("admin.js") < admin.indexOf("admin-live.js"), "Admin sample
 assert(admin.includes("data-admin-auth-status"), "Admin shell must render auth state.");
 assert(admin.includes("data-admin-auth-help"), "Admin shell must render live admin sign-in helper copy.");
 assert(admin.includes("data-admin-action-status"), "Admin shell must render guarded action feedback.");
-assert(admin.includes("data-admin-sign-in-form"), "Admin shell must render a disabled Firebase admin sign-in form.");
+assert(admin.includes("data-admin-sign-in-form"), "Admin shell must render a Firebase admin sign-in form.");
+assert(admin.includes("data-admin-google-sign-in"), "Admin shell must render a Google sign-in control.");
 assert(admin.includes("data-admin-sign-in-email"), "Admin shell must render the admin sign-in email field.");
 assert(admin.includes("data-admin-sign-in-password"), "Admin shell must render the admin sign-in password field.");
 assert(admin.includes("data-admin-sign-out"), "Admin shell must render a sign-out control for configured live mode.");
+assert(admin.includes("data-admin-content hidden"), "Admin shell must hide fulfillment content before admin authorization.");
 assert(adminConfigScript.includes("TheosAdminConfig"), "Admin config must expose the public admin config object.");
-assert(adminConfigScript.includes("enabled: false"), "Admin live mode must stay disabled until Firebase config is intentionally filled.");
+assert(adminConfigScript.includes("enabled: true"), "Admin live mode must be enabled for the Firebase-hosted admin route.");
+assert(adminConfigScript.includes("autoConfig: true"), "Admin live mode must use Firebase Hosting public auto config.");
 assert(adminConfigScript.includes("apiKey: \"\""), "Admin config must keep Firebase API key blank by default.");
 assert(adminConfigScript.includes("projectId: \"\""), "Admin config must keep Firebase project ID blank by default.");
 assert(adminConfigScript.includes("/api/admin/order-status"), "Admin config must point status actions at the trusted backend endpoint.");
@@ -337,11 +344,17 @@ assert(adminScript.includes("data-status-action"), "Admin shell must render guar
 assert(!adminScript.includes("fetch("), "Admin shell must not call live backend endpoints before authenticated admin wiring exists.");
 assert(!adminScript.toLowerCase().includes("firebase"), "Admin shell must not connect to Firebase yet.");
 assert(adminLiveScript.includes("configuredFirebase"), "Admin live bridge must gate Firebase initialization behind config.");
+assert(adminLiveScript.includes("resolveFirebaseConfig"), "Admin live bridge must resolve Firebase Hosting public config.");
+assert(adminLiveScript.includes("/__/firebase/init.json"), "Admin live bridge must use Firebase Hosting auto configuration.");
 assert(adminLiveScript.includes("getIdToken"), "Admin live bridge must use Firebase ID tokens for admin endpoint calls.");
+assert(adminLiveScript.includes("getIdTokenResult"), "Admin live bridge must inspect authenticated token claims.");
+assert(adminLiveScript.includes("claims.admin !== true"), "Admin live bridge must fail closed without the admin custom claim.");
+assert(adminLiveScript.includes("GoogleAuthProvider"), "Admin live bridge must configure the Firebase Google provider.");
+assert(adminLiveScript.includes("signInWithPopup"), "Admin live bridge must use Firebase Auth Google popup sign-in.");
 assert(adminLiveScript.includes("signInWithEmailAndPassword"), "Admin live bridge must use Firebase Auth email/password sign-in when configured.");
 assert(adminLiveScript.includes("signOut"), "Admin live bridge must wire Firebase Auth sign-out when configured.");
 assert(adminLiveScript.includes("setSignInDisabled(true)"), "Admin live bridge must keep sign-in controls disabled when Firebase is not configured.");
-assert(adminLiveScript.includes("Sign in with a Firebase admin account"), "Admin live bridge must update helper copy when sign-in is configured.");
+assert(adminLiveScript.includes("Sign in with Google or a Firebase admin account"), "Admin live bridge must update helper copy when sign-in is configured.");
 assert(adminLiveScript.includes("authorization"), "Admin live bridge must send Authorization headers to admin endpoints.");
 assert(adminLiveScript.includes("orderRequests"), "Admin live bridge must read the orderRequests collection after sign-in.");
 assert(adminLiveScript.includes("setOrders"), "Admin live bridge must hand authenticated reads to the existing renderer.");
@@ -635,6 +648,7 @@ function flushAdminActions() {
   const signInEmail = createAdminFakeElement("signInEmail", "admin@example.com");
   const signInPassword = createAdminFakeElement("signInPassword", "password123");
   const signInSubmit = createAdminFakeElement("signInSubmit");
+  const googleSignInButton = createAdminFakeElement("googleSignInButton");
   const signOutButton = createAdminFakeElement("signOutButton");
   const documentElement = {
     attributes: new Set(),
@@ -653,6 +667,9 @@ function flushAdminActions() {
     readyState: "loading",
     documentElement,
     addEventListener() {},
+    querySelectorAll() {
+      return [];
+    },
     querySelector(selector) {
       return {
         "[data-admin-auth-status]": authStatus,
@@ -661,6 +678,7 @@ function flushAdminActions() {
         "[data-admin-sign-in-email]": signInEmail,
         "[data-admin-sign-in-password]": signInPassword,
         "[data-admin-sign-in-submit]": signInSubmit,
+        "[data-admin-google-sign-in]": googleSignInButton,
         "[data-admin-sign-out]": signOutButton,
       }[selector] || null;
     },
@@ -669,6 +687,8 @@ function flushAdminActions() {
   let liveOrders = null;
   let signInEmailValue = "";
   let signInPasswordValue = "";
+  let googleSignInCalled = false;
+  let googleProviderParameters = null;
   let signOutCalled = false;
   let signOutShouldReject = false;
   const sandbox = {
@@ -701,6 +721,26 @@ function flushAdminActions() {
   };
 
   new Script(adminLiveScript, { filename: "admin-live.js" }).runInContext(createContext(sandbox));
+  let autoConfigRequest = null;
+  const autoConfig = await sandbox.window.TheosAdminLive.resolveFirebaseConfig(
+    { enabled: true, firebase: { autoConfig: true } },
+    async (url) => {
+      autoConfigRequest = url;
+      return {
+        ok: true,
+        async json() {
+          return {
+            apiKey: "hosted-public-api-key",
+            appId: "hosted-public-app-id",
+            authDomain: "theos-project.firebaseapp.com",
+            projectId: "theos-project",
+          };
+        },
+      };
+    },
+  );
+  assert(autoConfigRequest === "/__/firebase/init.json", "Admin live mode should request Firebase Hosting auto config.");
+  assert(autoConfig.projectId === "theos-project", "Admin live mode should accept complete Firebase Hosting auto config.");
   await sandbox.window.TheosAdminLive.initializeAdminLive({
     importModule(specifier) {
       if (specifier.includes("firebase-app")) {
@@ -711,7 +751,13 @@ function flushAdminActions() {
         });
       }
       if (specifier.includes("firebase-auth")) {
+        class GoogleAuthProvider {
+          setCustomParameters(parameters) {
+            googleProviderParameters = parameters;
+          }
+        }
         return Promise.resolve({
+          GoogleAuthProvider,
           getAuth() {
             return {};
           },
@@ -721,6 +767,10 @@ function flushAdminActions() {
           signInWithEmailAndPassword(auth, email, password) {
             signInEmailValue = email;
             signInPasswordValue = password;
+            return Promise.resolve({});
+          },
+          signInWithPopup() {
+            googleSignInCalled = true;
             return Promise.resolve({});
           },
           signOut() {
@@ -755,7 +805,12 @@ function flushAdminActions() {
     },
   });
   assert(signInSubmit.disabled === false, "Configured admin live mode should enable the sign-in submit button.");
+  assert(googleSignInButton.disabled === false, "Configured admin live mode should enable Google sign in.");
   assert(authHelp.textContent.includes("Firebase admin account"), "Configured admin live mode should update sign-in helper copy.");
+  googleSignInButton.listeners.click[0]();
+  await flushAdminActions();
+  assert(googleSignInCalled, "Admin live Google control should open Firebase Auth popup sign-in.");
+  assert(googleProviderParameters?.prompt === "select_account", "Admin Google sign-in should allow choosing the approved account.");
   signInForm.listeners.submit[0]({
     preventDefault() {},
   });
@@ -764,6 +819,10 @@ function flushAdminActions() {
   assert(signInPasswordValue === "password123", "Admin live sign-in should pass the password to Firebase Auth.");
   assert(signInPassword.value === "", "Admin live sign-in should clear the password after a successful sign-in call.");
   await authCallback({
+    getIdTokenResult(forceRefresh) {
+      assert(forceRefresh === true, "Admin claim verification should refresh the Firebase ID token.");
+      return Promise.resolve({ claims: { admin: true } });
+    },
     getIdToken() {
       return Promise.resolve("not-admin-token");
     },
@@ -771,6 +830,7 @@ function flushAdminActions() {
 
   assert(authStatus.textContent === "Admin access denied", "Admin live bridge should fail closed when Firestore admin reads are denied.");
   assert(!documentElement.hasAttribute("data-admin-signed-in"), "Admin live bridge must not leave the page marked signed in after denied reads.");
+  assert(signOutButton.hidden === false, "Denied authenticated users must be able to sign out and switch accounts.");
   assert(liveOrders === null, "Denied admin reads must not replace sample orders.");
   signOutShouldReject = true;
   signOutButton.listeners.click[0]();

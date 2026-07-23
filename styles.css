@@ -853,6 +853,18 @@ footer strong {
   color: #fff;
 }
 
+.footer-admin-link {
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.86rem;
+  font-weight: 800;
+  text-underline-offset: 3px;
+}
+
+.footer-admin-link:hover,
+.footer-admin-link:focus-visible {
+  color: #fff;
+}
+
 @media (max-width: 860px) {
   .site-header {
     grid-template-columns: 1fr auto;
