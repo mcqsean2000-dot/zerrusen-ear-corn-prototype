@@ -171,6 +171,8 @@ Notification delivery persistence uses separate Firestore transactions to claim 
 
 The Firebase runtime now exports a second-generation `notificationOutbox/{notificationId}` creation trigger. It binds `RESEND_API_KEY` through Firebase Secret Manager, requires `NOTIFICATION_DELIVERY_ENABLED=true` plus an approved sender address before calling Resend, and requests Firebase retries only when the trusted worker records `retry_pending`. The trigger has not been deployed or enabled by repository work.
 
+A separately gated ten-minute reconciliation schedule recovers jobs created before delivery was enabled. Each run requests at most 20 document IDs, interleaves `pending` and `retry_pending` results to avoid starvation, and sends each ID through the same transactional claim boundary. Set `NOTIFICATION_RECONCILIATION_ENABLED=true` only after delivery configuration has passed production verification.
+
 ## Admin Shipping Label Handler
 
 `adminShippingLabelsHandler` expects authenticated admin tooling to send:

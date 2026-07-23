@@ -664,6 +664,31 @@ function createFirestoreAdapter(options = {}) {
     return paidOrders;
   }
 
+  async function listPendingNotificationJobs({ collection, limit = 20 } = {}) {
+    const resultLimit = Number(limit);
+    if (!Number.isInteger(resultLimit) || resultLimit < 1 || resultLimit > 50) {
+      const error = new Error("Notification reconciliation query requires a limit from 1 to 50.");
+      error.code = "notification_reconciliation_limit_invalid";
+      throw error;
+    }
+
+    const outbox = collectionRef(firestore, notificationOutboxCollectionName(options, collection));
+    const groups = await Promise.all(["pending", "retry_pending"].map((status) => (
+      queryByFields(outbox, [["status", status]], resultLimit)
+    )));
+    const ids = [];
+    const longestGroup = Math.max(...groups.map((group) => group.length));
+    for (let index = 0; index < longestGroup && ids.length < resultLimit; index += 1) {
+      for (const group of groups) {
+        const id = cleanText(group[index] && group[index].id);
+        if (id && !ids.includes(id)) ids.push(id);
+        if (ids.length >= resultLimit) break;
+      }
+    }
+
+    return ids;
+  }
+
   async function completePaidOrderEvent({
     collection,
     eventId,
@@ -933,6 +958,7 @@ function createFirestoreAdapter(options = {}) {
     findOrderByCheckoutSessionId,
     findOrderByPaymentIntentId,
     listPaidFulfillmentOrders,
+    listPendingNotificationJobs,
     markCheckoutSessionFailed,
     markStripeEventProcessed,
     prepareLabelPurchase: prepareAdminLabelPurchase,

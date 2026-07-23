@@ -30,6 +30,9 @@ const {
   createNotificationDeliveryRuntime,
 } = require("./notification-delivery-runtime");
 const {
+  createNotificationReconciler,
+} = require("./notification-reconciliation");
+const {
   createTrustedBackendComposition,
 } = require("./trusted-backend-composition");
 
@@ -85,6 +88,13 @@ function notificationDeliveryEnv() {
     NOTIFICATION_FROM_EMAIL: process.env.NOTIFICATION_FROM_EMAIL,
     NOTIFICATION_REPLY_TO: process.env.NOTIFICATION_REPLY_TO,
     RESEND_API_KEY: resendApiKey.value(),
+  };
+}
+
+function notificationReconciliationEnv() {
+  return {
+    ...notificationDeliveryEnv(),
+    NOTIFICATION_RECONCILIATION_ENABLED: process.env.NOTIFICATION_RECONCILIATION_ENABLED,
   };
 }
 
@@ -192,6 +202,39 @@ const notificationOutboxDelivery = onDocumentCreated({
   console.info("notification_outbox_delivery", result);
 });
 
+const notificationOutboxReconciliation = onSchedule({
+  region: "us-central1",
+  schedule: "*/10 * * * *",
+  retryCount: 1,
+  maxRetrySeconds: 600,
+  secrets: [resendApiKey],
+}, async () => {
+  const app = firebaseApp();
+  const firestoreAdapter = createFirestoreAdapter({
+    firestore: getFirestore(app),
+    serverTimestamp,
+  });
+  const env = notificationReconciliationEnv();
+  const runtime = createNotificationDeliveryRuntime({
+    env,
+    fetchImpl: globalThis.fetch,
+    persistence: {
+      claimNotificationJob: firestoreAdapter.claimNotificationJob,
+      recordNotificationFailure: firestoreAdapter.recordNotificationFailure,
+      recordNotificationSuccess: firestoreAdapter.recordNotificationSuccess,
+    },
+  });
+  const reconciler = createNotificationReconciler({
+    env,
+    listPendingNotificationJobs: firestoreAdapter.listPendingNotificationJobs,
+    runtime,
+  });
+  const result = reconciler.enabled
+    ? await reconciler.run()
+    : { action: "disabled", missingConfiguration: reconciler.missingConfiguration };
+  console.info("notification_outbox_reconciliation", result);
+});
+
 module.exports = {
   api,
   dailyFulfillmentSummary,
@@ -199,6 +242,8 @@ module.exports = {
   firebaseApp,
   notificationDeliveryEnv,
   notificationOutboxDelivery,
+  notificationOutboxReconciliation,
+  notificationReconciliationEnv,
   runtimeEnv,
   runtimeOptions,
   serverTimestamp,

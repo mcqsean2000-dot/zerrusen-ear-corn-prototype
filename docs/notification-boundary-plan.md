@@ -23,6 +23,7 @@ Implemented:
 - `functions/src/notification-delivery-runtime.js` composes Resend with trusted persistence only when `NOTIFICATION_DELIVERY_ENABLED=true`, the sender and secret are injected, and every dependency is present.
 - `functions/src/firebase-notification-delivery-handler.js` validates trusted Firestore creation events, keeps disabled runs inert, and converts retryable delivery outcomes into sanitized Firebase retry requests.
 - `functions/src/firebase-runtime.js` exports a second-generation `notificationOutbox/{notificationId}` creation trigger with Firebase retries and function-scoped `RESEND_API_KEY` Secret Manager access. It remains disabled by environment configuration and has not been deployed by this work.
+- `functions/src/notification-reconciliation.js` and the Firebase runtime provide a separate, bounded ten-minute recovery schedule for pending/retryable jobs that predate enablement. It requires both delivery and reconciliation flags, and has not been deployed or enabled.
 - `functions/src/daily-fulfillment-summary.js` builds a deterministic admin summary from a bounded list of paid orders in the three supported fulfillment states, including supported bag totals and a capped needs-review list.
 - `functions/src/daily-fulfillment-outbox.js` obtains that bounded list through trusted Firestore composition and persists one deterministic daily outbox job. Repeated runs for the same date are duplicates rather than additional jobs.
 - `functions/src/daily-fulfillment-scheduler.js` derives the summary date in `America/Chicago` from a trusted clock and invokes the daily enqueue path only when `DAILY_FULFILLMENT_SUMMARY_ENABLED=true` and all configuration is valid.
@@ -34,6 +35,7 @@ Not yet implemented:
 
 - Resend account credentials, verified sender-domain configuration, production review, deployment, explicit enablement, or live sends.
 - Production review, deployment, and explicit enablement of the scheduled summary and notification delivery triggers.
+- Production review of the reconciliation interval and explicit enablement only after live delivery verification.
 
 Firestore rules currently deny public reads and writes to `notificationOutbox`; only trusted backend Admin SDK code can use this boundary.
 

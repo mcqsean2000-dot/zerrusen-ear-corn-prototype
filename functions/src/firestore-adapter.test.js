@@ -796,6 +796,26 @@ test("lists a bounded paid fulfillment queue across supported statuses", async (
   );
 });
 
+test("lists only bounded pending and retryable notification job IDs", async () => {
+  const firestore = new MemoryFirestore();
+  const jobs = collectionDocs(firestore, "notificationOutbox");
+  jobs.set("pending-job", { status: "pending" });
+  jobs.set("pending-job-2", { status: "pending" });
+  jobs.set("pending-job-3", { status: "pending" });
+  jobs.set("retry-job", { status: "retry_pending" });
+  jobs.set("sent-job", { status: "sent" });
+  const adapter = createFirestoreAdapter({ firestore, serverTimestamp: "SERVER_TIMESTAMP" });
+
+  assert.deepEqual(
+    (await adapter.listPendingNotificationJobs({ limit: 2 })).sort(),
+    ["pending-job", "retry-job"],
+  );
+  await assert.rejects(
+    () => adapter.listPendingNotificationJobs({ limit: 0 }),
+    (error) => error.code === "notification_reconciliation_limit_invalid",
+  );
+});
+
 test("claims one notification attempt and rejects concurrent claims", async () => {
   const firestore = new MemoryFirestore();
   const adapter = createFirestoreAdapter({

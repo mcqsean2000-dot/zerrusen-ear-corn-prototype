@@ -94,6 +94,7 @@ Natural search phrases to keep in mind:
 - `functions/src/notification-delivery.js` - provider-neutral claimed-job delivery and bounded retry worker
 - `functions/src/resend-email-adapter.js` - secret-injected Resend HTTP adapter with provider idempotency and sanitized failures
 - `functions/src/notification-delivery-runtime.js` - explicit opt-in composition gate for Resend and trusted Firestore delivery persistence
+- `functions/src/notification-reconciliation.js` - bounded recovery dispatcher for pending and retryable outbox jobs
 - `firebase.json` - Firebase Hosting config and Firestore deploy targets for the chosen production path
 - `.firebaserc.example` - safe Firebase project alias template for local setup
 - `firestore.rules` - initial Firestore rules for prototype order requests
@@ -117,7 +118,7 @@ Natural search phrases to keep in mind:
 
 - Current prices are placeholders and should be confirmed before launch.
 - Current cart is connected to live Shippo shipping-rate lookup, but not yet connected to payment processing, inventory, order persistence, live email sends, or label purchase.
-- Completed Stripe Checkout events atomically mark the order paid, create deterministic customer/admin Firestore outbox jobs, and mark the Stripe event processed. Trusted composition can also query the bounded paid fulfillment queue and enqueue one idempotent daily summary. The Firebase runtime exports an 8:00 AM Central schedule and an outbox-created delivery trigger, but both remain inert unless their explicit enable flags and required server-side configuration are present. This work does not deploy or enable either function.
+- Completed Stripe Checkout events atomically mark the order paid, create deterministic customer/admin Firestore outbox jobs, and mark the Stripe event processed. Trusted composition can also query the bounded paid fulfillment queue and enqueue one idempotent daily summary. The Firebase runtime exports an 8:00 AM Central summary schedule, an outbox-created delivery trigger, and a bounded ten-minute reconciliation schedule. All remain inert unless their explicit enable flags and required server-side configuration are present. This work does not deploy or enable them.
 - The Firebase-hosted admin shell supports Google sign-in plus an email/password fallback. Fulfillment content and actions remain hidden until Firebase Auth returns an `admin: true` custom claim; signing in with an ordinary Google account does not grant access.
 - Production admin config is loaded from Firebase Hosting's public `/__/firebase/init.json` endpoint. Enable the Google provider, authorize the production domain, create the approved admin account, and grant its custom claim before launch.
 - For local admin testing only, copy `admin-config.local.example.js` to ignored `admin-config.local.js` and fill in approved Firebase public web config after Auth users and admin claims are ready. Do not commit the local override.
