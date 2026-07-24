@@ -1,6 +1,7 @@
 "use strict";
 
 const DEFAULT_RECONCILIATION_LIMIT = 20;
+const PROCESSING_LEASE_MS = 15 * 60 * 1000;
 
 function safeJobId(value) {
   const id = String(value || "").trim();
@@ -25,6 +26,9 @@ function getMissingNotificationReconciliationConfiguration(options = {}) {
   if (typeof options.listPendingNotificationJobs !== "function") {
     missing.push("listPendingNotificationJobs");
   }
+  if (typeof options.recoverStaleNotificationJobs !== "function") {
+    missing.push("recoverStaleNotificationJobs");
+  }
   return [...new Set(missing)];
 }
 
@@ -38,6 +42,30 @@ function createNotificationReconciler(options = {}) {
   return {
     enabled: true,
     async run() {
+      const currentTime = options.now ? options.now() : new Date();
+      const currentTimeMillis = currentTime instanceof Date ? currentTime.getTime() : Number.NaN;
+      if (!Number.isFinite(currentTimeMillis)) {
+        const error = new Error("Notification reconciliation requires a trusted clock.");
+        error.code = "notification_reconciliation_clock_invalid";
+        throw error;
+      }
+      const leaseResult = await options.recoverStaleNotificationJobs({
+        limit,
+        staleBefore: new Date(currentTimeMillis - PROCESSING_LEASE_MS),
+      });
+      if (
+        !leaseResult ||
+        !Number.isInteger(leaseResult.failed) ||
+        !Number.isInteger(leaseResult.recovered) ||
+        leaseResult.failed < 0 ||
+        leaseResult.recovered < 0 ||
+        leaseResult.failed + leaseResult.recovered > limit
+      ) {
+        const error = new Error("Notification lease recovery returned an invalid result.");
+        error.code = "notification_lease_result_invalid";
+        throw error;
+      }
+
       const rawIds = await options.listPendingNotificationJobs({ limit });
       if (!Array.isArray(rawIds) || rawIds.length > limit) {
         const error = new Error("Notification reconciliation query returned an invalid result.");
@@ -61,13 +89,20 @@ function createNotificationReconciler(options = {}) {
         else counts.skipped += 1;
       }
 
-      return { action: "reconciled", checked: ids.length, ...counts };
+      return {
+        action: "reconciled",
+        checked: ids.length,
+        leaseFailed: leaseResult.failed,
+        leaseRecovered: leaseResult.recovered,
+        ...counts,
+      };
     },
   };
 }
 
 module.exports = {
   DEFAULT_RECONCILIATION_LIMIT,
+  PROCESSING_LEASE_MS,
   createNotificationReconciler,
   getMissingNotificationReconciliationConfiguration,
   reconciliationLimit,

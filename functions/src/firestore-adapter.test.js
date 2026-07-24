@@ -55,8 +55,8 @@ class MemoryQuery {
   }
 
   where(field, op, value) {
-    assert.equal(op, "==");
-    return new MemoryQuery(this.collection, [...this.filters, [field, value]], this.size);
+    assert.ok(["==", "<="].includes(op));
+    return new MemoryQuery(this.collection, [...this.filters, [field, op, value]], this.size);
   }
 
   limit(size) {
@@ -67,7 +67,11 @@ class MemoryQuery {
     const docs = [];
 
     for (const [id, value] of this.collection.docs.entries()) {
-      if (this.filters.every(([field, expected]) => value[field] === expected)) {
+      if (this.filters.every(([field, op, expected]) => (
+        op === "=="
+          ? value[field] === expected
+          : new Date(value[field]).getTime() <= new Date(expected).getTime()
+      ))) {
         docs.push(new MemoryDocSnapshot(id, value));
       }
 
@@ -814,6 +818,42 @@ test("lists only bounded pending and retryable notification job IDs", async () =
     () => adapter.listPendingNotificationJobs({ limit: 0 }),
     (error) => error.code === "notification_reconciliation_limit_invalid",
   );
+});
+
+test("recovers only expired processing leases and terminates exhausted jobs", async () => {
+  const firestore = new MemoryFirestore();
+  const jobs = collectionDocs(firestore, "notificationOutbox");
+  jobs.set("stale-job", {
+    attempts: 1,
+    lastAttemptAt: new Date("2026-07-23T17:00:00Z"),
+    maxAttempts: 3,
+    status: "processing",
+  });
+  jobs.set("fresh-job", {
+    attempts: 1,
+    lastAttemptAt: new Date("2026-07-23T17:55:00Z"),
+    maxAttempts: 3,
+    status: "processing",
+  });
+  jobs.set("exhausted-job", {
+    attempts: 3,
+    lastAttemptAt: new Date("2026-07-23T16:00:00Z"),
+    maxAttempts: 3,
+    status: "processing",
+  });
+  const adapter = createFirestoreAdapter({
+    firestore,
+    serverTimestamp: () => "SERVER_TIMESTAMP",
+  });
+
+  assert.deepEqual(await adapter.recoverStaleNotificationJobs({
+    limit: 10,
+    staleBefore: new Date("2026-07-23T17:45:00Z"),
+  }), { failed: 1, recovered: 1 });
+  assert.equal(jobs.get("stale-job").status, "retry_pending");
+  assert.equal(jobs.get("stale-job").lastErrorCode, "processing_lease_expired");
+  assert.equal(jobs.get("fresh-job").status, "processing");
+  assert.equal(jobs.get("exhausted-job").status, "failed");
 });
 
 test("claims one notification attempt and rejects concurrent claims", async () => {

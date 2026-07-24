@@ -180,7 +180,7 @@ Implemented foundation:
 - A Resend-compatible HTTP adapter now sends plain-text jobs with stable provider idempotency keys and sanitized error classification.
 - Delivery runtime composition fails closed behind an explicit enable flag and complete server-side configuration.
 - The Firebase runtime exports a retrying Firestore outbox-created trigger with function-scoped Resend secret access. Its SDK-free adapter rejects mismatched event IDs and logs only safe delivery outcomes; it has not been deployed or enabled.
-- A separately enabled ten-minute reconciliation schedule queries at most 20 pending/retryable outbox IDs and reuses transactional claims, recovering jobs created while delivery was disabled without concurrent duplicate sends.
+- A separately enabled ten-minute reconciliation schedule queries bounded pending/retryable outbox IDs, transactionally recovers processing leases older than 15 minutes, terminates exhausted jobs, and reuses transactional claims without concurrent duplicate sends.
 - A provider-neutral daily fulfillment summary builder now counts the three supported fulfillment states and 20 lb/40 lb bags while omitting private notes, contact details, and Stripe fields.
 - Trusted Firestore composition now queries paid orders across supported fulfillment states and idempotently enqueues one daily summary job. The required payment/status compound index is included.
 - A scheduler-ready dispatcher derives the farm business date in Central Time, calls only the trusted daily enqueue path, and fails closed without an explicit enable flag and valid configuration.

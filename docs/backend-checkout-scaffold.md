@@ -167,11 +167,11 @@ Webhook updates should be idempotent. Store processed Stripe event IDs through a
 
 For `checkout.session.completed`, the Firestore adapter commits the trusted paid-order fields, deterministic customer/admin notification outbox jobs, and processed Stripe event record in one transaction. This prevents a partially handled payment from being marked complete without its notification jobs and makes repeated completed events safe no-ops.
 
-Notification delivery persistence uses separate Firestore transactions to claim one pending or retryable outbox job and to record its matching success or failure. Attempt numbers prevent stale workers from overwriting a newer result. A job whose provider send succeeded but whose success record failed remains `processing` for manual reconciliation rather than being automatically resent.
+Notification delivery persistence uses separate Firestore transactions to claim one pending or retryable outbox job and to record its matching success or failure. Attempt numbers prevent stale workers from overwriting a newer result. The reconciler treats `processing` as a 15-minute lease: expired jobs return to `retry_pending`, while jobs already at their attempt limit become terminal failures. Provider idempotency keys protect against duplicate provider sends when a send succeeded but its Firestore success record did not.
 
 The Firebase runtime now exports a second-generation `notificationOutbox/{notificationId}` creation trigger. It binds `RESEND_API_KEY` through Firebase Secret Manager, requires `NOTIFICATION_DELIVERY_ENABLED=true` plus an approved sender address before calling Resend, and requests Firebase retries only when the trusted worker records `retry_pending`. The trigger has not been deployed or enabled by repository work.
 
-A separately gated ten-minute reconciliation schedule recovers jobs created before delivery was enabled. Each run requests at most 20 document IDs, interleaves `pending` and `retry_pending` results to avoid starvation, and sends each ID through the same transactional claim boundary. Set `NOTIFICATION_RECONCILIATION_ENABLED=true` only after delivery configuration has passed production verification.
+A separately gated ten-minute reconciliation schedule recovers jobs created before delivery was enabled and expired processing leases. Each run examines at most 20 jobs per recovery stage, interleaves `pending` and `retry_pending` results to avoid starvation, and sends each ID through the same transactional claim boundary. Set `NOTIFICATION_RECONCILIATION_ENABLED=true` only after delivery configuration has passed production verification.
 
 ## Admin Shipping Label Handler
 

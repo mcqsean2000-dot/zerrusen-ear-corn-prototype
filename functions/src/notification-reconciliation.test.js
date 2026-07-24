@@ -14,6 +14,7 @@ test("stays disabled until reconciliation and delivery are explicitly enabled", 
     "NOTIFICATION_RECONCILIATION_ENABLED",
     "notificationDeliveryRuntime",
     "listPendingNotificationJobs",
+    "recoverStaleNotificationJobs",
   ]);
 });
 
@@ -25,6 +26,13 @@ test("processes a bounded list and returns safe aggregate counts", async () => {
     async listPendingNotificationJobs(input) {
       calls.push({ type: "list", input });
       return ["job-1", "job-2", "job-3"];
+    },
+    now() {
+      return new Date("2026-07-23T18:00:00Z");
+    },
+    async recoverStaleNotificationJobs(input) {
+      calls.push({ type: "recover", input });
+      return { failed: 1, recovered: 2 };
     },
     runtime: {
       enabled: true,
@@ -43,11 +51,17 @@ test("processes a bounded list and returns safe aggregate counts", async () => {
     action: "reconciled",
     checked: 3,
     failed: 0,
+    leaseFailed: 1,
+    leaseRecovered: 2,
     retryScheduled: 1,
     sent: 1,
     skipped: 1,
   });
-  assert.deepEqual(calls[0], { type: "list", input: { limit: 3 } });
+  assert.deepEqual(calls[0], {
+    type: "recover",
+    input: { limit: 3, staleBefore: new Date("2026-07-23T17:45:00Z") },
+  });
+  assert.deepEqual(calls[1], { type: "list", input: { limit: 3 } });
 });
 
 test("rejects unsafe, duplicate, or over-limit query results before delivery", async () => {
@@ -57,6 +71,9 @@ test("rejects unsafe, duplicate, or over-limit query results before delivery", a
     limit: 2,
     async listPendingNotificationJobs() {
       return ["duplicate", "duplicate"];
+    },
+    async recoverStaleNotificationJobs() {
+      return { failed: 0, recovered: 0 };
     },
     runtime: {
       enabled: true,

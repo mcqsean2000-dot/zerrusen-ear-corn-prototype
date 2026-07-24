@@ -376,6 +376,42 @@ async function queryByFields(collection, filters, limit) {
     : [];
 }
 
+async function queryByConstraints(collection, constraints, limit) {
+  if (!isFunction(collection.where) || !Array.isArray(constraints) || !constraints.length) {
+    const error = new Error("Firestore-like collection reference must provide where(field, op, value).");
+    error.code = "firestore_query_missing";
+    throw error;
+  }
+
+  let query = collection;
+  for (const [field, op, value] of constraints) {
+    if (!query || !isFunction(query.where)) {
+      const error = new Error("Firestore-like compound query must provide where(field, op, value).");
+      error.code = "firestore_query_missing";
+      throw error;
+    }
+    query = query.where(field, op, value);
+  }
+  const limitedQuery = query && isFunction(query.limit) ? query.limit(limit) : query;
+  if (!limitedQuery || !isFunction(limitedQuery.get)) {
+    const error = new Error("Firestore-like query must provide get().");
+    error.code = "firestore_query_get_missing";
+    throw error;
+  }
+
+  const snapshot = await limitedQuery.get();
+  return Array.isArray(snapshot && snapshot.docs)
+    ? snapshot.docs.map(normalizeSnapshot).filter(Boolean)
+    : [];
+}
+
+function timestampMillis(value) {
+  if (value && isFunction(value.toMillis)) return Number(value.toMillis());
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "number") return value;
+  return Number.NaN;
+}
+
 async function findByDocumentId(collection, id) {
   const cleanId = String(id || "").trim();
   if (!cleanId) {
@@ -689,6 +725,64 @@ function createFirestoreAdapter(options = {}) {
     return ids;
   }
 
+  async function recoverStaleNotificationJobs({ collection, limit = 20, staleBefore } = {}) {
+    const resultLimit = Number(limit);
+    const cutoffMillis = timestampMillis(staleBefore);
+    if (!Number.isInteger(resultLimit) || resultLimit < 1 || resultLimit > 50) {
+      const error = new Error("Notification lease recovery requires a limit from 1 to 50.");
+      error.code = "notification_lease_limit_invalid";
+      throw error;
+    }
+    if (!Number.isFinite(cutoffMillis)) {
+      const error = new Error("Notification lease recovery requires a trusted cutoff time.");
+      error.code = "notification_lease_cutoff_invalid";
+      throw error;
+    }
+    if (!isFunction(firestore.runTransaction)) {
+      const error = new Error("Firestore-like backend must provide runTransaction() for lease recovery.");
+      error.code = "firestore_transaction_missing";
+      throw error;
+    }
+
+    const outbox = collectionRef(firestore, notificationOutboxCollectionName(options, collection));
+    const candidates = await queryByConstraints(outbox, [
+      ["status", "==", "processing"],
+      ["lastAttemptAt", "<=", staleBefore],
+    ], resultLimit);
+    const result = { failed: 0, recovered: 0 };
+
+    for (const candidate of candidates) {
+      const ref = outbox.doc(cleanText(candidate.id));
+      const action = await firestore.runTransaction(async (transaction) => {
+        const data = normalizeSnapshot(await transaction.get(ref));
+        if (
+          !data ||
+          data.status !== "processing" ||
+          !Number.isFinite(timestampMillis(data.lastAttemptAt)) ||
+          timestampMillis(data.lastAttemptAt) > cutoffMillis
+        ) {
+          return "skipped";
+        }
+
+        const attempts = Number(data.attempts || 0);
+        const maxAttempts = Number(data.maxAttempts || 0);
+        const exhausted = Number.isInteger(attempts) && Number.isInteger(maxAttempts) &&
+          attempts >= maxAttempts;
+        transaction.update(ref, {
+          lastAttemptFinishedAt: timestamp(),
+          lastErrorCode: "processing_lease_expired",
+          status: exhausted ? "failed" : "retry_pending",
+        });
+        return exhausted ? "failed" : "recovered";
+      });
+
+      if (action === "failed") result.failed += 1;
+      if (action === "recovered") result.recovered += 1;
+    }
+
+    return result;
+  }
+
   async function completePaidOrderEvent({
     collection,
     eventId,
@@ -967,6 +1061,7 @@ function createFirestoreAdapter(options = {}) {
     recordAdminLabelPurchase,
     recordNotificationFailure,
     recordNotificationSuccess,
+    recoverStaleNotificationJobs,
     updateAdminOrderStatus,
     updateOrderRequest,
   };

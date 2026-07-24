@@ -94,7 +94,7 @@ Natural search phrases to keep in mind:
 - `functions/src/notification-delivery.js` - provider-neutral claimed-job delivery and bounded retry worker
 - `functions/src/resend-email-adapter.js` - secret-injected Resend HTTP adapter with provider idempotency and sanitized failures
 - `functions/src/notification-delivery-runtime.js` - explicit opt-in composition gate for Resend and trusted Firestore delivery persistence
-- `functions/src/notification-reconciliation.js` - bounded recovery dispatcher for pending and retryable outbox jobs
+- `functions/src/notification-reconciliation.js` - bounded recovery dispatcher for pending, retryable, and expired processing jobs
 - `firebase.json` - Firebase Hosting config and Firestore deploy targets for the chosen production path
 - `.firebaserc.example` - safe Firebase project alias template for local setup
 - `firestore.rules` - initial Firestore rules for prototype order requests

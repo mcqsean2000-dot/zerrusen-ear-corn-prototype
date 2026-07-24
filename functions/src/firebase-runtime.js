@@ -227,6 +227,7 @@ const notificationOutboxReconciliation = onSchedule({
   const reconciler = createNotificationReconciler({
     env,
     listPendingNotificationJobs: firestoreAdapter.listPendingNotificationJobs,
+    recoverStaleNotificationJobs: firestoreAdapter.recoverStaleNotificationJobs,
     runtime,
   });
   const result = reconciler.enabled
