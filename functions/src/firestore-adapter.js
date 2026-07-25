@@ -1,10 +1,12 @@
 "use strict";
 
 const { TRUSTED_ORDER_FIELDS } = require("./order-validation");
+const { normalizeApprovedSocialPost } = require("./social-post-queue");
 
 const DEFAULT_ORDER_COLLECTION = "orderRequests";
 const DEFAULT_STRIPE_EVENT_COLLECTION = "stripeEvents";
 const DEFAULT_NOTIFICATION_OUTBOX_COLLECTION = "notificationOutbox";
+const DEFAULT_SOCIAL_POST_QUEUE_COLLECTION = "socialPostQueue";
 const SERVER_TIMESTAMP_SENTINEL = "FIRESTORE_SERVER_TIMESTAMP_REQUIRED";
 const NOTIFICATION_JOB_FIELDS = Object.freeze([
   "eventName",
@@ -91,6 +93,10 @@ function eventCollectionName(options) {
 
 function notificationOutboxCollectionName(options, override) {
   return cleanName(override || options.notificationOutboxCollection, DEFAULT_NOTIFICATION_OUTBOX_COLLECTION);
+}
+
+function socialPostQueueCollectionName(options, override) {
+  return cleanName(override || options.socialPostQueueCollection, DEFAULT_SOCIAL_POST_QUEUE_COLLECTION);
 }
 
 function trustedNotificationJob(job) {
@@ -435,6 +441,91 @@ function createFirestoreAdapter(options = {}) {
   const timestamp = isFunction(options.serverTimestamp)
     ? options.serverTimestamp
     : () => options.serverTimestamp || SERVER_TIMESTAMP_SENTINEL;
+
+  async function enqueueApprovedSocialPost({ collection, post }) {
+    const trustedPost = normalizeApprovedSocialPost(post);
+    if (!isFunction(firestore.runTransaction)) {
+      const error = new Error("Firestore-like backend must provide runTransaction() for social post queueing.");
+      error.code = "firestore_transaction_missing";
+      throw error;
+    }
+
+    const posts = collectionRef(firestore, socialPostQueueCollectionName(options, collection));
+    const ref = posts.doc(trustedPost.postId);
+    return firestore.runTransaction(async (transaction) => {
+      const existing = normalizeSnapshot(await transaction.get(ref));
+      if (existing) return { created: false, postId: trustedPost.postId };
+
+      transaction.set(ref, {
+        ...trustedPost,
+        approvedAt: timestamp(),
+        createdAt: timestamp(),
+        publishAttempts: 0,
+      });
+      return { created: true, postId: trustedPost.postId };
+    });
+  }
+
+  async function claimDueSocialPost({ collection, maxAttempts = 3, now }) {
+    const nowMillis = timestampMillis(now);
+    const attemptLimit = Number(maxAttempts);
+    if (!Number.isFinite(nowMillis)) {
+      const error = new Error("Social post claiming requires a trusted current time.");
+      error.code = "social_post_claim_time_invalid";
+      throw error;
+    }
+    if (!Number.isInteger(attemptLimit) || attemptLimit < 1 || attemptLimit > 5) {
+      const error = new Error("Social post claiming requires maxAttempts from 1 to 5.");
+      error.code = "social_post_claim_attempts_invalid";
+      throw error;
+    }
+    if (!isFunction(firestore.runTransaction)) {
+      const error = new Error("Firestore-like backend must provide runTransaction() for social post claiming.");
+      error.code = "firestore_transaction_missing";
+      throw error;
+    }
+
+    const posts = collectionRef(firestore, socialPostQueueCollectionName(options, collection));
+    const candidates = await queryByConstraints(posts, [
+      ["status", "==", "approved"],
+      ["scheduledAt", "<=", now],
+    ], 1);
+    if (!candidates.length) return null;
+
+    const postId = cleanText(candidates[0].id);
+    const ref = posts.doc(postId);
+    return firestore.runTransaction(async (transaction) => {
+      const data = normalizeSnapshot(await transaction.get(ref));
+      const attempts = Number(data && data.publishAttempts || 0);
+      if (
+        !data ||
+        data.status !== "approved" ||
+        !Number.isFinite(timestampMillis(data.scheduledAt)) ||
+        timestampMillis(data.scheduledAt) > nowMillis ||
+        !Number.isInteger(attempts) ||
+        attempts >= attemptLimit
+      ) {
+        return null;
+      }
+
+      transaction.update(ref, {
+        lastPublishAttemptAt: timestamp(),
+        publishAttempts: attempts + 1,
+        status: "publishing",
+      });
+      return {
+        attempt: attempts + 1,
+        post: {
+          caption: cleanText(data.caption),
+          hashtags: Array.isArray(data.hashtags) ? [...data.hashtags] : [],
+          imageUrl: cleanText(data.imageUrl),
+          platforms: Array.isArray(data.platforms) ? [...data.platforms] : [],
+          postId,
+          scheduledAt: data.scheduledAt,
+        },
+      };
+    });
+  }
 
   async function createOrderRequest({ collection, orderRequest }) {
     const orders = collectionRef(firestore, orderCollectionName(options, collection));
@@ -1145,10 +1236,12 @@ function createFirestoreAdapter(options = {}) {
   }
 
   return {
+    claimDueSocialPost,
     claimStripeEventProcessing,
     claimNotificationJob,
     completePaidOrderEvent,
     createOrderRequest,
+    enqueueApprovedSocialPost,
     enqueueNotificationJobs,
     findOrderByCheckoutSessionId,
     findOrderByPaymentIntentId,
@@ -1176,6 +1269,7 @@ module.exports = {
   ADMIN_STATUS_TRANSITIONS,
   DEFAULT_NOTIFICATION_OUTBOX_COLLECTION,
   DEFAULT_ORDER_COLLECTION,
+  DEFAULT_SOCIAL_POST_QUEUE_COLLECTION,
   DEFAULT_STRIPE_EVENT_COLLECTION,
   SERVER_TIMESTAMP_SENTINEL,
   createFirestoreAdapter,

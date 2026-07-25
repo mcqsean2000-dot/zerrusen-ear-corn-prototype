@@ -188,6 +188,101 @@ function dailySummaryJob(overrides = {}) {
   };
 }
 
+function approvedSocialPost(overrides = {}) {
+  return {
+    approvedBy: { email: "admin@example.test", uid: "admin-1" },
+    caption: "Fresh ear corn, packed to order. https://theosfarm.com",
+    hashtags: ["#TheosFarm", "#FarmToFeeder"],
+    imageUrl: "https://theosfarm.com/assets/theos-both-bags.jpg",
+    platforms: ["facebook", "instagram"],
+    postId: "2026-07-27-farm-to-feeder",
+    scheduledAt: new Date("2026-07-27T14:00:00.000Z"),
+    status: "approved",
+    ...overrides,
+  };
+}
+
+test("queues approved social posts idempotently with deterministic IDs", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({
+    firestore,
+    serverTimestamp() {
+      return "SERVER_TIMESTAMP";
+    },
+  });
+  const post = approvedSocialPost();
+
+  assert.deepEqual(await adapter.enqueueApprovedSocialPost({ post }), {
+    created: true,
+    postId: post.postId,
+  });
+  assert.deepEqual(await adapter.enqueueApprovedSocialPost({ post }), {
+    created: false,
+    postId: post.postId,
+  });
+  assert.deepEqual(collectionDocs(firestore, "socialPostQueue").get(post.postId), {
+    ...post,
+    approvedAt: "SERVER_TIMESTAMP",
+    createdAt: "SERVER_TIMESTAMP",
+    publishAttempts: 0,
+  });
+});
+
+test("claims one due approved social post and rejects concurrent claims", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({
+    firestore,
+    serverTimestamp() {
+      return "SERVER_TIMESTAMP";
+    },
+  });
+  const post = approvedSocialPost();
+  await adapter.enqueueApprovedSocialPost({ post });
+
+  assert.deepEqual(await adapter.claimDueSocialPost({
+    now: new Date("2026-07-27T14:01:00.000Z"),
+  }), {
+    attempt: 1,
+    post: {
+      caption: post.caption,
+      hashtags: post.hashtags,
+      imageUrl: post.imageUrl,
+      platforms: post.platforms,
+      postId: post.postId,
+      scheduledAt: post.scheduledAt,
+    },
+  });
+  assert.equal(await adapter.claimDueSocialPost({
+    now: new Date("2026-07-27T14:01:00.000Z"),
+  }), null);
+  assert.deepEqual(collectionDocs(firestore, "socialPostQueue").get(post.postId), {
+    ...post,
+    approvedAt: "SERVER_TIMESTAMP",
+    createdAt: "SERVER_TIMESTAMP",
+    lastPublishAttemptAt: "SERVER_TIMESTAMP",
+    publishAttempts: 1,
+    status: "publishing",
+  });
+});
+
+test("does not claim future social posts and bounds publish attempts", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({ firestore });
+  await adapter.enqueueApprovedSocialPost({ post: approvedSocialPost() });
+
+  assert.equal(await adapter.claimDueSocialPost({
+    now: new Date("2026-07-27T13:59:00.000Z"),
+  }), null);
+  await assert.rejects(
+    adapter.claimDueSocialPost({ maxAttempts: 0, now: new Date() }),
+    (error) => error.code === "social_post_claim_attempts_invalid",
+  );
+  await assert.rejects(
+    adapter.claimDueSocialPost({ now: "not-a-date" }),
+    (error) => error.code === "social_post_claim_time_invalid",
+  );
+});
+
 test("creates order requests in the configured collection", async () => {
   const firestore = new MemoryFirestore();
   const adapter = createFirestoreAdapter({

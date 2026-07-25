@@ -88,31 +88,48 @@ Suggested statuses:
 
 - `draft`
 - `approved`
+- `publishing`
 - `published`
 - `failed`
 - `skipped`
 
 ## Draft Queue Shape
 
-A future Firestore collection could be:
+The approved queue collection is:
 
 `socialPostQueue/{postId}`
 
 Recommended fields:
 
-- `scheduledDate`
+- `scheduledAt`
 - `status`
 - `caption`
 - `hashtags`
 - `imageUrl`
+- `platforms`
+- `approvedBy`
+- `approvedAt`
 - `facebookPostId`
 - `instagramMediaId`
 - `instagramPostId`
 - `publishAttempts`
 - `lastError`
 - `createdAt`
-- `approvedAt`
 - `publishedAt`
+
+## Implemented Queue Foundation
+
+The repository now includes a server-only, SDK-free queue boundary and Firestore persistence methods. They:
+
+- accept only deterministic post IDs and records explicitly marked `approved`;
+- require a trusted reviewer uid and email;
+- require every caption to include `https://theosfarm.com`;
+- allow only Facebook and Instagram targets with bounded, validated hashtags;
+- require Instagram images to use a public HTTPS URL on the Theo's Farm domain;
+- create queue documents idempotently and transactionally claim one due post;
+- prevent browser access through the existing default-deny Firestore rules.
+
+This foundation does not call Meta, read credentials, deploy functions, or publish a post. A later publisher must record success/failure and safely release or terminate a `publishing` claim.
 
 ## Initial Implementation Steps
 
@@ -121,7 +138,7 @@ Recommended fields:
 3. Create or identify the Meta Developer app.
 4. Generate the correct Page access token.
 5. Add Meta IDs/tokens to Firebase secrets.
-6. Add a disabled-by-default Firebase scheduled publisher.
+6. Add a disabled-by-default Firebase scheduled publisher. The approved queue and due-post claim foundation are implemented; the Meta adapter and schedule are not.
 7. Test with one approved post.
 8. Turn on daily publishing after the test succeeds.
 
