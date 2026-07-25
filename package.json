@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "check": "node tools/check-static.mjs && npm run package:static:check",
+    "check": "node tools/check-static.mjs && node tools/check-notification-release.mjs && npm run package:static:check",
+    "check:notification-release": "node tools/check-notification-release.mjs",
     "package:static": "node tools/package-static.mjs",
     "package:static:check": "node tools/package-static.mjs --check",
     "preview": "node tools/serve-static.mjs --port 4173",

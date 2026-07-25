@@ -77,6 +77,8 @@ go test ./...
 
 If Functions code changed, also run the Functions checks documented in `docs/backend-checkout-scaffold.md` before any Functions deploy.
 
+If notification Functions or indexes changed, run `npm run check:notification-release` and follow `docs/notification-production-activation.md`. Keep all notification enable flags false through the initial index and Functions deployment.
+
 ## Preview Channel
 
 Use a Firebase Hosting preview channel before production. This is an example command and requires the project targeting checks above:

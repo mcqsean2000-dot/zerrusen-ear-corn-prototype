@@ -100,6 +100,7 @@ Natural search phrases to keep in mind:
 - `firestore.rules` - initial Firestore rules for prototype order requests
 - `firestore.indexes.json` - Firestore index definition for order request queues
 - `docs/firebase-hosting-readiness.md` - first Firebase setup, preview, deploy, and production verification notes
+- `docs/notification-production-activation.md` - staged, disabled-first Resend and Firebase notification activation runbook
 - `docs/firebase-order-foundation.md` - Firebase order request shape and payment boundary notes
 - `docs/admin-fulfillment-foundation.md` - admin queue and fulfillment planning notes
 - `docs/stripe-checkout-handoff.md` - trusted backend contract for future Stripe Checkout session creation and webhook updates
