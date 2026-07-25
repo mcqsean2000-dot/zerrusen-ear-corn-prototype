@@ -23,6 +23,13 @@ const ADMIN_ORDER_STATUSES = Object.freeze([
   "ready_to_pack",
   "packed",
 ]);
+const ADMIN_NOTIFICATION_STATUSES = Object.freeze([
+  "pending",
+  "processing",
+  "retry_pending",
+  "sent",
+  "failed",
+]);
 const ADMIN_STATUS_TRANSITIONS = Object.freeze({
   needs_review: Object.freeze(["ready_to_pack"]),
   ready_to_pack: Object.freeze(["needs_review", "packed"]),
@@ -725,6 +732,100 @@ function createFirestoreAdapter(options = {}) {
     return ids;
   }
 
+  async function listAdminNotificationJobs({ collection, limit = 25 } = {}) {
+    const resultLimit = Number(limit);
+    if (!Number.isInteger(resultLimit) || resultLimit < 1 || resultLimit > 50) {
+      const error = new Error("Admin notification health requires a limit from 1 to 50.");
+      error.code = "admin_notification_limit_invalid";
+      throw error;
+    }
+
+    const outbox = collectionRef(firestore, notificationOutboxCollectionName(options, collection));
+    const groups = await Promise.all(ADMIN_NOTIFICATION_STATUSES.map((status) => (
+      queryByFields(outbox, [["status", status]], resultLimit + 1)
+    )));
+    const counts = {};
+    const truncatedStatuses = [];
+    const jobs = [];
+
+    groups.forEach((group, index) => {
+      const status = ADMIN_NOTIFICATION_STATUSES[index];
+      counts[status] = Math.min(group.length, resultLimit);
+      if (group.length > resultLimit) truncatedStatuses.push(status);
+      group.slice(0, resultLimit).forEach((job) => {
+        const id = cleanText(job.id || job.idempotencyKey);
+        if (!id || id.length > 500 || id.includes("/")) return;
+        jobs.push({
+          attempts: Number.isInteger(Number(job.attempts)) ? Number(job.attempts) : 0,
+          createdAtMillis: timestampMillis(job.createdAt),
+          eventName: cleanText(job.eventName).slice(0, 100),
+          id,
+          lastAttemptAtMillis: timestampMillis(job.lastAttemptAt),
+          lastErrorCode: cleanText(job.lastErrorCode).slice(0, 80),
+          maxAttempts: Number.isInteger(Number(job.maxAttempts)) ? Number(job.maxAttempts) : 0,
+          recipientCategory: cleanText(job.recipientCategory).slice(0, 40),
+          sentAtMillis: timestampMillis(job.sentAt),
+          status,
+        });
+      });
+    });
+
+    jobs.sort((left, right) => (
+      (Number.isFinite(right.createdAtMillis) ? right.createdAtMillis : 0) -
+      (Number.isFinite(left.createdAtMillis) ? left.createdAtMillis : 0)
+    ));
+
+    return {
+      counts,
+      jobs: jobs.slice(0, resultLimit),
+      truncatedStatuses,
+    };
+  }
+
+  async function requeueAdminNotificationJob({ admin, collection, idempotencyKey }) {
+    const actor = validateAdminActor(admin);
+    const id = cleanText(idempotencyKey);
+    if (!id || id.length > 500 || id.includes("/")) {
+      const error = new Error("Admin notification retry requires a safe job ID.");
+      error.code = "admin_notification_id_invalid";
+      throw error;
+    }
+    if (!isFunction(firestore.runTransaction)) {
+      const error = new Error("Firestore-like backend must provide runTransaction() for admin notification retry.");
+      error.code = "firestore_transaction_missing";
+      throw error;
+    }
+
+    const ref = collectionRef(firestore, notificationOutboxCollectionName(options, collection)).doc(id);
+    return firestore.runTransaction(async (transaction) => {
+      const data = normalizeSnapshot(await transaction.get(ref));
+      if (!data) {
+        const error = new Error("Notification job was not found.");
+        error.code = "admin_notification_not_found";
+        throw error;
+      }
+      if (!["failed", "retry_pending"].includes(data.status)) {
+        const error = new Error("Only failed or retry-pending notifications can be retried manually.");
+        error.code = "admin_notification_retry_conflict";
+        error.status = data.status;
+        throw error;
+      }
+
+      transaction.update(ref, {
+        attempts: 0,
+        lastErrorCode: "admin_retry_requested",
+        retryRequestedAt: timestamp(),
+        retryRequestedByEmail: actor.email,
+        retryRequestedByUid: actor.uid,
+        status: "retry_pending",
+      });
+      return {
+        id,
+        status: "retry_pending",
+      };
+    });
+  }
+
   async function recoverStaleNotificationJobs({ collection, limit = 20, staleBefore } = {}) {
     const resultLimit = Number(limit);
     const cutoffMillis = timestampMillis(staleBefore);
@@ -1051,6 +1152,7 @@ function createFirestoreAdapter(options = {}) {
     enqueueNotificationJobs,
     findOrderByCheckoutSessionId,
     findOrderByPaymentIntentId,
+    listAdminNotificationJobs,
     listPaidFulfillmentOrders,
     listPendingNotificationJobs,
     markCheckoutSessionFailed,
@@ -1061,6 +1163,7 @@ function createFirestoreAdapter(options = {}) {
     recordAdminLabelPurchase,
     recordNotificationFailure,
     recordNotificationSuccess,
+    requeueAdminNotificationJob,
     recoverStaleNotificationJobs,
     updateAdminOrderStatus,
     updateOrderRequest,
@@ -1068,6 +1171,7 @@ function createFirestoreAdapter(options = {}) {
 }
 
 module.exports = {
+  ADMIN_NOTIFICATION_STATUSES,
   ADMIN_ORDER_STATUSES,
   ADMIN_STATUS_TRANSITIONS,
   DEFAULT_NOTIFICATION_OUTBOX_COLLECTION,

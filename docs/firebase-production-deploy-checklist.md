@@ -23,6 +23,8 @@ Do not use this checklist to rotate secrets, delete data, migrate order records,
 6. Confirm the trusted checkout endpoint and webhook are implemented, reviewed, and intentionally enabled before taking payments.
 7. Confirm Firestore public writes are still limited to validated `orderRequests` creation and trusted payment fields are backend-owned.
 8. Confirm Google sign-in is enabled, the production domain is authorized, and only approved users carry the `admin: true` custom claim.
+9. Confirm notification delivery, reconciliation, and daily summary flags remain `false` for the initial functions deployment.
+10. Confirm the Resend secret and verified sender exist before enabling notification delivery.
 
 ## Local Project Targeting
 
@@ -147,6 +149,9 @@ Immediately after deploy:
 8. Confirm the admin route hides order data for signed-out and non-admin users, while an approved claimed admin can load it.
 9. Check Firebase Functions logs for checkout/webhook errors without exposing secrets in shared notes.
 10. Check Stripe webhook delivery status and retry details.
+11. Sign in as an approved admin and confirm notification health loads without recipient addresses or message bodies.
+12. Confirm a failed test notification can be manually requeued and that an active or sent job cannot be retried.
+13. Confirm signed-out and non-admin users cannot access either notification admin endpoint.
 
 ## Rollback
 

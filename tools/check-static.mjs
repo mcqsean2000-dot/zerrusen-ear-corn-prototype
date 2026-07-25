@@ -970,7 +970,14 @@ function createFakeElement(name) {
   };
 }
 
-function createStorefrontHarness({ checkoutEndpoint = "", href = "https://theos.example/", shippingRatesEndpoint = "/api/shipping-rates", fetchImpl, storedCart = null } = {}) {
+function createStorefrontHarness({
+  checkoutEndpoint = "",
+  fetchImpl,
+  href = "https://theos.example/",
+  shippingRatesEndpoint = "/api/shipping-rates",
+  storedCart = null,
+  storedPendingCheckout = null,
+} = {}) {
   const elements = {
     cartDrawer: createFakeElement("cartDrawer"),
     cartItems: createFakeElement("cartItems"),
@@ -1068,9 +1075,15 @@ function createStorefrontHarness({ checkoutEndpoint = "", href = "https://theos.
   if (storedCart !== null) {
     storageValues.set("theos-farm-cart-v1", storedCart);
   }
+  if (storedPendingCheckout !== null) {
+    storageValues.set("theos-farm-pending-checkout-v1", storedPendingCheckout);
+  }
   const localStorage = {
     getItem(key) {
       return storageValues.has(key) ? storageValues.get(key) : null;
+    },
+    removeItem(key) {
+      storageValues.delete(key);
     },
     setItem(key, value) {
       storageValues.set(key, String(value));
@@ -1191,10 +1204,23 @@ function createStorefrontHarness({ checkoutEndpoint = "", href = "https://theos.
   const harness = createStorefrontHarness({
     href: "https://theos.example/checkout/success?session_id=cs_test_clear_cart",
     storedCart: JSON.stringify([{ sku: "ear-corn-40lb", quantity: 1 }]),
+    storedPendingCheckout: "cs_test_clear_cart",
   });
 
-  assert(harness.elements.cartCount.textContent === 0, "Valid checkout success returns should clear the saved cart.");
-  assert(harness.localStorage.getItem("theos-farm-cart-v1") === "[]", "Valid checkout success returns should persist the cleared cart.");
+  assert(harness.elements.cartCount.textContent === 0, "Matching checkout success returns should clear the saved cart.");
+  assert(harness.localStorage.getItem("theos-farm-cart-v1") === "[]", "Matching checkout success returns should persist the cleared cart.");
+  assert(harness.localStorage.getItem("theos-farm-pending-checkout-v1") === null, "Consumed checkout sessions should be removed.");
+}
+
+{
+  const harness = createStorefrontHarness({
+    href: "https://theos.example/checkout/success?session_id=cs_unrecognized_session",
+    storedCart: JSON.stringify([{ sku: "ear-corn-40lb", quantity: 1 }]),
+    storedPendingCheckout: "cs_expected_session",
+  });
+
+  assert(harness.elements.cartCount.textContent === 1, "Unrecognized checkout success URLs must preserve the saved cart.");
+  assert(harness.localStorage.getItem("theos-farm-pending-checkout-v1") === "cs_expected_session", "Unrecognized checkout sessions must not consume the pending checkout.");
 }
 
 {

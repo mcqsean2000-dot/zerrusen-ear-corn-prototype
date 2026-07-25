@@ -29,6 +29,8 @@ Implemented:
 - `functions/src/daily-fulfillment-scheduler.js` derives the summary date in `America/Chicago` from a trusted clock and invokes the daily enqueue path only when `DAILY_FULFILLMENT_SUMMARY_ENABLED=true` and all configuration is valid.
 - `functions/src/firebase-daily-summary-handler.js` adapts Firebase schedule events to the guarded dispatcher without importing Firebase SDKs or reading secrets.
 - `functions/src/firebase-runtime.js` exports an 8:00 AM Central second-generation scheduled function with two bounded retries. It is disabled by environment configuration and has not been deployed by this work.
+- Authenticated admin notification health now reports bounded counts and safe job metadata for pending, processing, retrying, sent, and failed states without returning recipient addresses, subjects, or message bodies.
+- Authenticated admins can requeue only failed or retry-pending jobs. The trusted Firestore transaction resets the bounded attempt counter, records the requesting admin, and leaves actual delivery to the guarded reconciliation worker.
 - `firestore.indexes.json` includes the `paymentStatus`/`status` compound index required by the trusted fulfillment query.
 
 Not yet implemented:
@@ -36,6 +38,7 @@ Not yet implemented:
 - Resend account credentials, verified sender-domain configuration, production review, deployment, explicit enablement, or live sends.
 - Production review, deployment, and explicit enablement of the scheduled summary and notification delivery triggers.
 - Production review of the reconciliation interval and explicit enablement only after live delivery verification.
+- Production deployment and smoke verification of the authenticated notification health and recovery controls.
 
 Firestore rules currently deny public reads and writes to `notificationOutbox`; only trusted backend Admin SDK code can use this boundary.
 
@@ -142,6 +145,18 @@ Store notification send attempts in a trusted backend collection or equivalent l
 - Last error code/message, sanitized
 
 Retry only from trusted backend code. Never ask public storefront JavaScript to retry or reconcile notification sends.
+
+## Operations
+
+The authenticated admin dashboard provides the first recovery surface:
+
+- `GET /api/admin/notifications` returns bounded status counts and safe job metadata.
+- `POST /api/admin/notifications/retry` requeues only failed or retry-pending jobs.
+- Both routes require Firebase Admin Auth verification with the `admin: true` custom claim.
+- Recipient addresses, email subjects, and message bodies are excluded from health responses.
+- A manually requeued job is delivered only when guarded notification delivery and reconciliation are enabled.
+
+Before live delivery, operators should verify failed jobs are visible, unauthorized users receive no health data, and a requeued test job moves through `retry_pending` to `sent`.
 
 ## Checks
 

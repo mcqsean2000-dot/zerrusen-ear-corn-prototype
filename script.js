@@ -1,4 +1,5 @@
 const CART_STORAGE_KEY = "theos-farm-cart-v1";
+const PENDING_CHECKOUT_STORAGE_KEY = "theos-farm-pending-checkout-v1";
 const productButtons = Array.from(document.querySelectorAll("[data-add-to-cart]"));
 const productCatalog = new Map(
   productButtons.map((button) => [
@@ -111,6 +112,38 @@ function clearCart() {
   persistCart();
 }
 
+function rememberPendingCheckout(checkoutSessionId) {
+  const storage = getCartStorage();
+  const sessionId = String(checkoutSessionId || "").trim();
+  if (!storage || !/^cs_/.test(sessionId)) {
+    return;
+  }
+
+  try {
+    storage.setItem(PENDING_CHECKOUT_STORAGE_KEY, sessionId);
+  } catch (error) {
+    // Storage can be unavailable in private browsing or restricted embeds.
+  }
+}
+
+function consumePendingCheckout(checkoutSessionId) {
+  const storage = getCartStorage();
+  const sessionId = String(checkoutSessionId || "").trim();
+  if (!storage || !/^cs_/.test(sessionId)) {
+    return false;
+  }
+
+  try {
+    if (storage.getItem(PENDING_CHECKOUT_STORAGE_KEY) !== sessionId) {
+      return false;
+    }
+    storage.removeItem(PENDING_CHECKOUT_STORAGE_KEY);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -220,7 +253,7 @@ function renderCheckoutReturnState() {
   checkoutResult.focus({ preventScroll: true });
 
   if (state.type === "success") {
-    if (/^cs_/.test(state.sessionId)) {
+    if (consumePendingCheckout(state.sessionId)) {
       clearCart();
     }
     checkoutResultKicker.textContent = "Checkout received";
@@ -642,6 +675,7 @@ async function startStripeCheckout(checkoutRequest, shippingRate) {
       shippingAddress: checkoutRequest.shippingAddress,
       selectedShippingRate: shippingRate,
     });
+    rememberPendingCheckout(handoff.checkoutSessionId);
     window.location.assign(handoff.checkoutUrl);
   } catch (error) {
     orderStatus.textContent = checkoutFailureMessage;

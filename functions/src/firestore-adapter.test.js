@@ -856,6 +856,86 @@ test("recovers only expired processing leases and terminates exhausted jobs", as
   assert.equal(jobs.get("exhausted-job").status, "failed");
 });
 
+test("lists bounded notification health without recipient payloads", async () => {
+  const firestore = new MemoryFirestore();
+  const jobs = collectionDocs(firestore, "notificationOutbox");
+  jobs.set("failed-job", {
+    attempts: 3,
+    createdAt: new Date("2026-07-23T18:00:00Z"),
+    eventName: "admin.paid_order_created",
+    lastErrorCode: "resend_validation_error",
+    maxAttempts: 3,
+    recipientCategory: "admin",
+    status: "failed",
+    subject: "Private subject",
+    text: "Private body",
+    to: "private@example.test",
+  });
+  jobs.set("sent-job", {
+    attempts: 1,
+    createdAt: new Date("2026-07-23T19:00:00Z"),
+    eventName: "customer.order_confirmation",
+    maxAttempts: 5,
+    recipientCategory: "customer",
+    status: "sent",
+    to: "customer@example.test",
+  });
+  const adapter = createFirestoreAdapter({ firestore });
+
+  const health = await adapter.listAdminNotificationJobs({ limit: 10 });
+
+  assert.equal(health.counts.failed, 1);
+  assert.equal(health.counts.sent, 1);
+  assert.equal(health.jobs[0].id, "sent-job");
+  assert.equal(health.jobs.some((job) => "to" in job || "text" in job || "subject" in job), false);
+  assert.deepEqual(health.truncatedStatuses, []);
+});
+
+test("admin retry requeues only failed jobs with an audit boundary", async () => {
+  const firestore = new MemoryFirestore();
+  const jobs = collectionDocs(firestore, "notificationOutbox");
+  jobs.set("failed-job", {
+    attempts: 5,
+    lastErrorCode: "provider_send_failed",
+    status: "failed",
+  });
+  jobs.set("sent-job", {
+    attempts: 1,
+    status: "sent",
+  });
+  const adapter = createFirestoreAdapter({
+    firestore,
+    serverTimestamp: () => "SERVER_TIMESTAMP",
+  });
+  const admin = {
+    email: "admin@example.test",
+    uid: "admin-1",
+  };
+
+  assert.deepEqual(await adapter.requeueAdminNotificationJob({
+    admin,
+    idempotencyKey: "failed-job",
+  }), {
+    id: "failed-job",
+    status: "retry_pending",
+  });
+  assert.deepEqual(jobs.get("failed-job"), {
+    attempts: 0,
+    lastErrorCode: "admin_retry_requested",
+    retryRequestedAt: "SERVER_TIMESTAMP",
+    retryRequestedByEmail: "admin@example.test",
+    retryRequestedByUid: "admin-1",
+    status: "retry_pending",
+  });
+  await assert.rejects(
+    adapter.requeueAdminNotificationJob({
+      admin,
+      idempotencyKey: "sent-job",
+    }),
+    (error) => error.code === "admin_notification_retry_conflict",
+  );
+});
+
 test("claims one notification attempt and rejects concurrent claims", async () => {
   const firestore = new MemoryFirestore();
   const adapter = createFirestoreAdapter({

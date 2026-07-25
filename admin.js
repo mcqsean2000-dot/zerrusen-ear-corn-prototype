@@ -68,6 +68,10 @@ const rows = document.querySelector("[data-order-rows]");
 const packingList = document.querySelector("[data-packing-list]");
 const statusFilter = document.querySelector("[data-status-filter]");
 const actionStatus = document.querySelector("[data-admin-action-status]");
+const notificationMetrics = document.querySelector("[data-notification-metrics]");
+const notificationRows = document.querySelector("[data-notification-rows]");
+const notificationHealthStatus = document.querySelector("[data-notification-health-status]");
+const notificationRefreshButton = document.querySelector("[data-notification-refresh]");
 
 function asText(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -318,6 +322,11 @@ function getAdminPackableOrders(orders) {
 const adminOrders = normalizeAdminOrders(sampleOrders);
 let currentAdminOrders = adminOrders;
 let currentAdminActions = null;
+let currentNotificationHealth = {
+  counts: {},
+  jobs: [],
+  truncatedStatuses: [],
+};
 
 function setAdminOrders(orders) {
   currentAdminOrders = normalizeAdminOrders(orders);
@@ -338,12 +347,89 @@ function hasAdminActions() {
 function setAdminActions(actions) {
   currentAdminActions = actions && typeof actions.postAdminJson === "function" ? actions : null;
   render(currentAdminOrders);
+  renderNotificationHealth();
+  if (currentAdminActions) refreshNotificationHealth();
 }
 
 function clearAdminActions() {
   currentAdminActions = null;
   setAdminActionStatus("");
   render(currentAdminOrders);
+  setNotificationHealth();
+}
+
+function normalizeNotificationHealth(value) {
+  const source = value && typeof value === "object" ? value : {};
+  const counts = source.counts && typeof source.counts === "object" ? source.counts : {};
+  const jobs = Array.isArray(source.jobs) ? source.jobs : [];
+  return {
+    counts: Object.fromEntries(
+      ["pending", "processing", "retry_pending", "sent", "failed"].map((status) => [
+        status,
+        asWholeNumber(counts[status]),
+      ]),
+    ),
+    jobs: jobs.map((job) => ({
+      attempts: asWholeNumber(job?.attempts),
+      eventName: asText(job?.eventName) || "unknown",
+      id: asText(job?.id),
+      lastErrorCode: asText(job?.lastErrorCode),
+      maxAttempts: asWholeNumber(job?.maxAttempts),
+      recipientCategory: asText(job?.recipientCategory) || "unknown",
+      status: asText(job?.status) || "unknown",
+    })).filter((job) => job.id),
+    truncatedStatuses: Array.isArray(source.truncatedStatuses)
+      ? source.truncatedStatuses.map(asText).filter(Boolean)
+      : [],
+  };
+}
+
+function setNotificationHealth(value) {
+  currentNotificationHealth = normalizeNotificationHealth(value);
+  renderNotificationHealth();
+}
+
+function renderNotificationHealth() {
+  if (!notificationMetrics || !notificationRows || !notificationHealthStatus) return;
+  const health = currentNotificationHealth;
+  const labels = {
+    pending: "Pending",
+    processing: "Processing",
+    retry_pending: "Retrying",
+    sent: "Sent",
+    failed: "Failed",
+  };
+  notificationMetrics.innerHTML = Object.keys(labels).map((status) => (
+    '<div class="notification-metric"><strong>' +
+    health.counts[status] +
+    "</strong><span>" +
+    escapeHtml(labels[status]) +
+    "</span></div>"
+  )).join("");
+
+  notificationRows.innerHTML = health.jobs.map((job) => {
+    const retryable = ["failed", "retry_pending"].includes(job.status) &&
+      currentAdminActions &&
+      currentAdminActions.endpoints &&
+      asText(currentAdminActions.endpoints.notificationRetry);
+    return [
+      "<tr>",
+      "<td><strong>" + escapeHtml(job.id) + "</strong><small>" + escapeHtml(job.recipientCategory) + "</small></td>",
+      "<td>" + escapeHtml(job.eventName) + "</td>",
+      '<td><span class="status-pill" data-status="' + escapeHtml(job.status) + '">' + escapeHtml(job.status.replace(/_/g, " ")) + "</span></td>",
+      "<td>" + job.attempts + (job.maxAttempts ? " / " + job.maxAttempts : "") + "</td>",
+      "<td>" + escapeHtml(job.lastErrorCode || "None") + "</td>",
+      '<td><button class="admin-action notification-retry" type="button" data-notification-retry="' + escapeHtml(job.id) + '"' + (retryable ? "" : " disabled") + ">Retry</button></td>",
+      "</tr>",
+    ].join("");
+  }).join("");
+
+  const total = Object.values(health.counts).reduce((sum, count) => sum + count, 0);
+  notificationHealthStatus.textContent = health.truncatedStatuses.length
+    ? "Showing a bounded result; high-volume statuses: " + health.truncatedStatuses.join(", ") + "."
+    : total
+      ? "Notification health loaded."
+      : "No notification jobs found.";
 }
 
 function setAdminActionStatus(message, tone = "") {
@@ -392,6 +478,7 @@ if (typeof window !== "undefined") {
     hasActions: hasAdminActions,
     render,
     setActions: setAdminActions,
+    setNotificationHealth,
     setOrders: setAdminOrders,
   };
 }
@@ -524,6 +611,56 @@ async function handleLabelAction(target) {
   }
 }
 
+async function refreshNotificationHealth() {
+  if (
+    !currentAdminActions ||
+    typeof currentAdminActions.getAdminJson !== "function" ||
+    !asText(currentAdminActions.endpoints?.notificationHealth)
+  ) {
+    return;
+  }
+
+  if (notificationRefreshButton) notificationRefreshButton.disabled = true;
+  if (notificationHealthStatus) notificationHealthStatus.textContent = "Loading notification health...";
+  try {
+    const result = await currentAdminActions.getAdminJson({
+      endpoint: currentAdminActions.endpoints.notificationHealth,
+      user: currentAdminActions.user,
+    });
+    setNotificationHealth(result);
+  } catch (error) {
+    if (notificationHealthStatus) notificationHealthStatus.textContent = "Notification health could not be loaded.";
+  } finally {
+    if (notificationRefreshButton) notificationRefreshButton.disabled = false;
+  }
+}
+
+async function handleNotificationRetry(target) {
+  const idempotencyKey = asText(target?.dataset?.notificationRetry);
+  if (
+    !idempotencyKey ||
+    !currentAdminActions ||
+    typeof currentAdminActions.postAdminJson !== "function" ||
+    !asText(currentAdminActions.endpoints?.notificationRetry)
+  ) {
+    return;
+  }
+
+  target.disabled = true;
+  try {
+    await currentAdminActions.postAdminJson({
+      endpoint: currentAdminActions.endpoints.notificationRetry,
+      user: currentAdminActions.user,
+      body: { idempotencyKey },
+    });
+    setAdminActionStatus("Notification retry queued.");
+    await refreshNotificationHealth();
+  } catch (error) {
+    target.disabled = false;
+    setAdminActionStatus("Notification retry could not be queued.", "error");
+  }
+}
+
 statusFilter.addEventListener("change", () => render());
 rows.addEventListener("change", (event) => {
   if (event.target && event.target.dataset && event.target.dataset.statusAction === "update") {
@@ -535,4 +672,15 @@ rows.addEventListener("click", (event) => {
     handleLabelAction(event.target);
   }
 });
+if (notificationRefreshButton) {
+  notificationRefreshButton.addEventListener("click", refreshNotificationHealth);
+}
+if (notificationRows) {
+  notificationRows.addEventListener("click", (event) => {
+    if (event.target && event.target.dataset && event.target.dataset.notificationRetry) {
+      handleNotificationRetry(event.target);
+    }
+  });
+}
 render();
+renderNotificationHealth();

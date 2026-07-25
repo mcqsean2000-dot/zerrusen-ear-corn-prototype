@@ -10,6 +10,8 @@
     }),
     endpoints: Object.freeze({
       labelPurchase: "/api/admin/shippo-labels",
+      notificationHealth: "/api/admin/notifications",
+      notificationRetry: "/api/admin/notifications/retry",
       statusUpdate: "/api/admin/order-status",
     }),
   });

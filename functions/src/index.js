@@ -92,7 +92,7 @@ function buildCorsHeaders(req, env) {
   if (allowedOrigins.includes(origin) || (env.NODE_ENV !== "production" && isLocalDevelopmentOrigin(origin))) {
     return {
       "access-control-allow-origin": origin,
-      "access-control-allow-methods": "POST, OPTIONS",
+      "access-control-allow-methods": "GET, POST, OPTIONS",
       "access-control-allow-headers": "authorization, content-type, stripe-signature",
       "access-control-max-age": "300",
       vary: "Origin",
@@ -263,6 +263,36 @@ function resolveAdminStatusUpdater(options) {
 
   if (options.adminStatusDependencies && typeof options.adminStatusDependencies.updateAdminOrderStatus === "function") {
     return options.adminStatusDependencies.updateAdminOrderStatus;
+  }
+
+  return null;
+}
+
+function resolveAdminNotificationLister(options) {
+  if (typeof options.listAdminNotificationJobs === "function") {
+    return options.listAdminNotificationJobs;
+  }
+
+  if (
+    options.adminNotificationDependencies &&
+    typeof options.adminNotificationDependencies.listAdminNotificationJobs === "function"
+  ) {
+    return options.adminNotificationDependencies.listAdminNotificationJobs;
+  }
+
+  return null;
+}
+
+function resolveAdminNotificationRequeuer(options) {
+  if (typeof options.requeueAdminNotificationJob === "function") {
+    return options.requeueAdminNotificationJob;
+  }
+
+  if (
+    options.adminNotificationDependencies &&
+    typeof options.adminNotificationDependencies.requeueAdminNotificationJob === "function"
+  ) {
+    return options.adminNotificationDependencies.requeueAdminNotificationJob;
   }
 
   return null;
@@ -912,6 +942,151 @@ async function adminOrderStatusHandler(req, res, options = {}) {
   }
 }
 
+async function adminNotificationHealthHandler(req, res, options = {}) {
+  const env = options.env || process.env;
+  const corsHeaders = buildCorsHeaders(req, env);
+
+  if (req.method === "OPTIONS") {
+    return sendCorsPreflight(req, res, env);
+  }
+
+  if (req.method !== "GET") {
+    return sendJson(res, 405, {
+      error: {
+        code: "method_not_allowed",
+        message: "Use GET to review notification health.",
+      },
+    }, { allow: "GET, OPTIONS", ...corsHeaders });
+  }
+
+  const admin = await requireAuthenticatedAdmin(req, res, options, corsHeaders);
+  if (!admin) return null;
+
+  const listNotifications = resolveAdminNotificationLister(options);
+  if (typeof listNotifications !== "function") {
+    return sendJson(res, 501, {
+      error: {
+        code: "admin_notification_dependency_missing",
+        message: "Notification health requires trusted outbox persistence.",
+      },
+      mock: true,
+      ...safeSetupDetails(env, ["listAdminNotificationJobs"]),
+    }, corsHeaders);
+  }
+
+  const requestedLimit = Number(new URL(req.url, "http://localhost").searchParams.get("limit") || 25);
+  try {
+    const result = await listNotifications({ admin, limit: requestedLimit });
+    return sendJson(res, 200, {
+      counts: result.counts,
+      jobs: result.jobs,
+      truncatedStatuses: result.truncatedStatuses,
+    }, corsHeaders);
+  } catch (error) {
+    if (error.code === "admin_notification_limit_invalid") {
+      return sendJson(res, 400, {
+        error: {
+          code: error.code,
+          message: "Notification health limit must be from 1 to 50.",
+        },
+      }, corsHeaders);
+    }
+    return sendJson(res, 502, {
+      error: {
+        code: "admin_notification_health_failed",
+        message: "Notification health could not be loaded.",
+      },
+    }, corsHeaders);
+  }
+}
+
+async function adminNotificationRetryHandler(req, res, options = {}) {
+  const env = options.env || process.env;
+  const corsHeaders = buildCorsHeaders(req, env);
+
+  if (req.method === "OPTIONS") {
+    return sendCorsPreflight(req, res, env);
+  }
+
+  if (req.method !== "POST") {
+    return sendJson(res, 405, {
+      error: {
+        code: "method_not_allowed",
+        message: "Use POST to retry a notification.",
+      },
+    }, { allow: "POST, OPTIONS", ...corsHeaders });
+  }
+
+  const admin = await requireAuthenticatedAdmin(req, res, options, corsHeaders);
+  if (!admin) return null;
+
+  let body;
+  try {
+    body = await readJsonBody(req);
+  } catch (error) {
+    return sendJson(res, 400, {
+      error: {
+        code: "invalid_json",
+        message: "Send a valid JSON notification retry request.",
+      },
+    }, corsHeaders);
+  }
+
+  const requeueNotification = resolveAdminNotificationRequeuer(options);
+  if (typeof requeueNotification !== "function") {
+    return sendJson(res, 501, {
+      error: {
+        code: "admin_notification_dependency_missing",
+        message: "Notification retry requires trusted outbox persistence.",
+      },
+      mock: true,
+      ...safeSetupDetails(env, ["requeueAdminNotificationJob"]),
+    }, corsHeaders);
+  }
+
+  try {
+    const result = await requeueNotification({
+      admin,
+      idempotencyKey: body.idempotencyKey,
+    });
+    return sendJson(res, 200, {
+      idempotencyKey: result.id,
+      status: result.status,
+    }, corsHeaders);
+  } catch (error) {
+    if (error.code === "admin_actor_invalid" || error.code === "admin_notification_id_invalid") {
+      return sendJson(res, 400, {
+        error: {
+          code: error.code,
+          message: "Check the admin identity and notification job ID.",
+        },
+      }, corsHeaders);
+    }
+    if (error.code === "admin_notification_not_found") {
+      return sendJson(res, 404, {
+        error: {
+          code: error.code,
+          message: "Notification job was not found.",
+        },
+      }, corsHeaders);
+    }
+    if (error.code === "admin_notification_retry_conflict") {
+      return sendJson(res, 409, {
+        error: {
+          code: error.code,
+          message: "Only failed or retry-pending notifications can be retried.",
+        },
+      }, corsHeaders);
+    }
+    return sendJson(res, 502, {
+      error: {
+        code: "admin_notification_retry_failed",
+        message: "Notification retry could not be queued.",
+      },
+    }, corsHeaders);
+  }
+}
+
 async function stripeWebhookHandler(req, res, options = {}) {
   const env = options.env || process.env;
   const corsHeaders = buildCorsHeaders(req, env);
@@ -1021,6 +1196,14 @@ function routeRequest(req, res, options = {}) {
     return adminOrderStatusHandler(req, res, options);
   }
 
+  if (path === "/api/admin/notifications") {
+    return adminNotificationHealthHandler(req, res, options);
+  }
+
+  if (path === "/api/admin/notifications/retry") {
+    return adminNotificationRetryHandler(req, res, options);
+  }
+
   if (path === "/api/admin/shippo-labels") {
     return adminShippingLabelsHandler(req, res, options);
   }
@@ -1062,6 +1245,8 @@ if (require.main === module) {
 }
 
 module.exports = {
+  adminNotificationHealthHandler,
+  adminNotificationRetryHandler,
   adminOrderStatusHandler,
   adminShippingLabelsHandler,
   buildCorsHeaders,
@@ -1075,6 +1260,8 @@ module.exports = {
   resolveShippingLabelPurchaser,
   resolveAdminStatusUpdater,
   resolveAdminAuthenticator,
+  resolveAdminNotificationLister,
+  resolveAdminNotificationRequeuer,
   readJsonBody,
   readRawBody,
   routeRequest,

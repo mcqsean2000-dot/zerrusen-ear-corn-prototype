@@ -106,13 +106,46 @@
     return payload;
   }
 
+  async function getAdminJson({ endpoint, user, fetchImpl = fetch }) {
+    const target = text(endpoint);
+    if (!target) {
+      throw new Error("Admin endpoint is not configured.");
+    }
+
+    const response = await fetchImpl(target, {
+      method: "GET",
+      headers: await authHeaders(user),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(payload.error && payload.error.message || "Admin request failed.");
+      error.code = payload.error && payload.error.code || "admin_request_failed";
+      error.status = response.status;
+      throw error;
+    }
+    return payload;
+  }
+
   function setAuthState(message, authorized, authenticated = authorized) {
     const status = document.querySelector("[data-admin-auth-status]");
     if (status) status.textContent = message;
+    const help = document.querySelector("[data-admin-auth-help]");
+    if (help && authorized) {
+      help.textContent = "Live fulfillment tools are ready.";
+    } else if (help && authenticated) {
+      help.textContent = "This account is signed in but does not have admin access.";
+    } else if (help && message === "Sign in required") {
+      help.textContent = "Sign in with Google or a Firebase admin account to load live order requests.";
+    }
     document.documentElement.toggleAttribute("data-admin-signed-in", Boolean(authorized));
     const signOutButton = document.querySelector("[data-admin-sign-out]");
     if (signOutButton) signOutButton.hidden = !authenticated;
     if (typeof document.querySelectorAll === "function") {
+      document.querySelectorAll(
+        "[data-admin-sign-in-form] > :not([data-admin-sign-out])",
+      ).forEach((element) => {
+        element.hidden = Boolean(authenticated);
+      });
       document.querySelectorAll("[data-admin-content]").forEach((element) => {
         element.hidden = !authorized;
       });
@@ -135,8 +168,11 @@
       global.TheosAdminOrders.setActions({
         endpoints: {
           labelPurchase: endpointFor("labelPurchase"),
+          notificationHealth: endpointFor("notificationHealth"),
+          notificationRetry: endpointFor("notificationRetry"),
           statusUpdate: endpointFor("statusUpdate"),
         },
+        getAdminJson,
         postAdminJson,
         user,
       });
@@ -283,7 +319,8 @@
           global.TheosAdminOrders.setOrders(orders);
         }
         setAdminActions(user);
-        setAuthState("Signed in", true);
+        const accountEmail = text(user.email);
+        setAuthState(accountEmail ? "Signed in as " + accountEmail : "Signed in", true);
       } catch (error) {
         clearAdminActions();
         setAuthState("Admin access denied", false, true);
@@ -302,6 +339,7 @@
     authHeaders,
     configuredFirebase,
     endpointFor,
+    getAdminJson,
     initializeAdminLive,
     orderFromSnapshot,
     orderQuerySpec,

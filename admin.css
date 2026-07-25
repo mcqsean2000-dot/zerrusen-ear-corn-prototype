@@ -10,6 +10,7 @@
 :root[data-admin-signed-in] .admin-auth-panel strong { color: var(--leaf); }
 .admin-sign-in { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; align-items: end; }
 .admin-sign-in label { display: grid; gap: 5px; color: var(--muted); font-size: 0.78rem; font-weight: 900; }
+.admin-sign-in > [hidden] { display: none; }
 .admin-sign-in input { width: 180px; min-height: 36px; border: 1px solid var(--line); border-radius: 7px; padding: 0 10px; color: var(--ink); background: #fbfaf6; }
 .admin-sign-in button { min-height: 36px; border: 1px solid var(--field); border-radius: 7px; padding: 0 12px; color: #fff; background: var(--field); font-weight: 900; }
 .admin-sign-in .admin-google-sign-in { border-color: var(--line); color: var(--ink); background: #fff; }
@@ -22,6 +23,13 @@
 .metric { display: grid; gap: 8px; padding: 18px; }
 .metric strong { color: var(--ink); font-size: 2rem; }
 .metric span { color: var(--muted); font-weight: 800; }
+.admin-notifications { display: grid; gap: 16px; }
+.notification-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.notification-metric { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--line); border-radius: 7px; background: #fbfaf6; }
+.notification-metric strong { color: var(--ink); font-size: 1.35rem; }
+.notification-metric span { color: var(--muted); font-size: 0.78rem; font-weight: 900; text-transform: uppercase; }
+.notification-table { min-width: 820px; }
+.notification-retry { border-color: #9b2c2c; color: #9b2c2c; background: #fff8f8; }
 .admin-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
 .admin-panel { padding: 20px; }
 .admin-panel-head { display: flex; justify-content: space-between; gap: 18px; align-items: start; margin-bottom: 18px; }
@@ -49,7 +57,7 @@
 .packing-row { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--line); }
 .packing-row strong { color: var(--ink); }
 @media (max-width: 900px) {
-  .admin-metrics, .admin-layout { grid-template-columns: 1fr; }
+  .admin-metrics, .admin-layout, .notification-metrics { grid-template-columns: 1fr; }
   .admin-auth-panel { display: grid; }
   .admin-panel-head { display: grid; }
 }

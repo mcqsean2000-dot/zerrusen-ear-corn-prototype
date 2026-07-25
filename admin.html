@@ -57,6 +57,34 @@
 
       <section class="admin-metrics" aria-label="Fulfillment summary" data-admin-summary data-admin-content hidden></section>
 
+      <section class="admin-panel admin-notifications" id="notifications" aria-labelledby="notifications-title" data-admin-content hidden>
+        <div class="admin-panel-head">
+          <div>
+            <p class="eyebrow">Delivery health</p>
+            <h2 id="notifications-title">Notifications</h2>
+            <p class="admin-note">Recipient addresses and message bodies stay hidden from this view.</p>
+          </div>
+          <button class="admin-action" type="button" data-notification-refresh>Refresh</button>
+        </div>
+        <div class="notification-metrics" data-notification-metrics></div>
+        <p class="admin-note" data-notification-health-status>Notification health loads after admin sign-in.</p>
+        <div class="admin-table-wrap">
+          <table class="admin-table notification-table">
+            <thead>
+              <tr>
+                <th scope="col">Job</th>
+                <th scope="col">Event</th>
+                <th scope="col">Status</th>
+                <th scope="col">Attempts</th>
+                <th scope="col">Last error</th>
+                <th scope="col">Recovery</th>
+              </tr>
+            </thead>
+            <tbody data-notification-rows></tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="admin-layout" id="orders" aria-labelledby="orders-title" data-admin-content hidden>
         <div class="admin-panel">
           <div class="admin-panel-head">

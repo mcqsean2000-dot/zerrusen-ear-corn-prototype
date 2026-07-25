@@ -3,6 +3,8 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
+  adminNotificationHealthHandler,
+  adminNotificationRetryHandler,
   adminOrderStatusHandler,
   adminShippingLabelsHandler,
   checkoutSessionsHandler,
@@ -63,11 +65,12 @@ function authenticateAdminRequest() {
   return authenticatedAdmin;
 }
 
-function mockReq({ method = "POST", headers = {}, body = {} } = {}) {
+function mockReq({ method = "POST", headers = {}, body = {}, url = "/" } = {}) {
   return {
     method,
     headers,
     body,
+    url,
   };
 }
 
@@ -149,7 +152,7 @@ test("checkout handler supports CORS preflight for configured storefront origin"
 
   assert.equal(res.statusCode, 204);
   assert.equal(res.headers["access-control-allow-origin"], "https://theos.example");
-  assert.equal(res.headers["access-control-allow-methods"], "POST, OPTIONS");
+  assert.equal(res.headers["access-control-allow-methods"], "GET, POST, OPTIONS");
 });
 
 test("checkout handler rejects unsupported methods", async () => {
@@ -732,6 +735,109 @@ test("admin shipping label handler buys label through trusted dependencies", asy
   assert.equal(body.shippoTransactionId, "transaction_123");
   assert.equal(body.labelUrl, "https://shippo.example/label.pdf");
   assert.equal(recordedFields.trustedUpdatedAt, "SERVER_TIMESTAMP");
+});
+
+test("admin notification health returns only trusted safe job fields", async () => {
+  const req = mockReq({
+    method: "GET",
+    url: "/api/admin/notifications?limit=25",
+  });
+  const res = mockRes();
+  let receivedLimit = 0;
+
+  await adminNotificationHealthHandler(req, res, {
+    authenticateAdminRequest,
+    async listAdminNotificationJobs({ admin, limit }) {
+      assert.deepEqual(admin, authenticatedAdmin);
+      receivedLimit = limit;
+      return {
+        counts: { failed: 1, pending: 0, processing: 0, retry_pending: 0, sent: 2 },
+        jobs: [{
+          attempts: 5,
+          eventName: "admin.paid_order_created",
+          id: "admin.paid_order_created:order-1:event-1",
+          lastErrorCode: "resend_validation_error",
+          maxAttempts: 5,
+          recipientCategory: "admin",
+          status: "failed",
+        }],
+        truncatedStatuses: [],
+      };
+    },
+  });
+
+  assert.equal(receivedLimit, 25);
+  assert.equal(res.statusCode, 200);
+  assert.equal(parseJson(res).counts.failed, 1);
+  assert.equal(parseJson(res).jobs[0].status, "failed");
+  assert.equal("to" in parseJson(res).jobs[0], false);
+  assert.equal("text" in parseJson(res).jobs[0], false);
+});
+
+test("admin notification health requires authenticated admin access", async () => {
+  const req = mockReq({ method: "GET", url: "/api/admin/notifications" });
+  const res = mockRes();
+
+  await adminNotificationHealthHandler(req, res, {
+    async authenticateAdminRequest() {
+      const error = new Error("forbidden");
+      error.code = "admin_forbidden";
+      throw error;
+    },
+    async listAdminNotificationJobs() {
+      throw new Error("must not run");
+    },
+  });
+
+  assert.equal(res.statusCode, 403);
+  assert.equal(parseJson(res).error.code, "admin_forbidden");
+});
+
+test("admin notification retry requeues through authenticated persistence", async () => {
+  const req = mockReq({
+    body: { idempotencyKey: "admin.paid_order_created:order-1:event-1" },
+    url: "/api/admin/notifications/retry",
+  });
+  const res = mockRes();
+  let received = null;
+
+  await adminNotificationRetryHandler(req, res, {
+    authenticateAdminRequest,
+    async requeueAdminNotificationJob(input) {
+      received = input;
+      return {
+        id: input.idempotencyKey,
+        status: "retry_pending",
+      };
+    },
+  });
+
+  assert.deepEqual(received, {
+    admin: authenticatedAdmin,
+    idempotencyKey: "admin.paid_order_created:order-1:event-1",
+  });
+  assert.equal(res.statusCode, 200);
+  assert.equal(parseJson(res).status, "retry_pending");
+});
+
+test("admin notification retry rejects active delivery conflicts", async () => {
+  const req = mockReq({
+    body: { idempotencyKey: "customer.order_confirmation:order-1:event-1" },
+    url: "/api/admin/notifications/retry",
+  });
+  const res = mockRes();
+
+  await adminNotificationRetryHandler(req, res, {
+    authenticateAdminRequest,
+    async requeueAdminNotificationJob() {
+      const error = new Error("processing");
+      error.code = "admin_notification_retry_conflict";
+      throw error;
+    },
+  });
+
+  assert.equal(res.statusCode, 409);
+  assert.equal(parseJson(res).error.code, "admin_notification_retry_conflict");
 });
 
 test("webhook handler requires Stripe signature after env is configured", async () => {
