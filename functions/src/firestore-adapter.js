@@ -517,13 +517,120 @@ function createFirestoreAdapter(options = {}) {
         attempt: attempts + 1,
         post: {
           caption: cleanText(data.caption),
+          ...(cleanText(data.facebookPostId) ? { facebookPostId: cleanText(data.facebookPostId) } : {}),
           hashtags: Array.isArray(data.hashtags) ? [...data.hashtags] : [],
           imageUrl: cleanText(data.imageUrl),
+          ...(cleanText(data.instagramPostId) ? { instagramPostId: cleanText(data.instagramPostId) } : {}),
           platforms: Array.isArray(data.platforms) ? [...data.platforms] : [],
           postId,
           scheduledAt: data.scheduledAt,
         },
       };
+    });
+  }
+
+  async function recordSocialPostPlatformSuccess({ attempt, platform, postId, providerPostId }) {
+    const id = cleanText(postId);
+    const attemptNumber = Number(attempt);
+    const target = cleanText(platform).toLowerCase();
+    const providerId = cleanText(providerPostId);
+    if (
+      !/^[a-z0-9][a-z0-9_-]{2,79}$/.test(id) ||
+      !Number.isInteger(attemptNumber) || attemptNumber < 1 || attemptNumber > 5 ||
+      !["facebook", "instagram"].includes(target) ||
+      !/^[A-Za-z0-9_.:-]{1,200}$/.test(providerId)
+    ) {
+      const error = new Error("Social platform success requires safe bounded result fields.");
+      error.code = "social_post_platform_result_invalid";
+      throw error;
+    }
+
+    const ref = collectionRef(firestore, socialPostQueueCollectionName(options)).doc(id);
+    const idField = target === "facebook" ? "facebookPostId" : "instagramPostId";
+    return firestore.runTransaction(async (transaction) => {
+      const data = normalizeSnapshot(await transaction.get(ref));
+      if (!data || data.status !== "publishing" || data.publishAttempts !== attemptNumber) {
+        const error = new Error("Social platform success does not match the active publish attempt.");
+        error.code = "social_post_publish_state_conflict";
+        throw error;
+      }
+      if (cleanText(data[idField]) && cleanText(data[idField]) !== providerId) {
+        const error = new Error("Social platform already has a different provider post ID.");
+        error.code = "social_post_provider_id_conflict";
+        throw error;
+      }
+      transaction.update(ref, {
+        [idField]: providerId,
+        lastPublishProgressAt: timestamp(),
+      });
+      return true;
+    });
+  }
+
+  async function completeSocialPostPublishing({ attempt, postId }) {
+    const id = cleanText(postId);
+    const attemptNumber = Number(attempt);
+    if (!/^[a-z0-9][a-z0-9_-]{2,79}$/.test(id) || !Number.isInteger(attemptNumber)) {
+      const error = new Error("Social post completion requires a safe post and attempt.");
+      error.code = "social_post_completion_invalid";
+      throw error;
+    }
+
+    const ref = collectionRef(firestore, socialPostQueueCollectionName(options)).doc(id);
+    return firestore.runTransaction(async (transaction) => {
+      const data = normalizeSnapshot(await transaction.get(ref));
+      const platforms = Array.isArray(data && data.platforms) ? data.platforms : [];
+      const complete = platforms.length > 0 && platforms.every((platform) => (
+        platform === "facebook" ? cleanText(data.facebookPostId) :
+          platform === "instagram" ? cleanText(data.instagramPostId) : ""
+      ));
+      if (!data || data.status !== "publishing" || data.publishAttempts !== attemptNumber || !complete) {
+        const error = new Error("Social post completion does not match a fully published active attempt.");
+        error.code = "social_post_publish_state_conflict";
+        throw error;
+      }
+      transaction.update(ref, {
+        lastErrorCode: "",
+        lastPublishFinishedAt: timestamp(),
+        publishedAt: timestamp(),
+        status: "published",
+      });
+      return true;
+    });
+  }
+
+  async function recordSocialPostFailure({ attempt, errorCode, maxAttempts, postId, retryable }) {
+    const id = cleanText(postId);
+    const attemptNumber = Number(attempt);
+    const attemptLimit = Number(maxAttempts);
+    const code = cleanText(errorCode);
+    if (
+      !/^[a-z0-9][a-z0-9_-]{2,79}$/.test(id) ||
+      !Number.isInteger(attemptNumber) || attemptNumber < 1 ||
+      !Number.isInteger(attemptLimit) || attemptLimit < 1 || attemptLimit > 5 ||
+      !/^[A-Za-z0-9_.-]{1,80}$/.test(code) ||
+      typeof retryable !== "boolean"
+    ) {
+      const error = new Error("Social post failure requires safe bounded result fields.");
+      error.code = "social_post_failure_result_invalid";
+      throw error;
+    }
+
+    const ref = collectionRef(firestore, socialPostQueueCollectionName(options)).doc(id);
+    return firestore.runTransaction(async (transaction) => {
+      const data = normalizeSnapshot(await transaction.get(ref));
+      if (!data || data.status !== "publishing" || data.publishAttempts !== attemptNumber) {
+        const error = new Error("Social post failure does not match the active publish attempt.");
+        error.code = "social_post_publish_state_conflict";
+        throw error;
+      }
+      const canRetry = retryable && attemptNumber < attemptLimit;
+      transaction.update(ref, {
+        lastErrorCode: code,
+        lastPublishFinishedAt: timestamp(),
+        status: canRetry ? "approved" : "failed",
+      });
+      return { retryable: canRetry };
     });
   }
 
@@ -1239,6 +1346,7 @@ function createFirestoreAdapter(options = {}) {
     claimDueSocialPost,
     claimStripeEventProcessing,
     claimNotificationJob,
+    completeSocialPostPublishing,
     completePaidOrderEvent,
     createOrderRequest,
     enqueueApprovedSocialPost,
@@ -1256,6 +1364,8 @@ function createFirestoreAdapter(options = {}) {
     recordAdminLabelPurchase,
     recordNotificationFailure,
     recordNotificationSuccess,
+    recordSocialPostFailure,
+    recordSocialPostPlatformSuccess,
     requeueAdminNotificationJob,
     recoverStaleNotificationJobs,
     updateAdminOrderStatus,

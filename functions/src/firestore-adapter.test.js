@@ -283,6 +283,70 @@ test("does not claim future social posts and bounds publish attempts", async () 
   );
 });
 
+test("preserves completed platforms across retry and completes only after all targets", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({
+    firestore,
+    serverTimestamp() {
+      return "SERVER_TIMESTAMP";
+    },
+  });
+  const post = approvedSocialPost();
+  await adapter.enqueueApprovedSocialPost({ post });
+  await adapter.claimDueSocialPost({ now: new Date("2026-07-27T14:01:00.000Z") });
+
+  assert.equal(await adapter.recordSocialPostPlatformSuccess({
+    attempt: 1,
+    platform: "facebook",
+    postId: post.postId,
+    providerPostId: "facebook_123",
+  }), true);
+  await assert.rejects(
+    adapter.completeSocialPostPublishing({ attempt: 1, postId: post.postId }),
+    (error) => error.code === "social_post_publish_state_conflict",
+  );
+  assert.deepEqual(await adapter.recordSocialPostFailure({
+    attempt: 1,
+    errorCode: "meta_graph_network_error",
+    maxAttempts: 3,
+    postId: post.postId,
+    retryable: true,
+  }), { retryable: true });
+
+  const retry = await adapter.claimDueSocialPost({ now: new Date("2026-07-27T14:02:00.000Z") });
+  assert.equal(retry.attempt, 2);
+  assert.equal(retry.post.facebookPostId, "facebook_123");
+  assert.equal(retry.post.instagramPostId, undefined);
+  await adapter.recordSocialPostPlatformSuccess({
+    attempt: 2,
+    platform: "instagram",
+    postId: post.postId,
+    providerPostId: "instagram_123",
+  });
+  assert.equal(await adapter.completeSocialPostPublishing({ attempt: 2, postId: post.postId }), true);
+  const stored = collectionDocs(firestore, "socialPostQueue").get(post.postId);
+  assert.equal(stored.status, "published");
+  assert.equal(stored.facebookPostId, "facebook_123");
+  assert.equal(stored.instagramPostId, "instagram_123");
+});
+
+test("moves permanent and exhausted social publishing failures to failed", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({ firestore });
+  const post = approvedSocialPost();
+  await adapter.enqueueApprovedSocialPost({ post });
+  await adapter.claimDueSocialPost({ now: new Date("2026-07-27T14:01:00.000Z"), maxAttempts: 1 });
+
+  assert.deepEqual(await adapter.recordSocialPostFailure({
+    attempt: 1,
+    errorCode: "meta_graph_190",
+    maxAttempts: 1,
+    postId: post.postId,
+    retryable: false,
+  }), { retryable: false });
+  assert.equal(collectionDocs(firestore, "socialPostQueue").get(post.postId).status, "failed");
+});
+
 test("creates order requests in the configured collection", async () => {
   const firestore = new MemoryFirestore();
   const adapter = createFirestoreAdapter({

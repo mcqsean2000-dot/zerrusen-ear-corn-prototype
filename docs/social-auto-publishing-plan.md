@@ -129,7 +129,9 @@ The repository now includes a server-only, SDK-free queue boundary and Firestore
 - create queue documents idempotently and transactionally claim one due post;
 - prevent browser access through the existing default-deny Firestore rules.
 
-This foundation does not call Meta, read credentials, deploy functions, or publish a post. A later publisher must record success/failure and safely release or terminate a `publishing` claim.
+The repository also includes a secret-injected Meta Graph adapter, a provider-neutral per-platform worker, and an explicit `SOCIAL_PUBLISHING_ENABLED` runtime gate. Platform IDs are persisted separately so a retry can skip a platform that already succeeded. Provider failures are sanitized and bounded; persistence failures after a provider success leave the post locked for manual reconciliation to avoid an automatic duplicate.
+
+This foundation is not connected to a Firebase schedule, has no committed credentials, has not been deployed, and cannot publish while the runtime gate remains disabled. Stale `publishing` claim reconciliation is still required before production activation.
 
 ## Initial Implementation Steps
 
@@ -138,7 +140,7 @@ This foundation does not call Meta, read credentials, deploy functions, or publi
 3. Create or identify the Meta Developer app.
 4. Generate the correct Page access token.
 5. Add Meta IDs/tokens to Firebase secrets.
-6. Add a disabled-by-default Firebase scheduled publisher. The approved queue and due-post claim foundation are implemented; the Meta adapter and schedule are not.
+6. Add a disabled-by-default Firebase scheduled publisher. The approved queue, due-post claim, Meta adapter, and guarded worker are implemented; the Firebase schedule is not.
 7. Test with one approved post.
 8. Turn on daily publishing after the test succeeds.
 
