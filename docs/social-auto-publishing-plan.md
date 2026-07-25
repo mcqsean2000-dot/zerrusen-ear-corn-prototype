@@ -89,6 +89,7 @@ Suggested statuses:
 - `draft`
 - `approved`
 - `publishing`
+- `needs_reconciliation`
 - `published`
 - `failed`
 - `skipped`
@@ -131,7 +132,9 @@ The repository now includes a server-only, SDK-free queue boundary and Firestore
 
 The repository also includes a secret-injected Meta Graph adapter, a provider-neutral per-platform worker, and an explicit `SOCIAL_PUBLISHING_ENABLED` runtime gate. Platform IDs are persisted separately so a retry can skip a platform that already succeeded. Provider failures are sanitized and bounded; persistence failures after a provider success leave the post locked for manual reconciliation to avoid an automatic duplicate.
 
-This foundation is not connected to a Firebase schedule, has no committed credentials, has not been deployed, and cannot publish while the runtime gate remains disabled. Stale `publishing` claim reconciliation is still required before production activation.
+Expired `publishing` leases are handled conservatively: posts with every required provider ID are finalized, while ambiguous records move to `needs_reconciliation` and are never automatically republished. Recovery is separately gated by `SOCIAL_RECONCILIATION_ENABLED`.
+
+This foundation is not connected to a Firebase schedule, has no committed credentials, has not been deployed, and cannot publish while the runtime gate remains disabled. An admin review path for `needs_reconciliation` is still required before production activation.
 
 ## Initial Implementation Steps
 

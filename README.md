@@ -99,6 +99,7 @@ Natural search phrases to keep in mind:
 - `functions/src/meta-graph-adapter.js` - secret-injected Facebook and Instagram Graph publishing adapter
 - `functions/src/social-post-publisher.js` - provider-neutral per-platform publishing worker with bounded retries
 - `functions/src/social-post-publishing-runtime.js` - explicit opt-in composition gate for Meta publishing
+- `functions/src/social-post-reconciliation.js` - disabled-by-default stale publishing lease reconciler
 - `firebase.json` - Firebase Hosting config and Firestore deploy targets for the chosen production path
 - `.firebaserc.example` - safe Firebase project alias template for local setup
 - `firestore.rules` - initial Firestore rules for prototype order requests

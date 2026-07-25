@@ -634,6 +634,76 @@ function createFirestoreAdapter(options = {}) {
     });
   }
 
+  async function recoverStaleSocialPostClaims({ collection, limit = 20, staleBefore } = {}) {
+    const resultLimit = Number(limit);
+    const cutoffMillis = timestampMillis(staleBefore);
+    if (!Number.isInteger(resultLimit) || resultLimit < 1 || resultLimit > 50) {
+      const error = new Error("Social post lease recovery requires a limit from 1 to 50.");
+      error.code = "social_post_lease_limit_invalid";
+      throw error;
+    }
+    if (!Number.isFinite(cutoffMillis)) {
+      const error = new Error("Social post lease recovery requires a trusted cutoff time.");
+      error.code = "social_post_lease_cutoff_invalid";
+      throw error;
+    }
+    if (!isFunction(firestore.runTransaction)) {
+      const error = new Error("Firestore-like backend must provide runTransaction() for social post recovery.");
+      error.code = "firestore_transaction_missing";
+      throw error;
+    }
+
+    const posts = collectionRef(firestore, socialPostQueueCollectionName(options, collection));
+    const candidates = await queryByConstraints(posts, [
+      ["status", "==", "publishing"],
+      ["lastPublishAttemptAt", "<=", staleBefore],
+    ], resultLimit);
+    const result = { published: 0, reconciliationRequired: 0 };
+
+    for (const candidate of candidates) {
+      const ref = posts.doc(cleanText(candidate.id));
+      const action = await firestore.runTransaction(async (transaction) => {
+        const data = normalizeSnapshot(await transaction.get(ref));
+        const attemptMillis = timestampMillis(data && data.lastPublishAttemptAt);
+        const progressMillis = timestampMillis(data && data.lastPublishProgressAt);
+        const latestActivityMillis = Number.isFinite(progressMillis)
+          ? Math.max(attemptMillis, progressMillis)
+          : attemptMillis;
+        if (
+          !data ||
+          data.status !== "publishing" ||
+          !Number.isFinite(latestActivityMillis) ||
+          latestActivityMillis > cutoffMillis
+        ) {
+          return "skipped";
+        }
+
+        const platforms = Array.isArray(data.platforms) ? data.platforms : [];
+        const fullyRecorded = platforms.length > 0 && platforms.every((platform) => (
+          platform === "facebook" ? cleanText(data.facebookPostId) :
+            platform === "instagram" ? cleanText(data.instagramPostId) : ""
+        ));
+        transaction.update(ref, fullyRecorded ? {
+          lastErrorCode: "",
+          lastPublishFinishedAt: timestamp(),
+          publishedAt: timestamp(),
+          status: "published",
+        } : {
+          lastErrorCode: "publishing_lease_expired",
+          lastPublishFinishedAt: timestamp(),
+          reconciliationRequiredAt: timestamp(),
+          status: "needs_reconciliation",
+        });
+        return fullyRecorded ? "published" : "reconciliation_required";
+      });
+
+      if (action === "published") result.published += 1;
+      if (action === "reconciliation_required") result.reconciliationRequired += 1;
+    }
+
+    return result;
+  }
+
   async function createOrderRequest({ collection, orderRequest }) {
     const orders = collectionRef(firestore, orderCollectionName(options, collection));
     const ref = orders.doc();
@@ -1366,6 +1436,7 @@ function createFirestoreAdapter(options = {}) {
     recordNotificationSuccess,
     recordSocialPostFailure,
     recordSocialPostPlatformSuccess,
+    recoverStaleSocialPostClaims,
     requeueAdminNotificationJob,
     recoverStaleNotificationJobs,
     updateAdminOrderStatus,

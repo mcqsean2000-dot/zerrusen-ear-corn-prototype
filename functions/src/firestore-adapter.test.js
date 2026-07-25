@@ -347,6 +347,44 @@ test("moves permanent and exhausted social publishing failures to failed", async
   assert.equal(collectionDocs(firestore, "socialPostQueue").get(post.postId).status, "failed");
 });
 
+test("reconciles expired social claims without automatically retrying ambiguous posts", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({
+    firestore,
+    serverTimestamp() {
+      return "SERVER_TIMESTAMP";
+    },
+  });
+  const posts = collectionDocs(firestore, "socialPostQueue");
+  posts.set("fully-recorded", {
+    facebookPostId: "facebook_123",
+    instagramPostId: "instagram_123",
+    lastPublishAttemptAt: new Date("2026-07-27T13:00:00.000Z"),
+    platforms: ["facebook", "instagram"],
+    status: "publishing",
+  });
+  posts.set("ambiguous", {
+    lastPublishAttemptAt: new Date("2026-07-27T13:01:00.000Z"),
+    platforms: ["facebook"],
+    status: "publishing",
+  });
+  posts.set("recent-progress", {
+    facebookPostId: "facebook_456",
+    lastPublishAttemptAt: new Date("2026-07-27T13:00:00.000Z"),
+    lastPublishProgressAt: new Date("2026-07-27T13:55:00.000Z"),
+    platforms: ["facebook", "instagram"],
+    status: "publishing",
+  });
+
+  assert.deepEqual(await adapter.recoverStaleSocialPostClaims({
+    staleBefore: new Date("2026-07-27T13:30:00.000Z"),
+  }), { published: 1, reconciliationRequired: 1 });
+  assert.equal(posts.get("fully-recorded").status, "published");
+  assert.equal(posts.get("ambiguous").status, "needs_reconciliation");
+  assert.equal(posts.get("ambiguous").lastErrorCode, "publishing_lease_expired");
+  assert.equal(posts.get("recent-progress").status, "publishing");
+});
+
 test("creates order requests in the configured collection", async () => {
   const firestore = new MemoryFirestore();
   const adapter = createFirestoreAdapter({
