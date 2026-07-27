@@ -1,6 +1,8 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 const {
   createSocialPostPublishingRuntime,
@@ -45,4 +47,13 @@ test("runtime composes only after explicit enablement and complete injection", a
   const runtime = createSocialPostPublishingRuntime(enabledOptions());
   assert.equal(runtime.enabled, true);
   assert.deepEqual(await runtime.publishDueSocialPost({ now: new Date() }), { action: "skipped" });
+});
+
+test("Firebase runtime exports a guarded five-minute social publisher", () => {
+  const source = fs.readFileSync(path.join(__dirname, "firebase-runtime.js"), "utf8");
+  assert.match(source, /defineSecret\("META_PAGE_ACCESS_TOKEN"\)/);
+  assert.match(source, /schedule: "\*\/5 \* \* \* \*"/);
+  assert.match(source, /SOCIAL_PUBLISHING_ENABLED: process\.env\.SOCIAL_PUBLISHING_ENABLED/);
+  assert.match(source, /socialPostPublishing,/);
+  assert.match(source, /secrets: \[metaFacebookPageId, metaInstagramAccountId, metaPageAccessToken\]/);
 });

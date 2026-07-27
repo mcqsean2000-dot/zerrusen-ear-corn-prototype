@@ -324,6 +324,19 @@ function resolveAdminSocialReconciliationResolver(options) {
   return null;
 }
 
+function resolveAdminSocialPostQueuer(options) {
+  if (typeof options.queueApprovedSocialPost === "function") {
+    return options.queueApprovedSocialPost;
+  }
+  if (
+    options.adminSocialDependencies &&
+    typeof options.adminSocialDependencies.queueApprovedSocialPost === "function"
+  ) {
+    return options.adminSocialDependencies.queueApprovedSocialPost;
+  }
+  return null;
+}
+
 function resolveAdminAuthenticator(options) {
   if (typeof options.authenticateAdminRequest === "function") {
     return options.authenticateAdminRequest;
@@ -1232,6 +1245,71 @@ async function adminSocialReconciliationResolveHandler(req, res, options = {}) {
   }
 }
 
+async function adminSocialPostQueueHandler(req, res, options = {}) {
+  const env = options.env || process.env;
+  const corsHeaders = buildCorsHeaders(req, env);
+  if (req.method === "OPTIONS") return sendCorsPreflight(req, res, env);
+  if (req.method !== "POST") {
+    return sendJson(res, 405, {
+      error: { code: "method_not_allowed", message: "Use POST to approve and queue a social post." },
+    }, { allow: "POST, OPTIONS", ...corsHeaders });
+  }
+
+  const admin = await requireAuthenticatedAdmin(req, res, options, corsHeaders);
+  if (!admin) return null;
+
+  let body;
+  try {
+    body = await readJsonBody(req);
+  } catch {
+    return sendJson(res, 400, {
+      error: { code: "invalid_json", message: "Send a valid JSON social post." },
+    }, corsHeaders);
+  }
+
+  const queuePost = resolveAdminSocialPostQueuer(options);
+  if (typeof queuePost !== "function") {
+    return sendJson(res, 501, {
+      error: {
+        code: "admin_social_queue_dependency_missing",
+        message: "Social post approval requires trusted queue persistence.",
+      },
+      mock: true,
+      ...safeSetupDetails(env, ["queueApprovedSocialPost"]),
+    }, corsHeaders);
+  }
+
+  try {
+    const result = await queuePost({
+      approvedBy: admin,
+      caption: body.caption,
+      hashtags: body.hashtags,
+      imageUrl: body.imageUrl,
+      platforms: body.platforms,
+      postId: body.postId,
+      scheduledAt: body.scheduledAt,
+      status: "approved",
+    });
+    return sendJson(res, result.created ? 201 : 200, {
+      created: result.created,
+      postId: result.postId,
+      status: "approved",
+    }, corsHeaders);
+  } catch (error) {
+    if (String(error.code || "").startsWith("social_post_")) {
+      return sendJson(res, 400, {
+        error: { code: error.code, message: "Check the social post content and schedule." },
+      }, corsHeaders);
+    }
+    return sendJson(res, 502, {
+      error: {
+        code: "admin_social_queue_failed",
+        message: "The approved social post could not be queued.",
+      },
+    }, corsHeaders);
+  }
+}
+
 async function stripeWebhookHandler(req, res, options = {}) {
   const env = options.env || process.env;
   const corsHeaders = buildCorsHeaders(req, env);
@@ -1357,6 +1435,10 @@ function routeRequest(req, res, options = {}) {
     return adminSocialReconciliationResolveHandler(req, res, options);
   }
 
+  if (path === "/api/admin/social-posts/queue") {
+    return adminSocialPostQueueHandler(req, res, options);
+  }
+
   if (path === "/api/admin/shippo-labels") {
     return adminShippingLabelsHandler(req, res, options);
   }
@@ -1402,6 +1484,7 @@ module.exports = {
   adminNotificationRetryHandler,
   adminSocialReconciliationHandler,
   adminSocialReconciliationResolveHandler,
+  adminSocialPostQueueHandler,
   adminOrderStatusHandler,
   adminShippingLabelsHandler,
   buildCorsHeaders,
@@ -1419,6 +1502,7 @@ module.exports = {
   resolveAdminNotificationRequeuer,
   resolveAdminSocialReconciliationLister,
   resolveAdminSocialReconciliationResolver,
+  resolveAdminSocialPostQueuer,
   readJsonBody,
   readRawBody,
   routeRequest,

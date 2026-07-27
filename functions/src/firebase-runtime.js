@@ -33,9 +33,21 @@ const {
   createNotificationReconciler,
 } = require("./notification-reconciliation");
 const {
+  createSocialPostPublishingRuntime,
+} = require("./social-post-publishing-runtime");
+const {
+  createSocialPostQueue,
+} = require("./social-post-queue");
+const {
+  createSocialPostReconciler,
+} = require("./social-post-reconciliation");
+const {
   createTrustedBackendComposition,
 } = require("./trusted-backend-composition");
 
+const metaFacebookPageId = defineSecret("META_FACEBOOK_PAGE_ID");
+const metaInstagramAccountId = defineSecret("META_INSTAGRAM_ACCOUNT_ID");
+const metaPageAccessToken = defineSecret("META_PAGE_ACCESS_TOKEN");
 const shippoApiToken = defineSecret("SHIPPO_API_TOKEN");
 const resendApiKey = defineSecret("RESEND_API_KEY");
 const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
@@ -98,6 +110,22 @@ function notificationReconciliationEnv() {
   };
 }
 
+function socialPublishingEnv() {
+  return {
+    META_FACEBOOK_PAGE_ID: metaFacebookPageId.value(),
+    META_GRAPH_API_VERSION: process.env.META_GRAPH_API_VERSION,
+    META_INSTAGRAM_ACCOUNT_ID: metaInstagramAccountId.value(),
+    META_PAGE_ACCESS_TOKEN: metaPageAccessToken.value(),
+    SOCIAL_PUBLISHING_ENABLED: process.env.SOCIAL_PUBLISHING_ENABLED,
+  };
+}
+
+function socialReconciliationEnv() {
+  return {
+    SOCIAL_RECONCILIATION_ENABLED: process.env.SOCIAL_RECONCILIATION_ENABLED,
+  };
+}
+
 function firebaseApp() {
   return getApps()[0] || initializeApp();
 }
@@ -128,6 +156,9 @@ function runtimeOptions(env = runtimeEnv()) {
       return getAuth(app).verifyIdToken(token);
     },
   });
+  const socialPostQueue = createSocialPostQueue({
+    enqueueApprovedSocialPost: firestoreAdapter.enqueueApprovedSocialPost,
+  });
 
   return {
     authenticateAdminRequest,
@@ -143,6 +174,7 @@ function runtimeOptions(env = runtimeEnv()) {
     },
     adminSocialDependencies: {
       listAdminSocialPostReconciliation: firestoreAdapter.listAdminSocialPostReconciliation,
+      queueApprovedSocialPost: socialPostQueue.queueApprovedSocialPost,
       resolveAdminSocialPostReconciliation: firestoreAdapter.resolveAdminSocialPostReconciliation,
     },
     shippingLabelDependencies: {
@@ -244,6 +276,53 @@ const notificationOutboxReconciliation = onSchedule({
   console.info("notification_outbox_reconciliation", result);
 });
 
+const socialPostPublishing = onSchedule({
+  region: "us-central1",
+  schedule: "*/5 * * * *",
+  retryCount: 0,
+  secrets: [metaFacebookPageId, metaInstagramAccountId, metaPageAccessToken],
+}, async (event) => {
+  const app = firebaseApp();
+  const firestoreAdapter = createFirestoreAdapter({
+    firestore: getFirestore(app),
+    serverTimestamp,
+  });
+  const runtime = createSocialPostPublishingRuntime({
+    env: socialPublishingEnv(),
+    fetchImpl: globalThis.fetch,
+    persistence: {
+      claimDueSocialPost: firestoreAdapter.claimDueSocialPost,
+      completeSocialPostPublishing: firestoreAdapter.completeSocialPostPublishing,
+      recordSocialPostFailure: firestoreAdapter.recordSocialPostFailure,
+      recordSocialPostPlatformSuccess: firestoreAdapter.recordSocialPostPlatformSuccess,
+    },
+  });
+  const result = runtime.enabled
+    ? await runtime.publishDueSocialPost({ now: new Date(event.scheduleTime) })
+    : { action: "disabled", missingConfiguration: runtime.missingConfiguration };
+  console.info("social_post_publishing", result);
+});
+
+const socialPostReconciliation = onSchedule({
+  region: "us-central1",
+  schedule: "*/10 * * * *",
+  retryCount: 0,
+}, async () => {
+  const app = firebaseApp();
+  const firestoreAdapter = createFirestoreAdapter({
+    firestore: getFirestore(app),
+    serverTimestamp,
+  });
+  const reconciler = createSocialPostReconciler({
+    env: socialReconciliationEnv(),
+    recoverStaleSocialPostClaims: firestoreAdapter.recoverStaleSocialPostClaims,
+  });
+  const result = reconciler.enabled
+    ? await reconciler.run()
+    : { action: "disabled", missingConfiguration: reconciler.missingConfiguration };
+  console.info("social_post_reconciliation", result);
+});
+
 module.exports = {
   api,
   dailyFulfillmentSummary,
@@ -256,4 +335,8 @@ module.exports = {
   runtimeEnv,
   runtimeOptions,
   serverTimestamp,
+  socialPostPublishing,
+  socialPostReconciliation,
+  socialPublishingEnv,
+  socialReconciliationEnv,
 };

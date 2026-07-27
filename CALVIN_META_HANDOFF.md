@@ -11,9 +11,10 @@ The implementation plan is documented in:
 ## Current State
 
 - Codex is set to generate a weekly seven-post batch on Mondays at 8:30 AM.
-- The current workflow is draft/review only.
-- Automatic Facebook/Instagram publishing is not implemented yet.
-- The desired future flow is: approved post queue -> Firebase scheduled function -> Meta Graph API publish.
+- The weekly batch has a local dry-run validator and remains draft/review only until an admin approves it.
+- The approved queue, authenticated approval endpoint, guarded scheduled publisher, and stale-lease recovery are implemented.
+- Automatic publishing remains disabled until the Meta setup is complete, Firebase secrets are configured, and the runtime flags are explicitly enabled.
+- No live Meta publishing test has succeeded yet.
 
 ## What Sean Needs You To Do
 
@@ -37,7 +38,7 @@ Create or configure the required Meta setup so the website/backend can publish a
    - Instagram professional account ID
 8. Do not paste secrets into GitHub, source files, docs, or Codex chat unless Sean explicitly accepts that risk.
 
-## Firebase Secrets Needed Later
+## Firebase Secrets
 
 These should be added through Firebase secret management, not committed:
 
@@ -49,16 +50,45 @@ Optional:
 
 - `META_GRAPH_API_VERSION`
 
-## Implementation Direction
+Set the three required secret values with the Firebase CLI from a trusted terminal. Do not put their values on a command line that will be retained in shell history; run each command and enter the value when prompted:
 
-Once the Meta setup is ready, the code work should be:
+```powershell
+firebase functions:secrets:set META_PAGE_ACCESS_TOKEN
+firebase functions:secrets:set META_FACEBOOK_PAGE_ID
+firebase functions:secrets:set META_INSTAGRAM_ACCOUNT_ID
+```
 
-1. Add a Firestore `socialPostQueue` collection model for approved posts.
-2. Add a Firebase scheduled function that publishes only records marked `approved`.
-3. Publish to Facebook Page feed through the Page token.
-4. Publish to Instagram through the media-container then media-publish flow.
-5. Store post IDs, publish timestamps, attempts, and errors back on the queue record.
-6. Start with a disabled or test-only publisher until one post succeeds.
+The non-secret runtime settings must also be configured for the Functions environment:
+
+- `META_GRAPH_API_VERSION`
+- `SOCIAL_PUBLISHING_ENABLED=true`
+- `SOCIAL_RECONCILIATION_ENABLED=true`
+
+Keep both enable flags off until the controlled test post has been reviewed and scheduled for a future time.
+
+## Implemented Backend
+
+The backend now provides:
+
+1. `POST /api/admin/social-posts/queue` for authenticated Firebase admins to approve one reviewed post.
+2. A five-minute Firebase schedule that claims only due `approved` records.
+3. Facebook Page photo publishing and Instagram media-container/media-publish handling.
+4. Per-platform provider IDs, bounded retries, and final publish state persistence.
+5. A ten-minute stale-lease recovery schedule and authenticated reconciliation endpoints.
+6. Disabled-by-default gates for both publishing and recovery.
+
+The admin page does not yet expose the queue or reconciliation controls. Until those controls are added, the authenticated endpoint must be exercised with a Firebase admin ID token from a trusted test client.
+
+## Controlled Test Order
+
+1. Confirm the Facebook Page, professional Instagram account, Meta app permissions, IDs, and Page token.
+2. Configure the three Firebase secrets and `META_GRAPH_API_VERSION` while leaving both enable flags off.
+3. Deploy the Functions runtime.
+4. Queue one reviewed post for Facebook only at least 15 minutes in the future.
+5. Enable `SOCIAL_PUBLISHING_ENABLED`, deploy the setting, and verify the Facebook provider ID is recorded.
+6. Queue a separate reviewed Instagram-only post and verify its provider ID.
+7. Enable reconciliation only after the admin reconciliation UI or an equivalent trusted operating procedure is available.
+8. Approve the remaining weekly posts only after both single-platform tests succeed.
 
 ## Guardrails
 

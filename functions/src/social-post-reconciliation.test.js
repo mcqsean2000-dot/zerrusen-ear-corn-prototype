@@ -1,6 +1,8 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 const {
   createSocialPostReconciler,
@@ -65,4 +67,11 @@ test("rejects untrusted clocks and impossible recovery counts", async () => {
     invalidResult.run(),
     (error) => error.code === "social_post_reconciliation_result_invalid",
   );
+});
+
+test("Firebase runtime exports disabled-by-default social lease recovery", () => {
+  const source = fs.readFileSync(path.join(__dirname, "firebase-runtime.js"), "utf8");
+  assert.match(source, /SOCIAL_RECONCILIATION_ENABLED: process\.env\.SOCIAL_RECONCILIATION_ENABLED/);
+  assert.match(source, /socialPostReconciliation,/);
+  assert.match(source, /recoverStaleSocialPostClaims: firestoreAdapter\.recoverStaleSocialPostClaims/);
 });

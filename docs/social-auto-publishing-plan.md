@@ -134,9 +134,9 @@ The repository also includes a secret-injected Meta Graph adapter, a provider-ne
 
 Expired `publishing` leases are handled conservatively: posts with every required provider ID are finalized, while ambiguous records move to `needs_reconciliation` and are never automatically republished. Recovery is separately gated by `SOCIAL_RECONCILIATION_ENABLED`.
 
-This foundation is not connected to a Firebase schedule, has no committed credentials, has not been deployed, and cannot publish while the runtime gate remains disabled. Visible admin controls for `needs_reconciliation` are still required before production activation.
+This foundation is connected to a five-minute Firebase schedule, but has no committed credentials, has not been deployed, and cannot publish while the runtime gate remains disabled. A separate ten-minute schedule recovers expired publishing leases only when its own reconciliation gate is enabled. Visible admin controls for queue approval and `needs_reconciliation` are still required before production activation.
 
-The authenticated admin backend review path is implemented at `/api/admin/social-posts/reconciliation` and `/api/admin/social-posts/reconciliation/resolve`. It returns bounded safe fields and supports audited `mark_published`, `retry_confirmed_not_published`, and `skip` resolutions. The retry action must be used only after an admin confirms that the missing platform post does not exist. Visible admin-page controls are still pending.
+The authenticated admin backend approval path is implemented at `POST /api/admin/social-posts/queue`. It derives `approvedBy` from the verified Firebase admin token, forces `status` to `approved`, and delegates validation and idempotent persistence to the trusted queue. The authenticated review path is implemented at `/api/admin/social-posts/reconciliation` and `/api/admin/social-posts/reconciliation/resolve`. It returns bounded safe fields and supports audited `mark_published`, `retry_confirmed_not_published`, and `skip` resolutions. The retry action must be used only after an admin confirms that the missing platform post does not exist. Visible admin-page controls are still pending.
 
 ## Initial Implementation Steps
 
@@ -145,9 +145,9 @@ The authenticated admin backend review path is implemented at `/api/admin/social
 3. Create or identify the Meta Developer app.
 4. Generate the correct Page access token.
 5. Add Meta IDs/tokens to Firebase secrets.
-6. Add a disabled-by-default Firebase scheduled publisher. The approved queue, due-post claim, Meta adapter, and guarded worker are implemented; the Firebase schedule is not.
-7. Test with one approved post.
-8. Turn on daily publishing after the test succeeds.
+6. Deploy the disabled-by-default Firebase scheduled publisher and stale-lease recovery functions.
+7. Test one Facebook-only approved post, then one Instagram-only approved post.
+8. Turn on daily dual-platform publishing only after both tests succeed.
 
 ## Rollout Recommendation
 

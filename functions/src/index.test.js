@@ -7,6 +7,7 @@ const {
   adminNotificationRetryHandler,
   adminOrderStatusHandler,
   adminShippingLabelsHandler,
+  adminSocialPostQueueHandler,
   adminSocialReconciliationHandler,
   adminSocialReconciliationResolveHandler,
   checkoutSessionsHandler,
@@ -914,6 +915,65 @@ test("admin social reconciliation maps stale-state conflicts safely", async () =
   });
   assert.equal(res.statusCode, 409);
   assert.equal(parseJson(res).error.code, "admin_social_reconciliation_conflict");
+});
+
+test("admin social queue derives approval identity from authenticated admin", async () => {
+  const req = mockReq({
+    body: {
+      approvedBy: { email: "spoofed@example.test", uid: "spoofed" },
+      caption: "Packed to order. https://theosfarm.com",
+      hashtags: ["#TheosFarm", "#FarmToFeeder"],
+      imageUrl: "https://theosfarm.com/assets/theos-both-bags.jpg",
+      platforms: ["facebook", "instagram"],
+      postId: "weekly-test-post",
+      scheduledAt: "2026-07-28T13:30:00.000Z",
+      status: "published",
+    },
+    url: "/api/admin/social-posts/queue",
+  });
+  const res = mockRes();
+  let received = null;
+
+  await adminSocialPostQueueHandler(req, res, {
+    authenticateAdminRequest,
+    async queueApprovedSocialPost(input) {
+      received = input;
+      return { created: true, postId: input.postId };
+    },
+  });
+
+  assert.deepEqual(received.approvedBy, authenticatedAdmin);
+  assert.equal(received.status, "approved");
+  assert.equal(received.postId, "weekly-test-post");
+  assert.equal(res.statusCode, 201);
+  assert.deepEqual(parseJson(res), {
+    created: true,
+    postId: "weekly-test-post",
+    status: "approved",
+  });
+});
+
+test("admin social queue maps validation failures without exposing details", async () => {
+  const req = mockReq({
+    body: { postId: "bad" },
+    url: "/api/admin/social-posts/queue",
+  });
+  const res = mockRes();
+
+  await adminSocialPostQueueHandler(req, res, {
+    authenticateAdminRequest,
+    async queueApprovedSocialPost() {
+      const error = new Error("sensitive validation detail");
+      error.code = "social_post_caption_invalid";
+      throw error;
+    },
+  });
+
+  assert.equal(res.statusCode, 400);
+  assert.deepEqual(parseJson(res).error, {
+    code: "social_post_caption_invalid",
+    message: "Check the social post content and schedule.",
+  });
 });
 
 test("webhook handler requires Stripe signature after env is configured", async () => {
