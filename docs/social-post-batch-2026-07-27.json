@@ -1,0 +1,69 @@
+{
+  "weekOf": "2026-07-27",
+  "reviewStatus": "draft",
+  "posts": [
+    {
+      "postId": "2026-07-27-farm-to-feeder",
+      "scheduledAt": "2026-07-27T13:30:00.000Z",
+      "status": "draft",
+      "platforms": ["facebook", "instagram"],
+      "caption": "Fresh whole ear corn, packed at Theo's Farm and shipped direct to your wildlife feeder. Choose a 20 lb or 40 lb bag of cleaned cob corn, packed to order at the farm.\n\nOrder at https://theosfarm.com",
+      "hashtags": ["#TheosFarm", "#FarmToFeeder", "#EarCorn", "#WildlifeCorn", "#CobCorn"],
+      "imageUrl": "https://theosfarm.com/assets/theos-both-bags.jpg"
+    },
+    {
+      "postId": "2026-07-28-cleaned-and-selected",
+      "scheduledAt": "2026-07-28T13:30:00.000Z",
+      "status": "draft",
+      "platforms": ["facebook", "instagram"],
+      "caption": "Good wildlife corn starts with good ears. Theo's Farm removes husks and foreign material, then takes out small or partially filled ears before each order is packaged.\n\nSee our whole ear corn at https://theosfarm.com",
+      "hashtags": ["#TheosFarm", "#WholeEarCorn", "#EarCorn", "#WildlifeFeeding", "#CornOnTheCob"],
+      "imageUrl": "https://theosfarm.com/assets/theos-20lb-bag.jpg"
+    },
+    {
+      "postId": "2026-07-29-family-farm-story",
+      "scheduledAt": "2026-07-29T13:30:00.000Z",
+      "status": "draft",
+      "platforms": ["facebook", "instagram"],
+      "caption": "Theo's Farm is part of a sixth-generation family farm dating back to 1894, with 40 years of experience growing and packaging ear corn for wildlife food.\n\nLearn more and shop at https://theosfarm.com",
+      "hashtags": ["#TheosFarm", "#FamilyFarm", "#FarmToFeeder", "#EarCorn", "#WildlifeCorn"],
+      "imageUrl": "https://theosfarm.com/assets/ear-corn-hero.png"
+    },
+    {
+      "postId": "2026-07-30-choose-your-bag",
+      "scheduledAt": "2026-07-30T13:30:00.000Z",
+      "status": "draft",
+      "platforms": ["facebook", "instagram"],
+      "caption": "Stocking a backyard feeder or a larger wildlife feeding area? Theo's Farm offers 20 lb and 40 lb bags of whole ear corn so you can choose the amount that fits your setup.\n\nCompare both sizes at https://theosfarm.com",
+      "hashtags": ["#TheosFarm", "#DeerCorn", "#SquirrelCorn", "#WholeEarCorn", "#WildlifeFeeders"],
+      "imageUrl": "https://theosfarm.com/assets/theos-both-bags.jpg"
+    },
+    {
+      "postId": "2026-07-31-packed-to-order",
+      "scheduledAt": "2026-07-31T13:30:00.000Z",
+      "status": "draft",
+      "platforms": ["facebook", "instagram"],
+      "caption": "Every Theo's Farm bag is packaged to order. That means we do not ship old bagged inventory - your whole ear corn is prepared when your order is ready to go.\n\nOrder direct at https://theosfarm.com",
+      "hashtags": ["#TheosFarm", "#PackedToOrder", "#EarCorn", "#CobCorn", "#FarmToFeeder"],
+      "imageUrl": "https://theosfarm.com/assets/theos-40lb-bag.jpg"
+    },
+    {
+      "postId": "2026-08-01-protected-for-shipping",
+      "scheduledAt": "2026-08-01T13:30:00.000Z",
+      "status": "draft",
+      "platforms": ["facebook", "instagram"],
+      "caption": "Whole ear corn needs solid shipping protection. Each Theo's Farm order is packed in a durable woven bag, wrapped with a paper overlay, and boxed for the trip from our farm to your feeder.\n\nSee how we ship at https://theosfarm.com",
+      "hashtags": ["#TheosFarm", "#EarCorn", "#FarmToFeeder", "#WildlifeCorn", "#ShippedDirect"],
+      "imageUrl": "https://theosfarm.com/assets/theos-shipping-box-packed.jpg"
+    },
+    {
+      "postId": "2026-08-02-keep-the-feeder-stocked",
+      "scheduledAt": "2026-08-02T13:30:00.000Z",
+      "status": "draft",
+      "platforms": ["facebook", "instagram"],
+      "caption": "Keep your wildlife feeder ready for the week ahead with whole ear corn from Theo's Farm. Our 20 lb and 40 lb bags ship direct from the farm for deer, squirrels, and backyard wildlife.\n\nShop at https://theosfarm.com",
+      "hashtags": ["#TheosFarm", "#WildlifeFeeders", "#DeerCorn", "#SquirrelCorn", "#WholeEarCorn"],
+      "imageUrl": "https://theosfarm.com/assets/theos-shipping-box-sealed.jpg"
+    }
+  ]
+}
