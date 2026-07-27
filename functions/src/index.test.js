@@ -7,6 +7,8 @@ const {
   adminNotificationRetryHandler,
   adminOrderStatusHandler,
   adminShippingLabelsHandler,
+  adminSocialReconciliationHandler,
+  adminSocialReconciliationResolveHandler,
   checkoutSessionsHandler,
   shippingRatesHandler,
   stripeWebhookHandler,
@@ -838,6 +840,80 @@ test("admin notification retry rejects active delivery conflicts", async () => {
 
   assert.equal(res.statusCode, 409);
   assert.equal(parseJson(res).error.code, "admin_notification_retry_conflict");
+});
+
+test("admin social reconciliation lists safe exceptions through authenticated persistence", async () => {
+  const req = mockReq({ method: "GET", url: "/api/admin/social-posts/reconciliation?limit=10" });
+  const res = mockRes();
+  let received = null;
+
+  await adminSocialReconciliationHandler(req, res, {
+    authenticateAdminRequest,
+    async listAdminSocialPostReconciliation(input) {
+      received = input;
+      return {
+        posts: [{
+          caption: "Packed to order. https://theosfarm.com",
+          platforms: ["facebook"],
+          postId: "ambiguous-post",
+          status: "needs_reconciliation",
+        }],
+        truncated: false,
+      };
+    },
+  });
+
+  assert.deepEqual(received, { admin: authenticatedAdmin, limit: 10 });
+  assert.equal(res.statusCode, 200);
+  assert.equal(parseJson(res).posts[0].postId, "ambiguous-post");
+});
+
+test("admin social reconciliation resolves only through authenticated persistence", async () => {
+  const req = mockReq({
+    body: {
+      postId: "ambiguous-post",
+      providerPostIds: { facebookPostId: "facebook_confirmed" },
+      resolution: "mark_published",
+    },
+    url: "/api/admin/social-posts/reconciliation/resolve",
+  });
+  const res = mockRes();
+  let received = null;
+
+  await adminSocialReconciliationResolveHandler(req, res, {
+    authenticateAdminRequest,
+    async resolveAdminSocialPostReconciliation(input) {
+      received = input;
+      return { id: input.postId, resolution: input.resolution, status: "published" };
+    },
+  });
+
+  assert.deepEqual(received, {
+    admin: authenticatedAdmin,
+    postId: "ambiguous-post",
+    providerPostIds: { facebookPostId: "facebook_confirmed" },
+    resolution: "mark_published",
+  });
+  assert.equal(res.statusCode, 200);
+  assert.equal(parseJson(res).status, "published");
+});
+
+test("admin social reconciliation maps stale-state conflicts safely", async () => {
+  const req = mockReq({
+    body: { postId: "ambiguous-post", resolution: "skip" },
+    url: "/api/admin/social-posts/reconciliation/resolve",
+  });
+  const res = mockRes();
+  await adminSocialReconciliationResolveHandler(req, res, {
+    authenticateAdminRequest,
+    async resolveAdminSocialPostReconciliation() {
+      const error = new Error("state detail");
+      error.code = "admin_social_reconciliation_conflict";
+      throw error;
+    },
+  });
+  assert.equal(res.statusCode, 409);
+  assert.equal(parseJson(res).error.code, "admin_social_reconciliation_conflict");
 });
 
 test("webhook handler requires Stripe signature after env is configured", async () => {

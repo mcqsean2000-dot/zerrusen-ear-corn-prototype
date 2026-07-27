@@ -141,6 +141,10 @@ function runtimeOptions(env = runtimeEnv()) {
       listAdminNotificationJobs: firestoreAdapter.listAdminNotificationJobs,
       requeueAdminNotificationJob: firestoreAdapter.requeueAdminNotificationJob,
     },
+    adminSocialDependencies: {
+      listAdminSocialPostReconciliation: firestoreAdapter.listAdminSocialPostReconciliation,
+      resolveAdminSocialPostReconciliation: firestoreAdapter.resolveAdminSocialPostReconciliation,
+    },
     shippingLabelDependencies: {
       prepareLabelPurchase: firestoreAdapter.prepareLabelPurchase,
       recordLabelPurchase: firestoreAdapter.recordLabelPurchase,

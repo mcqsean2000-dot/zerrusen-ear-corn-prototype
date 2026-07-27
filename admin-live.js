@@ -170,6 +170,8 @@
           labelPurchase: endpointFor("labelPurchase"),
           notificationHealth: endpointFor("notificationHealth"),
           notificationRetry: endpointFor("notificationRetry"),
+          socialReconciliation: endpointFor("socialReconciliation"),
+          socialReconciliationResolve: endpointFor("socialReconciliationResolve"),
           statusUpdate: endpointFor("statusUpdate"),
         },
         getAdminJson,

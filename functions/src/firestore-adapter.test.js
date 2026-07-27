@@ -385,6 +385,106 @@ test("reconciles expired social claims without automatically retrying ambiguous 
   assert.equal(posts.get("recent-progress").status, "publishing");
 });
 
+test("lists only safe social reconciliation fields for authenticated admins", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({ firestore });
+  collectionDocs(firestore, "socialPostQueue").set("ambiguous-post", {
+    accessToken: "must-not-leak",
+    caption: "Packed to order. https://theosfarm.com",
+    customerData: "must-not-leak",
+    imageUrl: "https://theosfarm.com/assets/theos-both-bags.jpg",
+    lastErrorCode: "publishing_lease_expired",
+    platforms: ["facebook", "instagram", "unsupported"],
+    publishAttempts: 1,
+    status: "needs_reconciliation",
+  });
+
+  assert.deepEqual(await adapter.listAdminSocialPostReconciliation({
+    admin: { email: "admin@example.test", uid: "admin-1" },
+  }), {
+    posts: [{
+      caption: "Packed to order. https://theosfarm.com",
+      facebookPostId: "",
+      imageUrl: "https://theosfarm.com/assets/theos-both-bags.jpg",
+      instagramPostId: "",
+      lastErrorCode: "publishing_lease_expired",
+      platforms: ["facebook", "instagram"],
+      postId: "ambiguous-post",
+      publishAttempts: 1,
+      reconciliationRequiredAtMillis: Number.NaN,
+      scheduledAtMillis: Number.NaN,
+      status: "needs_reconciliation",
+    }],
+    truncated: false,
+  });
+});
+
+test("admin resolves ambiguous social posts with audited explicit actions", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({
+    firestore,
+    serverTimestamp() {
+      return "SERVER_TIMESTAMP";
+    },
+  });
+  const posts = collectionDocs(firestore, "socialPostQueue");
+  posts.set("confirm-published", {
+    facebookPostId: "facebook_existing",
+    platforms: ["facebook", "instagram"],
+    status: "needs_reconciliation",
+  });
+  posts.set("confirm-retry", {
+    platforms: ["facebook"],
+    status: "needs_reconciliation",
+  });
+  const admin = { email: "admin@example.test", uid: "admin-1" };
+
+  assert.deepEqual(await adapter.resolveAdminSocialPostReconciliation({
+    admin,
+    postId: "confirm-published",
+    providerPostIds: { instagramPostId: "instagram_confirmed" },
+    resolution: "mark_published",
+  }), { id: "confirm-published", resolution: "mark_published", status: "published" });
+  assert.equal(posts.get("confirm-published").reconciledByUid, "admin-1");
+  assert.equal(posts.get("confirm-published").instagramPostId, "instagram_confirmed");
+
+  assert.deepEqual(await adapter.resolveAdminSocialPostReconciliation({
+    admin,
+    postId: "confirm-retry",
+    resolution: "retry_confirmed_not_published",
+  }), { id: "confirm-retry", resolution: "retry_confirmed_not_published", status: "approved" });
+  assert.equal(posts.get("confirm-retry").lastErrorCode, "admin_confirmed_not_published");
+  assert.equal(posts.get("confirm-retry").publishAttempts, 0);
+});
+
+test("admin social reconciliation rejects incomplete or conflicting resolutions", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({ firestore });
+  collectionDocs(firestore, "socialPostQueue").set("ambiguous-post", {
+    platforms: ["facebook", "instagram"],
+    status: "needs_reconciliation",
+  });
+  const admin = { email: "admin@example.test", uid: "admin-1" };
+
+  await assert.rejects(
+    adapter.resolveAdminSocialPostReconciliation({
+      admin,
+      postId: "ambiguous-post",
+      providerPostIds: { facebookPostId: "facebook_confirmed" },
+      resolution: "mark_published",
+    }),
+    (error) => error.code === "admin_social_provider_ids_incomplete",
+  );
+  await assert.rejects(
+    adapter.resolveAdminSocialPostReconciliation({
+      admin,
+      postId: "ambiguous-post",
+      resolution: "unknown",
+    }),
+    (error) => error.code === "admin_social_resolution_invalid",
+  );
+});
+
 test("creates order requests in the configured collection", async () => {
   const firestore = new MemoryFirestore();
   const adapter = createFirestoreAdapter({

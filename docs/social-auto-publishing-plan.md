@@ -134,7 +134,9 @@ The repository also includes a secret-injected Meta Graph adapter, a provider-ne
 
 Expired `publishing` leases are handled conservatively: posts with every required provider ID are finalized, while ambiguous records move to `needs_reconciliation` and are never automatically republished. Recovery is separately gated by `SOCIAL_RECONCILIATION_ENABLED`.
 
-This foundation is not connected to a Firebase schedule, has no committed credentials, has not been deployed, and cannot publish while the runtime gate remains disabled. An admin review path for `needs_reconciliation` is still required before production activation.
+This foundation is not connected to a Firebase schedule, has no committed credentials, has not been deployed, and cannot publish while the runtime gate remains disabled. Visible admin controls for `needs_reconciliation` are still required before production activation.
+
+The authenticated admin backend review path is implemented at `/api/admin/social-posts/reconciliation` and `/api/admin/social-posts/reconciliation/resolve`. It returns bounded safe fields and supports audited `mark_published`, `retry_confirmed_not_published`, and `skip` resolutions. The retry action must be used only after an admin confirms that the missing platform post does not exist. Visible admin-page controls are still pending.
 
 ## Initial Implementation Steps
 

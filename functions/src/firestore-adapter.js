@@ -704,6 +704,141 @@ function createFirestoreAdapter(options = {}) {
     return result;
   }
 
+  async function listAdminSocialPostReconciliation({ admin, collection, limit = 25 } = {}) {
+    validateAdminActor(admin);
+    const resultLimit = Number(limit);
+    if (!Number.isInteger(resultLimit) || resultLimit < 1 || resultLimit > 50) {
+      const error = new Error("Admin social reconciliation requires a limit from 1 to 50.");
+      error.code = "admin_social_reconciliation_limit_invalid";
+      throw error;
+    }
+
+    const posts = collectionRef(firestore, socialPostQueueCollectionName(options, collection));
+    const matches = await queryByFields(posts, [["status", "needs_reconciliation"]], resultLimit + 1);
+    return {
+      posts: matches.slice(0, resultLimit).map((post) => ({
+        caption: cleanText(post.caption).slice(0, 2000),
+        facebookPostId: cleanText(post.facebookPostId).slice(0, 200),
+        imageUrl: cleanText(post.imageUrl).slice(0, 2048),
+        instagramPostId: cleanText(post.instagramPostId).slice(0, 200),
+        lastErrorCode: cleanText(post.lastErrorCode).slice(0, 80),
+        platforms: Array.isArray(post.platforms)
+          ? post.platforms.filter((platform) => ["facebook", "instagram"].includes(platform))
+          : [],
+        postId: cleanText(post.id).slice(0, 80),
+        publishAttempts: Number.isInteger(Number(post.publishAttempts)) ? Number(post.publishAttempts) : 0,
+        reconciliationRequiredAtMillis: timestampMillis(post.reconciliationRequiredAt),
+        scheduledAtMillis: timestampMillis(post.scheduledAt),
+        status: "needs_reconciliation",
+      })),
+      truncated: matches.length > resultLimit,
+    };
+  }
+
+  async function resolveAdminSocialPostReconciliation({
+    admin,
+    collection,
+    postId,
+    providerPostIds = {},
+    resolution,
+  }) {
+    const actor = validateAdminActor(admin);
+    const id = cleanText(postId);
+    const action = cleanText(resolution);
+    const suppliedIds = providerPostIds && typeof providerPostIds === "object" && !Array.isArray(providerPostIds)
+      ? providerPostIds
+      : {};
+    const unexpectedIdFields = Object.keys(suppliedIds).filter((field) => (
+      !["facebookPostId", "instagramPostId"].includes(field)
+    ));
+    const facebookPostId = cleanText(suppliedIds.facebookPostId);
+    const instagramPostId = cleanText(suppliedIds.instagramPostId);
+    if (!/^[a-z0-9][a-z0-9_-]{2,79}$/.test(id)) {
+      const error = new Error("Admin social reconciliation requires a safe post ID.");
+      error.code = "admin_social_post_id_invalid";
+      throw error;
+    }
+    if (!["mark_published", "retry_confirmed_not_published", "skip"].includes(action)) {
+      const error = new Error("Admin social reconciliation used an unsupported resolution.");
+      error.code = "admin_social_resolution_invalid";
+      throw error;
+    }
+    if (
+      unexpectedIdFields.length ||
+      [facebookPostId, instagramPostId].some((providerId) => (
+        providerId && !/^[A-Za-z0-9_.:-]{1,200}$/.test(providerId)
+      )) ||
+      (action !== "mark_published" && (facebookPostId || instagramPostId))
+    ) {
+      const error = new Error("Admin social reconciliation provider IDs are invalid.");
+      error.code = "admin_social_provider_ids_invalid";
+      throw error;
+    }
+    if (!isFunction(firestore.runTransaction)) {
+      const error = new Error("Firestore-like backend must provide runTransaction() for social reconciliation.");
+      error.code = "firestore_transaction_missing";
+      throw error;
+    }
+
+    const ref = collectionRef(firestore, socialPostQueueCollectionName(options, collection)).doc(id);
+    return firestore.runTransaction(async (transaction) => {
+      const data = normalizeSnapshot(await transaction.get(ref));
+      if (!data) {
+        const error = new Error("Social post was not found.");
+        error.code = "admin_social_post_not_found";
+        throw error;
+      }
+      if (data.status !== "needs_reconciliation") {
+        const error = new Error("Social post is not awaiting reconciliation.");
+        error.code = "admin_social_reconciliation_conflict";
+        throw error;
+      }
+
+      const fields = {
+        reconciledAt: timestamp(),
+        reconciledByEmail: actor.email,
+        reconciledByUid: actor.uid,
+        reconciliationResolution: action,
+      };
+      if (action === "mark_published") {
+        const platforms = Array.isArray(data.platforms) ? data.platforms : [];
+        const resolvedFacebookId = facebookPostId || cleanText(data.facebookPostId);
+        const resolvedInstagramId = instagramPostId || cleanText(data.instagramPostId);
+        const complete = platforms.length > 0 && platforms.every((platform) => (
+          platform === "facebook" ? resolvedFacebookId :
+            platform === "instagram" ? resolvedInstagramId : ""
+        ));
+        if (!complete) {
+          const error = new Error("Marking a post published requires every selected platform ID.");
+          error.code = "admin_social_provider_ids_incomplete";
+          throw error;
+        }
+        Object.assign(fields, {
+          ...(resolvedFacebookId ? { facebookPostId: resolvedFacebookId } : {}),
+          ...(resolvedInstagramId ? { instagramPostId: resolvedInstagramId } : {}),
+          lastErrorCode: "",
+          lastPublishFinishedAt: timestamp(),
+          publishedAt: timestamp(),
+          status: "published",
+        });
+      } else if (action === "retry_confirmed_not_published") {
+        Object.assign(fields, {
+          lastErrorCode: "admin_confirmed_not_published",
+          publishAttempts: 0,
+          status: "approved",
+        });
+      } else {
+        Object.assign(fields, {
+          lastErrorCode: "admin_skipped_ambiguous_post",
+          status: "skipped",
+        });
+      }
+
+      transaction.update(ref, fields);
+      return { id, resolution: action, status: fields.status };
+    });
+  }
+
   async function createOrderRequest({ collection, orderRequest }) {
     const orders = collectionRef(firestore, orderCollectionName(options, collection));
     const ref = orders.doc();
@@ -1424,6 +1559,7 @@ function createFirestoreAdapter(options = {}) {
     findOrderByCheckoutSessionId,
     findOrderByPaymentIntentId,
     listAdminNotificationJobs,
+    listAdminSocialPostReconciliation,
     listPaidFulfillmentOrders,
     listPendingNotificationJobs,
     markCheckoutSessionFailed,
@@ -1437,6 +1573,7 @@ function createFirestoreAdapter(options = {}) {
     recordSocialPostFailure,
     recordSocialPostPlatformSuccess,
     recoverStaleSocialPostClaims,
+    resolveAdminSocialPostReconciliation,
     requeueAdminNotificationJob,
     recoverStaleNotificationJobs,
     updateAdminOrderStatus,
