@@ -66,6 +66,96 @@ The non-secret runtime settings must also be configured for the Functions enviro
 
 Keep both enable flags off until the controlled test post has been reviewed and scheduled for a future time.
 
+## Sean: Firebase Credential Setup
+
+Run these steps from PowerShell on the machine that has the repository checkout and Firebase CLI.
+
+### 1. Update the repository and sign in
+
+```powershell
+cd C:\path\to\zerrusen-ear-corn-prototype
+git pull origin main
+firebase login
+firebase projects:list
+firebase use --add
+```
+
+Select the production Firebase project used by `theosfarm.com`. The committed `.firebaserc.example` is only a placeholder. The real `.firebaserc` is local and ignored by Git.
+
+The signed-in Google account must have access to the Firebase project and permission to manage Functions secrets and deploy Cloud Functions.
+
+### 2. Confirm the Meta values
+
+Have these values ready before entering Firebase configuration:
+
+- Facebook Page access token. Do not use a Facebook password or personal login token.
+- Facebook Page ID.
+- Instagram professional account ID for `theosfeedfarm`.
+- Meta Graph API version supported by the Meta app, including the `v` prefix.
+
+### 3. Enter the secrets interactively
+
+Run each command separately and paste the requested value only when Firebase prompts for it:
+
+```powershell
+firebase functions:secrets:set META_PAGE_ACCESS_TOKEN
+firebase functions:secrets:set META_FACEBOOK_PAGE_ID
+firebase functions:secrets:set META_INSTAGRAM_ACCOUNT_ID
+```
+
+Do not put secret values directly in the command, a source file, GitHub, an issue, or chat.
+
+### 4. Add disabled runtime settings
+
+Use `firebase use` to display the active project ID. Create an ignored project-specific environment file, replacing `PROJECT_ID` in the filename with that exact ID:
+
+```powershell
+firebase use
+notepad functions\.env.PROJECT_ID
+```
+
+Start with publishing and reconciliation disabled:
+
+```dotenv
+META_GRAPH_API_VERSION=vXX.X
+SOCIAL_PUBLISHING_ENABLED=false
+SOCIAL_RECONCILIATION_ENABLED=false
+```
+
+Replace `vXX.X` with the version supported by the Meta app. Do not commit this `.env.PROJECT_ID` file; the repository already ignores it.
+
+### 5. Run the checks
+
+```powershell
+cd functions
+npm ci
+npm run check
+cd ..
+```
+
+Do not deploy if these checks fail.
+
+### 6. Deploy the guarded backend
+
+```powershell
+firebase deploy --only "functions:api,functions:socialPostPublishing,functions:socialPostReconciliation"
+```
+
+This deploys the admin queue endpoint and both scheduled functions. They remain unable to publish while `SOCIAL_PUBLISHING_ENABLED=false`.
+
+### 7. Verify without revealing secret values
+
+```powershell
+firebase functions:secrets:get META_PAGE_ACCESS_TOKEN
+firebase functions:secrets:get META_FACEBOOK_PAGE_ID
+firebase functions:secrets:get META_INSTAGRAM_ACCOUNT_ID
+firebase functions:list
+```
+
+Use `functions:secrets:get` to inspect metadata. Do not use `functions:secrets:access` while screen sharing or recording because it reveals the stored value.
+
+After these steps succeed, stop with publishing disabled and report that Firebase configuration is ready. The controlled Facebook-only and Instagram-only tests should be scheduled and monitored separately.
+
 ## Implemented Backend
 
 The backend now provides:
