@@ -1,11 +1,6 @@
 import path from "node:path";
-import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-
-const bundledRequire = createRequire(
-  "/Users/intellinair/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/sharp/package.json",
-);
-const sharp = bundledRequire("sharp");
+import sharp from "sharp";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const assets = path.join(root, "assets");
