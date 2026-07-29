@@ -1,0 +1,10 @@
+content_id,url,title,page_type,indexability,status,primary_cluster,canonical_source,fact_review_owner,technical_owner,last_reviewed,next_action
+PAGE-001,https://theosfarm.com/,"Theo's Farm Ear Corn | Whole Cob Corn for Wildlife Feeders",storefront,indexable,live,KW-001,index.html,Sean,Calvin,2026-07-29,"Retain until dedicated product and pillar pages are approved."
+PAGE-002,https://theosfarm.com/ear-corn/,"Whole Ear Corn",pillar,indexable,planned,KW-002,planned,Sean,Calvin,,"Create in SEO-008 or SEO-010."
+PAGE-003,https://theosfarm.com/20-lb-ear-corn/,"20 lb Whole Ear Corn",product,indexable,planned,KW-003,planned,Sean,Calvin,,"Create in SEO-009."
+PAGE-004,https://theosfarm.com/40-lb-ear-corn/,"40 lb Whole Ear Corn",product,indexable,planned,KW-004,planned,Sean,Calvin,,"Create in SEO-009."
+PAGE-005,https://theosfarm.com/shipping-whole-ear-corn/,"Shipping Whole Ear Corn",service,indexable,planned,KW-005,planned,Sean,Calvin,,"Create after shipping facts are reviewed."
+PAGE-006,https://theosfarm.com/about-the-farm/,"About Theo's Farm",about,indexable,planned,KW-006,planned,Sean,Calvin,,"Create from approved farm-history facts."
+PAGE-007,https://theosfarm.com/guides/,"Whole Ear Corn Guides",guide-index,indexable,planned,,planned,Sean,Calvin,,"Create before publishing the first guide."
+PAGE-008,https://theosfarm.com/admin.html,"Theo's Farm Admin",admin,not-indexable,live,,admin.html,,Calvin,2026-07-29,"Verify production noindex and authentication during SEO-006."
+
