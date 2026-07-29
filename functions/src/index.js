@@ -7,6 +7,7 @@ const {
   resolveAdminSocialReconciliationLister,
   resolveAdminSocialReconciliationResolver,
 } = require("./admin-social-http-handlers");
+const { reportOperationalError } = require("./operational-logger");
 const {
   createCheckoutSessionAdapter,
   getMissingCheckoutAdapterDependencies,
@@ -586,6 +587,10 @@ async function checkoutSessionsHandler(req, res, options = {}) {
       }, corsHeaders);
     }
 
+    reportOperationalError(options, "checkout_shipping_rates_failed", error, {
+      method: req.method,
+      path: "/api/checkout-sessions",
+    });
     return sendJson(res, 502, {
       error: {
         code: "shipping_rates_failed",
@@ -615,10 +620,9 @@ async function checkoutSessionsHandler(req, res, options = {}) {
       checkoutUrl: result.checkoutUrl,
     }, corsHeaders);
   } catch (error) {
-    console.error("checkout_creation_failed", {
-      code: error && error.code || "unknown",
-      name: error && error.name || "Error",
-      message: error && error.message || "Checkout creation failed.",
+    reportOperationalError(options, "checkout_creation_failed", error, {
+      method: req.method,
+      path: "/api/checkout-sessions",
     });
     return sendJson(res, 502, {
       error: {
@@ -717,6 +721,10 @@ async function shippingRatesHandler(req, res, options = {}) {
       }, corsHeaders);
     }
 
+    reportOperationalError(options, "shipping_rates_failed", error, {
+      method: req.method,
+      path: "/api/shipping-rates",
+    });
     return sendJson(res, 502, {
       error: {
         code: "shipping_rates_failed",
@@ -848,6 +856,10 @@ async function adminShippingLabelsHandler(req, res, options = {}) {
     }
 
     if (error.code === "shippo_label_transaction_incomplete") {
+      reportOperationalError(options, "shipping_label_transaction_incomplete", error, {
+        method: req.method,
+        path: "/api/admin/shippo-labels",
+      });
       return sendJson(res, 502, {
         error: {
           code: "shippo_label_transaction_incomplete",
@@ -856,6 +868,10 @@ async function adminShippingLabelsHandler(req, res, options = {}) {
       }, corsHeaders);
     }
 
+    reportOperationalError(options, "shipping_label_purchase_failed", error, {
+      method: req.method,
+      path: "/api/admin/shippo-labels",
+    });
     return sendJson(res, 502, {
       error: {
         code: "shipping_label_purchase_failed",
@@ -952,6 +968,10 @@ async function adminOrderStatusHandler(req, res, options = {}) {
       }, corsHeaders);
     }
 
+    reportOperationalError(options, "admin_status_update_failed", error, {
+      method: req.method,
+      path: "/api/admin/order-status",
+    });
     return sendJson(res, 502, {
       error: {
         code: "admin_status_update_failed",
@@ -1010,6 +1030,10 @@ async function adminNotificationHealthHandler(req, res, options = {}) {
         },
       }, corsHeaders);
     }
+    reportOperationalError(options, "admin_notification_health_failed", error, {
+      method: req.method,
+      path: "/api/admin/notifications",
+    });
     return sendJson(res, 502, {
       error: {
         code: "admin_notification_health_failed",
@@ -1097,6 +1121,10 @@ async function adminNotificationRetryHandler(req, res, options = {}) {
         },
       }, corsHeaders);
     }
+    reportOperationalError(options, "admin_notification_retry_failed", error, {
+      method: req.method,
+      path: "/api/admin/notifications/retry",
+    });
     return sendJson(res, 502, {
       error: {
         code: "admin_notification_retry_failed",
@@ -1199,6 +1227,10 @@ async function stripeWebhookHandler(req, res, options = {}) {
       eventType: event.type,
     }, corsHeaders);
   } catch (error) {
+    reportOperationalError(options, "stripe_webhook_failed", error, {
+      method: req.method,
+      path: "/api/stripe/webhook",
+    });
     return sendJson(res, 400, {
       error: {
         code: "invalid_stripe_webhook",
@@ -1262,7 +1294,11 @@ function routeRequest(req, res, options = {}) {
 if (require.main === module) {
   const port = Number(process.env.PORT || 8787);
   http.createServer((req, res) => {
-    Promise.resolve(routeRequest(req, res)).catch(() => {
+    Promise.resolve(routeRequest(req, res)).catch((error) => {
+      reportOperationalError({}, "local_api_request_unhandled", error, {
+        method: req.method,
+        path: new URL(req.url, "http://localhost").pathname,
+      });
       sendJson(res, 500, {
         error: {
           code: "internal_error",
