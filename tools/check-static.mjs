@@ -6,6 +6,7 @@ const require = createRequire(import.meta.url);
 const orderRequests = require("../order-request.js");
 
 const requiredFiles = [
+  ".github/workflows/ci.yml",
   "index.html",
   "styles.css",
   "script.js",
