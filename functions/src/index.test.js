@@ -2,6 +2,7 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
+const { createOperationalLogger } = require("./operational-logger");
 const {
   adminNotificationHealthHandler,
   adminNotificationRetryHandler,
@@ -467,6 +468,47 @@ test("shipping rates handler returns customer-safe Shippo rate options", async (
   assert.equal(res.headers["access-control-allow-origin"], "https://theos.example");
   assert.equal(body.rates[0].rateId, "UPS|ups_ground");
   assert.equal(body.rates[0].amountCents, 3684);
+});
+
+test("shipping rate failures emit one sanitized operational error", async () => {
+  const req = mockReq({
+    body: {
+      orderRequest: validOrderRequest,
+      shippingAddress: validShippingCheckoutFields().shippingAddress,
+    },
+    url: "/api/shipping-rates",
+  });
+  const res = mockRes();
+  const writes = [];
+  const providerError = new Error("Provider exposed shippo_test_secret_value");
+  providerError.code = "shippo_provider_failure";
+
+  await shippingRatesHandler(req, res, {
+    env: configuredShippingEnv,
+    logger: createOperationalLogger({
+      writeError(event, reportableError, details) {
+        writes.push({ event, reportableError, details });
+      },
+    }),
+    shippingRateDependencies: {
+      createShippoShipment() {
+        throw providerError;
+      },
+    },
+  });
+
+  assert.equal(res.statusCode, 502);
+  assert.equal(parseJson(res).error.code, "shipping_rates_failed");
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].event, "shipping_rates_failed");
+  assert.deepEqual(writes[0].details, {
+    errorCode: "shippo_provider_failure",
+    errorName: "Error",
+    event: "shipping_rates_failed",
+    method: "POST",
+    path: "/api/shipping-rates",
+  });
+  assert.equal(JSON.stringify(writes).includes("shippo_test_secret_value"), false);
 });
 
 test("admin shipping label handler returns disabled response when Shippo token is missing", async () => {
