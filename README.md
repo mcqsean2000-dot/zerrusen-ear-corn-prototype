@@ -100,6 +100,7 @@ Natural search phrases to keep in mind:
 - `functions/src/social-post-publisher.js` - provider-neutral per-platform publishing worker with bounded retries
 - `functions/src/social-post-publishing-runtime.js` - explicit opt-in composition gate for Meta publishing
 - `functions/src/social-post-reconciliation.js` - disabled-by-default stale publishing lease reconciler
+- `social-weekly-drafts.js` - deterministic four-week rotating generator for the next Monday-through-Sunday review batch
 - `firebase.json` - Firebase Hosting config and Firestore deploy targets for the chosen production path
 - `.firebaserc.example` - safe Firebase project alias template for local setup
 - `firestore.rules` - initial Firestore rules for prototype order requests
@@ -126,7 +127,7 @@ Natural search phrases to keep in mind:
 - Current cart is connected to live Shippo shipping-rate lookup, but not yet connected to payment processing, inventory, order persistence, live email sends, or label purchase.
 - Completed Stripe Checkout events atomically mark the order paid, create deterministic customer/admin Firestore outbox jobs, and mark the Stripe event processed. Trusted composition can also query the bounded paid fulfillment queue and enqueue one idempotent daily summary. The Firebase runtime exports an 8:00 AM Central summary schedule, an outbox-created delivery trigger, and a bounded ten-minute reconciliation schedule. All remain inert unless their explicit enable flags and required server-side configuration are present. This work does not deploy or enable them.
 - The Firebase-hosted admin shell supports Google sign-in plus an email/password fallback. Fulfillment content and actions remain hidden until Firebase Auth returns an `admin: true` custom claim; signing in with an ordinary Google account does not grant access.
-- Authenticated admin API routes and visible admin controls can list social posts in `needs_reconciliation` and record an audited publish, retry-confirmed-safe, or skip resolution. The admin page also loads the current seven-post review batch and requires explicit approval before queueing each post.
+- Authenticated admin API routes and visible admin controls can list social posts in `needs_reconciliation` and record an audited publish, retry-confirmed-safe, or skip resolution. The admin page automatically generates the next Monday-through-Sunday seven-post batch in Central Time, displays every caption/image/schedule for review, and queues the full week through one explicit confirmation. Each queue write remains individually validated and idempotent.
 - Production admin config is loaded from Firebase Hosting's public `/__/firebase/init.json` endpoint. Enable the Google provider, authorize the production domain, create the approved admin account, and grant its custom claim before launch.
 - For local admin testing only, copy `admin-config.local.example.js` to ignored `admin-config.local.js` and fill in approved Firebase public web config after Auth users and admin claims are ready. Do not commit the local override.
 - Keep `checkout-config.js` blank until a trusted backend endpoint is ready. For Firebase Hosting, set only the public checkout session URL there, never secrets.

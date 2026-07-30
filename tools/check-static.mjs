@@ -18,6 +18,7 @@ const requiredFiles = [
   "admin-config.local.example.js",
   "admin.js",
   "admin-live.js",
+  "social-weekly-drafts.js",
   "robots.txt",
   "sitemap.xml",
   "social-post-batches/2026-08-03.json",
@@ -75,6 +76,7 @@ const adminConfigScript = await readFile("admin-config.js", "utf8");
 const adminLocalConfigExample = await readFile("admin-config.local.example.js", "utf8");
 const adminScript = await readFile("admin.js", "utf8");
 const adminLiveScript = await readFile("admin-live.js", "utf8");
+const weeklySocialDraftScript = await readFile("social-weekly-drafts.js", "utf8");
 const gitignore = await readFile(".gitignore", "utf8");
 const packageJson = JSON.parse(await readFile("package.json", "utf8"));
 const hostingReadiness = await readFile("docs/firebase-hosting-readiness.md", "utf8");
@@ -109,6 +111,7 @@ assert(firebaseConfig.hosting?.ignore?.includes("admin-config.local.example.js")
 assert(firebaseConfig.hosting?.ignore?.includes("admin-config.local.js"), "Firebase Hosting should not publish local admin config overrides.");
 assert(!firebaseConfig.hosting?.ignore?.includes("admin.js"), "Firebase Hosting should publish the admin renderer.");
 assert(!firebaseConfig.hosting?.ignore?.includes("admin-live.js"), "Firebase Hosting should publish the authenticated admin bridge.");
+assert(!firebaseConfig.hosting?.ignore?.includes("social-weekly-drafts.js"), "Firebase Hosting should publish the weekly social draft generator.");
 assert(!firebaseConfig.hosting?.ignore?.includes("social-post-batches/**"), "Firebase Hosting should publish reviewed social draft batches.");
 assert(
   firebaseConfig.hosting?.headers?.some((entry) => (
@@ -364,6 +367,8 @@ assert(adminScript.includes("setAdminActions"), "Admin shell must expose an auth
 assert(adminScript.includes("clearAdminActions"), "Admin shell must clear live admin actions on sign-out or denied reads.");
 assert(adminScript.includes("setAdminActionStatus"), "Admin shell must expose safe action feedback for guarded admin controls.");
 assert(adminScript.includes("approveSocialDraft"), "Admin shell must require an explicit social draft approval action.");
+assert(adminScript.includes("approveSocialWeek"), "Admin shell must support one-confirmation weekly approval.");
+assert(adminScript.includes("Approve all "), "Weekly social approval must describe the exact batch size before queueing.");
 assert(adminScript.includes("retry_confirmed_not_published"), "Admin shell must expose the guarded confirmed-absent retry action.");
 assert(adminScript.includes("mark_published"), "Admin shell must support verified provider IDs for already-published exceptions.");
 assert(adminScript.includes("providerPostIds"), "Admin shell must send verified provider IDs only for mark-published reconciliation.");
@@ -390,9 +395,10 @@ assert(adminLiveScript.includes("setActions({"), "Admin live bridge must pass si
 assert(adminLiveScript.includes("clearAdminActions()"), "Admin live bridge must clear action wiring when auth/read access fails.");
 assert(adminLiveScript.includes("postAdminJson"), "Admin live bridge must centralize guarded admin endpoint calls.");
 assert(adminLiveScript.includes("loadSocialDraftBatch"), "Admin live bridge must load the review-only social draft batch.");
-assert(adminLiveScript.includes("/social-post-batches/2026-08-03.json"), "Admin live bridge must load the published August 3 review batch.");
-assert(adminLiveScript.includes('cache: "no-store"'), "Admin live bridge must not cache social approval drafts.");
-assert(adminLiveScript.includes("application/json"), "Admin live bridge must reject non-JSON social draft responses.");
+assert(adminLiveScript.includes("TheosWeeklySocialDrafts"), "Admin live bridge must use the rotating weekly draft generator.");
+assert(weeklySocialDraftScript.includes("America/Chicago"), "Weekly social drafts must use the farm's Central Time calendar.");
+assert(weeklySocialDraftScript.includes("generateWeeklyBatch"), "Weekly social drafts must expose deterministic batch generation.");
+assert(weeklySocialDraftScript.includes("facebook") && weeklySocialDraftScript.includes("instagram"), "Weekly drafts must target both configured platforms.");
 assert(!adminLiveScript.includes("body.admin"), "Admin live bridge must not send request-provided admin identity.");
 assert(!adminLiveScript.includes("sk_") && !adminLiveScript.includes("whsec_"), "Admin live bridge must not include secret-looking values.");
 

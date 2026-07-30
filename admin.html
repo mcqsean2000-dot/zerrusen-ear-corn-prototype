@@ -90,10 +90,11 @@
           <div>
             <p class="eyebrow">Human approval required</p>
             <h2 id="social-title">Social post queue</h2>
-            <p class="admin-note">Approving a draft adds it to the guarded queue. Publishing remains unavailable until the Meta runtime is configured and explicitly enabled.</p>
+            <p class="admin-note">A new seven-post batch is generated automatically each week. Review it once, approve the week, and Firebase publishes each post at its displayed time.</p>
           </div>
           <div class="admin-social-actions">
             <button class="admin-action" type="button" data-social-drafts-refresh>Load drafts</button>
+            <button class="admin-action admin-action-primary" type="button" data-social-week-approve disabled>Approve entire week</button>
             <button class="admin-action" type="button" data-social-reconciliation-refresh>Check exceptions</button>
           </div>
         </div>
@@ -162,6 +163,7 @@
 
     <script src="admin-config.js"></script>
     <script src="admin-config.local.js"></script>
+    <script src="social-weekly-drafts.js"></script>
     <script src="admin.js"></script>
     <script src="admin-live.js"></script>
   </body>

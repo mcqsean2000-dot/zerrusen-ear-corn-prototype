@@ -32,6 +32,8 @@
 .notification-retry { border-color: #9b2c2c; color: #9b2c2c; background: #fff8f8; }
 .admin-social { display: grid; gap: 16px; }
 .admin-social-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-social-actions .admin-action-primary { border-color: var(--leaf); color: #fff; background: var(--leaf); }
+.admin-social-actions .admin-action-primary:disabled { border-color: var(--line); color: var(--muted); background: #f2f0e8; }
 .social-draft-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .social-draft { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: #fbfaf6; }
 .social-draft h3, .social-draft p { margin: 0; }

@@ -75,6 +75,7 @@ const notificationRefreshButton = document.querySelector("[data-notification-ref
 const socialDrafts = document.querySelector("[data-social-drafts]");
 const socialStatus = document.querySelector("[data-social-status]");
 const socialDraftsRefreshButton = document.querySelector("[data-social-drafts-refresh]");
+const socialWeekApproveButton = document.querySelector("[data-social-week-approve]");
 const socialReconciliationRefreshButton = document.querySelector("[data-social-reconciliation-refresh]");
 const socialReconciliationRows = document.querySelector("[data-social-reconciliation-rows]");
 
@@ -333,6 +334,7 @@ let currentNotificationHealth = {
   truncatedStatuses: [],
 };
 let currentSocialDrafts = [];
+let currentSocialWeekOf = "";
 let currentSocialExceptions = [];
 
 function setAdminOrders(orders) {
@@ -367,6 +369,7 @@ function setAdminActions(actions) {
 function clearAdminActions() {
   currentAdminActions = null;
   currentSocialDrafts = [];
+  currentSocialWeekOf = "";
   currentSocialExceptions = [];
   setAdminActionStatus("");
   render(currentAdminOrders);
@@ -403,10 +406,16 @@ function renderSocialDrafts() {
   if (!socialDrafts || !socialStatus) return;
   if (!currentSocialDrafts.length) {
     socialDrafts.innerHTML = "";
+    if (socialWeekApproveButton) socialWeekApproveButton.disabled = true;
     if (!currentAdminActions) socialStatus.textContent = "Social drafts load after admin sign-in.";
     return;
   }
   const queueReady = socialActionsReady() && asText(currentAdminActions.endpoints?.socialQueue);
+  const allQueued = currentSocialDrafts.every((draft) => draft.state === "queued");
+  if (socialWeekApproveButton) {
+    socialWeekApproveButton.disabled = !queueReady || allQueued;
+    socialWeekApproveButton.textContent = allQueued ? "Week approved" : "Approve entire week";
+  }
   socialDrafts.innerHTML = currentSocialDrafts.map((draft) => {
     const queued = draft.state === "queued";
     const scheduled = new Date(draft.scheduledAt);
@@ -427,7 +436,7 @@ function renderSocialDrafts() {
       "</article>",
     ].join("");
   }).join("");
-  socialStatus.textContent = "Review every caption, image, platform, and scheduled time before approval.";
+  socialStatus.textContent = "Review all seven posts, then approve the week once.";
 }
 
 async function loadSocialDrafts() {
@@ -442,15 +451,28 @@ async function loadSocialDrafts() {
     if (batch.reviewStatus !== "draft" || !Array.isArray(batch.posts) || batch.posts.length !== 7) {
       throw new Error("Social draft batch is invalid.");
     }
+    currentSocialWeekOf = asText(batch.weekOf);
     currentSocialDrafts = batch.posts.map(normalizedSocialDraft).filter((draft) => draft.postId);
     renderSocialDrafts();
   } catch (error) {
+    currentSocialWeekOf = "";
     currentSocialDrafts = [];
     socialDrafts.innerHTML = "";
     socialStatus.textContent = "Social drafts could not be loaded. Refresh the page and try again.";
   } finally {
     if (socialDraftsRefreshButton) socialDraftsRefreshButton.disabled = false;
   }
+}
+
+function socialDraftRequestBody(draft) {
+  return {
+    caption: draft.caption,
+    hashtags: draft.hashtags,
+    imageUrl: draft.imageUrl,
+    platforms: draft.platforms,
+    postId: draft.postId,
+    scheduledAt: draft.scheduledAt,
+  };
 }
 
 async function approveSocialDraft(target) {
@@ -474,14 +496,7 @@ async function approveSocialDraft(target) {
     await currentAdminActions.postAdminJson({
       endpoint: currentAdminActions.endpoints.socialQueue,
       user: currentAdminActions.user,
-      body: {
-        caption: draft.caption,
-        hashtags: draft.hashtags,
-        imageUrl: draft.imageUrl,
-        platforms: draft.platforms,
-        postId: draft.postId,
-        scheduledAt: draft.scheduledAt,
-      },
+      body: socialDraftRequestBody(draft),
     });
     currentSocialDrafts = currentSocialDrafts.map((candidate) => (
       candidate.postId === postId ? { ...candidate, state: "queued" } : candidate
@@ -491,6 +506,47 @@ async function approveSocialDraft(target) {
   } catch (error) {
     target.disabled = false;
     setAdminActionStatus("Social post approval failed. Check the draft and admin access.", "error");
+  }
+}
+
+async function approveSocialWeek() {
+  if (
+    !socialWeekApproveButton ||
+    !currentSocialDrafts.length ||
+    !socialActionsReady() ||
+    !asText(currentAdminActions.endpoints?.socialQueue)
+  ) {
+    return;
+  }
+  const pending = currentSocialDrafts.filter((draft) => draft.state !== "queued");
+  if (!pending.length) return;
+  const approved = window.confirm(
+    "Approve all " + pending.length + " posts for the week of " + currentSocialWeekOf +
+      "? This queues the displayed Facebook and Instagram posts at their scheduled times.",
+  );
+  if (!approved) return;
+
+  socialWeekApproveButton.disabled = true;
+  setAdminActionStatus("Approving the weekly social batch...");
+  try {
+    for (const draft of pending) {
+      await currentAdminActions.postAdminJson({
+        endpoint: currentAdminActions.endpoints.socialQueue,
+        user: currentAdminActions.user,
+        body: socialDraftRequestBody(draft),
+      });
+      currentSocialDrafts = currentSocialDrafts.map((candidate) => (
+        candidate.postId === draft.postId ? { ...candidate, state: "queued" } : candidate
+      ));
+      renderSocialDrafts();
+    }
+    setAdminActionStatus("Weekly social batch approved and scheduled.");
+  } catch (error) {
+    socialWeekApproveButton.disabled = false;
+    setAdminActionStatus(
+      "Weekly approval stopped before every post was queued. Review the batch and retry; completed posts are idempotent.",
+      "error",
+    );
   }
 }
 
@@ -952,6 +1008,9 @@ if (notificationRows) {
 }
 if (socialDraftsRefreshButton) {
   socialDraftsRefreshButton.addEventListener("click", loadSocialDrafts);
+}
+if (socialWeekApproveButton) {
+  socialWeekApproveButton.addEventListener("click", approveSocialWeek);
 }
 if (socialReconciliationRefreshButton) {
   socialReconciliationRefreshButton.addEventListener("click", refreshSocialExceptions);
