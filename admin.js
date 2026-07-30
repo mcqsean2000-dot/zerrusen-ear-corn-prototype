@@ -72,6 +72,11 @@ const notificationMetrics = document.querySelector("[data-notification-metrics]"
 const notificationRows = document.querySelector("[data-notification-rows]");
 const notificationHealthStatus = document.querySelector("[data-notification-health-status]");
 const notificationRefreshButton = document.querySelector("[data-notification-refresh]");
+const socialDrafts = document.querySelector("[data-social-drafts]");
+const socialStatus = document.querySelector("[data-social-status]");
+const socialDraftsRefreshButton = document.querySelector("[data-social-drafts-refresh]");
+const socialReconciliationRefreshButton = document.querySelector("[data-social-reconciliation-refresh]");
+const socialReconciliationRows = document.querySelector("[data-social-reconciliation-rows]");
 
 function asText(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -327,6 +332,8 @@ let currentNotificationHealth = {
   jobs: [],
   truncatedStatuses: [],
 };
+let currentSocialDrafts = [];
+let currentSocialExceptions = [];
 
 function setAdminOrders(orders) {
   currentAdminOrders = normalizeAdminOrders(orders);
@@ -348,14 +355,271 @@ function setAdminActions(actions) {
   currentAdminActions = actions && typeof actions.postAdminJson === "function" ? actions : null;
   render(currentAdminOrders);
   renderNotificationHealth();
-  if (currentAdminActions) refreshNotificationHealth();
+  renderSocialDrafts();
+  renderSocialExceptions();
+  if (currentAdminActions) {
+    refreshNotificationHealth();
+    loadSocialDrafts();
+    refreshSocialExceptions();
+  }
 }
 
 function clearAdminActions() {
   currentAdminActions = null;
+  currentSocialDrafts = [];
+  currentSocialExceptions = [];
   setAdminActionStatus("");
   render(currentAdminOrders);
   setNotificationHealth();
+  renderSocialDrafts();
+  renderSocialExceptions();
+}
+
+function socialActionsReady() {
+  return Boolean(
+    currentAdminActions &&
+      typeof currentAdminActions.postAdminJson === "function" &&
+      typeof currentAdminActions.getAdminJson === "function" &&
+      currentAdminActions.user,
+  );
+}
+
+function normalizedSocialDraft(value) {
+  const draft = value && typeof value === "object" ? value : {};
+  return {
+    caption: asText(draft.caption),
+    hashtags: Array.isArray(draft.hashtags) ? draft.hashtags.map(asText).filter(Boolean) : [],
+    imageUrl: safeUrl(draft.imageUrl),
+    platforms: Array.isArray(draft.platforms)
+      ? draft.platforms.map(asText).filter((platform) => ["facebook", "instagram"].includes(platform))
+      : [],
+    postId: asText(draft.postId),
+    scheduledAt: asText(draft.scheduledAt),
+    state: asText(draft.state || draft.status) || "draft",
+  };
+}
+
+function renderSocialDrafts() {
+  if (!socialDrafts || !socialStatus) return;
+  if (!currentSocialDrafts.length) {
+    socialDrafts.innerHTML = "";
+    if (!currentAdminActions) socialStatus.textContent = "Social drafts load after admin sign-in.";
+    return;
+  }
+  const queueReady = socialActionsReady() && asText(currentAdminActions.endpoints?.socialQueue);
+  socialDrafts.innerHTML = currentSocialDrafts.map((draft) => {
+    const queued = draft.state === "queued";
+    const scheduled = new Date(draft.scheduledAt);
+    const scheduleLabel = Number.isFinite(scheduled.getTime())
+      ? scheduled.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })
+      : "Invalid schedule";
+    return [
+      '<article class="social-draft">',
+      "<h3>" + escapeHtml(draft.postId) + "</h3>",
+      "<p>" + escapeHtml(draft.caption) + "</p>",
+      '<div class="social-draft-meta"><span>' + escapeHtml(scheduleLabel) + "</span><span>" +
+        escapeHtml(draft.platforms.join(" + ")) + "</span><span>" +
+        escapeHtml(draft.hashtags.join(" ")) + "</span></div>",
+      '<button class="admin-action" type="button" data-social-approve="' + escapeHtml(draft.postId) +
+        '" data-state="' + escapeHtml(draft.state) + '"' +
+        (!queueReady || queued ? " disabled" : "") + ">" +
+        (queued ? "Queued" : "Approve and queue") + "</button>",
+      "</article>",
+    ].join("");
+  }).join("");
+  socialStatus.textContent = "Review every caption, image, platform, and scheduled time before approval.";
+}
+
+async function loadSocialDrafts() {
+  if (!socialDrafts || !socialStatus) return;
+  if (socialDraftsRefreshButton) socialDraftsRefreshButton.disabled = true;
+  socialStatus.textContent = "Loading the review-only batch...";
+  try {
+    if (!currentAdminActions || typeof currentAdminActions.loadSocialDraftBatch !== "function") {
+      throw new Error("Social draft loader is unavailable.");
+    }
+    const batch = await currentAdminActions.loadSocialDraftBatch();
+    if (batch.reviewStatus !== "draft" || !Array.isArray(batch.posts) || batch.posts.length !== 7) {
+      throw new Error("Social draft batch is invalid.");
+    }
+    currentSocialDrafts = batch.posts.map(normalizedSocialDraft).filter((draft) => draft.postId);
+    renderSocialDrafts();
+  } catch (error) {
+    currentSocialDrafts = [];
+    socialDrafts.innerHTML = "";
+    socialStatus.textContent = "Social drafts could not be loaded. Refresh the page and try again.";
+  } finally {
+    if (socialDraftsRefreshButton) socialDraftsRefreshButton.disabled = false;
+  }
+}
+
+async function approveSocialDraft(target) {
+  const postId = asText(target?.dataset?.socialApprove);
+  const draft = currentSocialDrafts.find((candidate) => candidate.postId === postId);
+  if (
+    !draft ||
+    !socialActionsReady() ||
+    !asText(currentAdminActions.endpoints?.socialQueue)
+  ) {
+    return;
+  }
+  const approved = window.confirm(
+    "Approve " + postId + " for " + draft.platforms.join(" and ") +
+      " at its displayed scheduled time? This adds it to the guarded queue.",
+  );
+  if (!approved) return;
+
+  target.disabled = true;
+  try {
+    await currentAdminActions.postAdminJson({
+      endpoint: currentAdminActions.endpoints.socialQueue,
+      user: currentAdminActions.user,
+      body: {
+        caption: draft.caption,
+        hashtags: draft.hashtags,
+        imageUrl: draft.imageUrl,
+        platforms: draft.platforms,
+        postId: draft.postId,
+        scheduledAt: draft.scheduledAt,
+      },
+    });
+    currentSocialDrafts = currentSocialDrafts.map((candidate) => (
+      candidate.postId === postId ? { ...candidate, state: "queued" } : candidate
+    ));
+    setAdminActionStatus("Social post approved and added to the guarded queue.");
+    renderSocialDrafts();
+  } catch (error) {
+    target.disabled = false;
+    setAdminActionStatus("Social post approval failed. Check the draft and admin access.", "error");
+  }
+}
+
+function normalizedSocialException(value) {
+  const post = value && typeof value === "object" ? value : {};
+  return {
+    facebookPostId: asText(post.facebookPostId),
+    instagramPostId: asText(post.instagramPostId),
+    lastErrorCode: asText(post.lastErrorCode),
+    platforms: Array.isArray(post.platforms) ? post.platforms.map(asText).filter(Boolean) : [],
+    postId: asText(post.postId),
+    publishAttempts: asWholeNumber(post.publishAttempts),
+  };
+}
+
+function renderSocialExceptions() {
+  if (!socialReconciliationRows) return;
+  if (!currentSocialExceptions.length) {
+    socialReconciliationRows.innerHTML = '<tr><td colspan="5">No publishing exceptions require review.</td></tr>';
+    return;
+  }
+  const resolveReady = socialActionsReady() &&
+    asText(currentAdminActions.endpoints?.socialReconciliationResolve);
+  socialReconciliationRows.innerHTML = currentSocialExceptions.map((post) => [
+    "<tr>",
+    "<td><strong>" + escapeHtml(post.postId) + "</strong></td>",
+    "<td>" + escapeHtml(post.platforms.join(", ")) + "</td>",
+    "<td>" + post.publishAttempts + "</td>",
+    "<td>" + escapeHtml(post.lastErrorCode || "Unknown") +
+      (post.facebookPostId ? "<br>Facebook: " + escapeHtml(post.facebookPostId) : "") +
+      (post.instagramPostId ? "<br>Instagram: " + escapeHtml(post.instagramPostId) : "") + "</td>",
+    '<td><div class="social-resolution-actions">',
+    '<button class="admin-action" type="button" data-social-resolution="mark_published" data-social-post-id="' +
+      escapeHtml(post.postId) + '"' + (resolveReady ? "" : " disabled") + ">Confirm published</button>",
+    '<button class="admin-action" type="button" data-social-resolution="retry_confirmed_not_published" data-social-post-id="' +
+      escapeHtml(post.postId) + '"' + (resolveReady ? "" : " disabled") + ">Confirmed absent: retry</button>",
+    '<button class="admin-action" type="button" data-social-resolution="skip" data-social-post-id="' +
+      escapeHtml(post.postId) + '"' + (resolveReady ? "" : " disabled") + ">Skip</button>",
+    "</div></td>",
+    "</tr>",
+  ].join("")).join("");
+}
+
+async function refreshSocialExceptions() {
+  if (
+    !socialActionsReady() ||
+    !asText(currentAdminActions.endpoints?.socialReconciliation)
+  ) {
+    return;
+  }
+  if (socialReconciliationRefreshButton) socialReconciliationRefreshButton.disabled = true;
+  try {
+    const result = await currentAdminActions.getAdminJson({
+      endpoint: currentAdminActions.endpoints.socialReconciliation,
+      user: currentAdminActions.user,
+    });
+    currentSocialExceptions = Array.isArray(result.posts)
+      ? result.posts.map(normalizedSocialException).filter((post) => post.postId)
+      : [];
+    renderSocialExceptions();
+  } catch (error) {
+    if (socialStatus) socialStatus.textContent = "Publishing exceptions could not be loaded.";
+  } finally {
+    if (socialReconciliationRefreshButton) socialReconciliationRefreshButton.disabled = false;
+  }
+}
+
+async function resolveSocialException(target) {
+  const postId = asText(target?.dataset?.socialPostId);
+  const resolution = asText(target?.dataset?.socialResolution);
+  if (
+    !postId ||
+    !["mark_published", "retry_confirmed_not_published", "skip"].includes(resolution) ||
+    !socialActionsReady() ||
+    !asText(currentAdminActions.endpoints?.socialReconciliationResolve)
+  ) {
+    return;
+  }
+  const post = currentSocialExceptions.find((candidate) => candidate.postId === postId);
+  const providerPostIds = {};
+  if (resolution === "mark_published") {
+    if (!post) return;
+    if (post.platforms.includes("facebook")) {
+      const facebookPostId = post.facebookPostId || window.prompt(
+        "Enter the verified Facebook post ID. Cancel if the post cannot be confirmed.",
+        "",
+      );
+      if (!asText(facebookPostId)) return;
+      providerPostIds.facebookPostId = asText(facebookPostId);
+    }
+    if (post.platforms.includes("instagram")) {
+      const instagramPostId = post.instagramPostId || window.prompt(
+        "Enter the verified Instagram post ID. Cancel if the post cannot be confirmed.",
+        "",
+      );
+      if (!asText(instagramPostId)) return;
+      providerPostIds.instagramPostId = asText(instagramPostId);
+    }
+  }
+  const warning = resolution === "retry_confirmed_not_published"
+    ? "Retry only after checking both selected Meta platforms and confirming the post does not exist. Confirm retry?"
+    : resolution === "mark_published"
+      ? "Mark this post published only after verifying every selected platform post ID?"
+      : "Skip this ambiguous post permanently without republishing it?";
+  if (!window.confirm(warning)) return;
+
+  target.disabled = true;
+  try {
+    await currentAdminActions.postAdminJson({
+      endpoint: currentAdminActions.endpoints.socialReconciliationResolve,
+      user: currentAdminActions.user,
+      body: {
+        postId,
+        resolution,
+        ...(resolution === "mark_published" ? { providerPostIds } : {}),
+      },
+    });
+    setAdminActionStatus(
+      resolution === "skip"
+        ? "Ambiguous social post skipped."
+        : resolution === "mark_published"
+          ? "Social post marked published with verified platform IDs."
+          : "Social post returned to the approved queue.",
+    );
+    await refreshSocialExceptions();
+  } catch (error) {
+    target.disabled = false;
+    setAdminActionStatus("Social publishing exception could not be resolved.", "error");
+  }
 }
 
 function normalizeNotificationHealth(value) {
@@ -474,12 +738,16 @@ if (typeof window !== "undefined") {
     buildLabelActionViewModel: buildAdminLabelActionViewModel,
     canTransitionStatus: canTransitionAdminStatus,
     getAllowedStatusTransitions: getAllowedAdminStatusTransitions,
+    normalizeSocialDraft: normalizedSocialDraft,
+    normalizeSocialException: normalizedSocialException,
     clearActions: clearAdminActions,
     hasActions: hasAdminActions,
     render,
     setActions: setAdminActions,
     setNotificationHealth,
     setOrders: setAdminOrders,
+    loadSocialDrafts,
+    refreshSocialExceptions,
   };
 }
 
@@ -682,5 +950,27 @@ if (notificationRows) {
     }
   });
 }
+if (socialDraftsRefreshButton) {
+  socialDraftsRefreshButton.addEventListener("click", loadSocialDrafts);
+}
+if (socialReconciliationRefreshButton) {
+  socialReconciliationRefreshButton.addEventListener("click", refreshSocialExceptions);
+}
+if (socialDrafts) {
+  socialDrafts.addEventListener("click", (event) => {
+    if (event.target && event.target.dataset && event.target.dataset.socialApprove) {
+      approveSocialDraft(event.target);
+    }
+  });
+}
+if (socialReconciliationRows) {
+  socialReconciliationRows.addEventListener("click", (event) => {
+    if (event.target && event.target.dataset && event.target.dataset.socialResolution) {
+      resolveSocialException(event.target);
+    }
+  });
+}
 render();
 renderNotificationHealth();
+renderSocialDrafts();
+renderSocialExceptions();

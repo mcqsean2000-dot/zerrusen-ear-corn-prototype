@@ -12,6 +12,7 @@
       labelPurchase: "/api/admin/shippo-labels",
       notificationHealth: "/api/admin/notifications",
       notificationRetry: "/api/admin/notifications/retry",
+      socialQueue: "/api/admin/social-posts/queue",
       socialReconciliation: "/api/admin/social-posts/reconciliation",
       socialReconciliationResolve: "/api/admin/social-posts/reconciliation/resolve",
       statusUpdate: "/api/admin/order-status",

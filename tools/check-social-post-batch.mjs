@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const { normalizeApprovedSocialPost } = require("../functions/src/social-post-queue.js");
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const batchPath = path.join(root, "docs", "social-post-batch-2026-07-27.json");
+const batchPath = path.join(root, "docs", "social-post-batch-2026-08-03.json");
 const batch = JSON.parse(fs.readFileSync(batchPath, "utf8"));
 
 if (batch.reviewStatus !== "draft" || !Array.isArray(batch.posts) || batch.posts.length !== 7) {
