@@ -126,6 +126,21 @@
     return payload;
   }
 
+  async function loadSocialDraftBatch(fetchImpl = fetch) {
+    const response = await fetchImpl("/social-post-batches/2026-08-03.json", {
+      cache: "no-store",
+      headers: { accept: "application/json" },
+    });
+    if (!response || !response.ok) {
+      throw new Error("Social draft batch could not be loaded.");
+    }
+    const contentType = response.headers && response.headers.get("content-type") || "";
+    if (!contentType.toLowerCase().includes("application/json")) {
+      throw new Error("Social draft batch returned an unexpected response.");
+    }
+    return response.json();
+  }
+
   function setAuthState(message, authorized, authenticated = authorized) {
     const status = document.querySelector("[data-admin-auth-status]");
     if (status) status.textContent = message;
@@ -170,11 +185,13 @@
           labelPurchase: endpointFor("labelPurchase"),
           notificationHealth: endpointFor("notificationHealth"),
           notificationRetry: endpointFor("notificationRetry"),
+          socialQueue: endpointFor("socialQueue"),
           socialReconciliation: endpointFor("socialReconciliation"),
           socialReconciliationResolve: endpointFor("socialReconciliationResolve"),
           statusUpdate: endpointFor("statusUpdate"),
         },
         getAdminJson,
+        loadSocialDraftBatch,
         postAdminJson,
         user,
       });

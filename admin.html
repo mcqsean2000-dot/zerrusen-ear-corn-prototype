@@ -85,6 +85,37 @@
         </div>
       </section>
 
+      <section class="admin-panel admin-social" id="social" aria-labelledby="social-title" data-admin-content hidden>
+        <div class="admin-panel-head">
+          <div>
+            <p class="eyebrow">Human approval required</p>
+            <h2 id="social-title">Social post queue</h2>
+            <p class="admin-note">Approving a draft adds it to the guarded queue. Publishing remains unavailable until the Meta runtime is configured and explicitly enabled.</p>
+          </div>
+          <div class="admin-social-actions">
+            <button class="admin-action" type="button" data-social-drafts-refresh>Load drafts</button>
+            <button class="admin-action" type="button" data-social-reconciliation-refresh>Check exceptions</button>
+          </div>
+        </div>
+        <p class="admin-note" data-social-status>Social drafts load after admin sign-in.</p>
+        <div class="social-draft-grid" data-social-drafts></div>
+        <div class="admin-table-wrap social-reconciliation-wrap">
+          <table class="admin-table social-reconciliation-table">
+            <caption>Publishing exceptions requiring a verified operator decision</caption>
+            <thead>
+              <tr>
+                <th scope="col">Post</th>
+                <th scope="col">Platforms</th>
+                <th scope="col">Attempts</th>
+                <th scope="col">Last error</th>
+                <th scope="col">Resolution</th>
+              </tr>
+            </thead>
+            <tbody data-social-reconciliation-rows></tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="admin-layout" id="orders" aria-labelledby="orders-title" data-admin-content hidden>
         <div class="admin-panel">
           <div class="admin-panel-head">

@@ -20,6 +20,7 @@ const requiredFiles = [
   "admin-live.js",
   "robots.txt",
   "sitemap.xml",
+  "social-post-batches/2026-08-03.json",
   "ROADMAP.md",
   "_config.yml",
   ".firebaserc.example",
@@ -33,6 +34,7 @@ const requiredFiles = [
   "docs/backend-checkout-scaffold.md",
   "docs/shippo-shipping-plan.md",
   "docs/godaddy-static-deploy.md",
+  "docs/social-post-batch-2026-08-03.json",
   "tools/package-static.mjs",
   "tools/serve-static.mjs",
   "tools/smoke-static-package.mjs",
@@ -81,6 +83,8 @@ const backendScaffold = await readFile("docs/backend-checkout-scaffold.md", "utf
 const adminFulfillment = await readFile("docs/admin-fulfillment-foundation.md", "utf8");
 const shippoPlan = await readFile("docs/shippo-shipping-plan.md", "utf8");
 const godaddyDeploy = await readFile("docs/godaddy-static-deploy.md", "utf8");
+const publicSocialBatch = JSON.parse(await readFile("social-post-batches/2026-08-03.json", "utf8"));
+const reviewSocialBatch = JSON.parse(await readFile("docs/social-post-batch-2026-08-03.json", "utf8"));
 const packageStaticScript = await readFile("tools/package-static.mjs", "utf8");
 const serveStaticScript = await readFile("tools/serve-static.mjs", "utf8");
 const smokeStaticPackageScript = await readFile("tools/smoke-static-package.mjs", "utf8");
@@ -105,6 +109,14 @@ assert(firebaseConfig.hosting?.ignore?.includes("admin-config.local.example.js")
 assert(firebaseConfig.hosting?.ignore?.includes("admin-config.local.js"), "Firebase Hosting should not publish local admin config overrides.");
 assert(!firebaseConfig.hosting?.ignore?.includes("admin.js"), "Firebase Hosting should publish the admin renderer.");
 assert(!firebaseConfig.hosting?.ignore?.includes("admin-live.js"), "Firebase Hosting should publish the authenticated admin bridge.");
+assert(!firebaseConfig.hosting?.ignore?.includes("social-post-batches/**"), "Firebase Hosting should publish reviewed social draft batches.");
+assert(
+  firebaseConfig.hosting?.headers?.some((entry) => (
+    entry.source === "**/*.json" &&
+    entry.headers?.some((header) => header.key === "Cache-Control" && header.value === "no-cache")
+  )),
+  "Firebase Hosting must prevent stale cached social draft JSON.",
+);
 assert(firebaseConfig.hosting?.ignore?.includes("**/*.zip"), "Firebase Hosting should not publish local ZIP artifacts.");
 assert(firebaseConfig.hosting?.ignore?.includes("dist/**"), "Firebase Hosting should not publish generated package artifacts.");
 assert(firebaseConfig.firestore?.rules === "firestore.rules", "Firebase config must point at firestore.rules.");
@@ -320,6 +332,8 @@ assert(admin.includes("data-admin-sign-in-email"), "Admin shell must render the 
 assert(admin.includes("data-admin-sign-in-password"), "Admin shell must render the admin sign-in password field.");
 assert(admin.includes("data-admin-sign-out"), "Admin shell must render a sign-out control for configured live mode.");
 assert(admin.includes("data-admin-content hidden"), "Admin shell must hide fulfillment content before admin authorization.");
+assert(admin.includes("data-social-drafts"), "Admin shell must render the social draft review surface.");
+assert(admin.includes("data-social-reconciliation-rows"), "Admin shell must render the social reconciliation queue.");
 assert(adminConfigScript.includes("TheosAdminConfig"), "Admin config must expose the public admin config object.");
 assert(adminConfigScript.includes("enabled: true"), "Admin live mode must be enabled for the Firebase-hosted admin route.");
 assert(adminConfigScript.includes("autoConfig: true"), "Admin live mode must use Firebase Hosting public auto config.");
@@ -327,6 +341,9 @@ assert(adminConfigScript.includes("apiKey: \"\""), "Admin config must keep Fireb
 assert(adminConfigScript.includes("projectId: \"\""), "Admin config must keep Firebase project ID blank by default.");
 assert(adminConfigScript.includes("/api/admin/order-status"), "Admin config must point status actions at the trusted backend endpoint.");
 assert(adminConfigScript.includes("/api/admin/shippo-labels"), "Admin config must point label actions at the trusted backend endpoint.");
+assert(adminConfigScript.includes("/api/admin/social-posts/queue"), "Admin config must point social approvals at the trusted backend endpoint.");
+assert(adminConfigScript.includes("/api/admin/social-posts/reconciliation"), "Admin config must point social exception reads at the trusted backend endpoint.");
+assert(adminConfigScript.includes("/api/admin/social-posts/reconciliation/resolve"), "Admin config must point social exception actions at the trusted backend endpoint.");
 assert(!adminConfigScript.includes("sk_") && !adminConfigScript.includes("whsec_"), "Admin config must not include secret-looking values.");
 assert(adminLocalConfigExample.includes("replace-with-public-firebase-web-api-key"), "Local admin config example must use placeholder Firebase web config.");
 assert(adminLocalConfigExample.includes("enabled: true"), "Local admin config example must show how to intentionally enable local live mode.");
@@ -346,6 +363,11 @@ assert(adminScript.includes("Auth required"), "Admin shell label action must sta
 assert(adminScript.includes("setAdminActions"), "Admin shell must expose an authenticated action bridge setter for live admin wiring.");
 assert(adminScript.includes("clearAdminActions"), "Admin shell must clear live admin actions on sign-out or denied reads.");
 assert(adminScript.includes("setAdminActionStatus"), "Admin shell must expose safe action feedback for guarded admin controls.");
+assert(adminScript.includes("approveSocialDraft"), "Admin shell must require an explicit social draft approval action.");
+assert(adminScript.includes("retry_confirmed_not_published"), "Admin shell must expose the guarded confirmed-absent retry action.");
+assert(adminScript.includes("mark_published"), "Admin shell must support verified provider IDs for already-published exceptions.");
+assert(adminScript.includes("providerPostIds"), "Admin shell must send verified provider IDs only for mark-published reconciliation.");
+assert(adminScript.includes("window.confirm"), "Admin social actions must require explicit operator confirmation.");
 assert(adminScript.includes("data-status-action"), "Admin shell must render guarded status action controls.");
 assert(!adminScript.includes("fetch("), "Admin shell must not call live backend endpoints before authenticated admin wiring exists.");
 assert(!adminScript.toLowerCase().includes("firebase"), "Admin shell must not connect to Firebase yet.");
@@ -367,8 +389,37 @@ assert(adminLiveScript.includes("setOrders"), "Admin live bridge must hand authe
 assert(adminLiveScript.includes("setActions({"), "Admin live bridge must pass signed-in action wiring to the admin renderer.");
 assert(adminLiveScript.includes("clearAdminActions()"), "Admin live bridge must clear action wiring when auth/read access fails.");
 assert(adminLiveScript.includes("postAdminJson"), "Admin live bridge must centralize guarded admin endpoint calls.");
+assert(adminLiveScript.includes("loadSocialDraftBatch"), "Admin live bridge must load the review-only social draft batch.");
+assert(adminLiveScript.includes("/social-post-batches/2026-08-03.json"), "Admin live bridge must load the published August 3 review batch.");
+assert(adminLiveScript.includes('cache: "no-store"'), "Admin live bridge must not cache social approval drafts.");
+assert(adminLiveScript.includes("application/json"), "Admin live bridge must reject non-JSON social draft responses.");
 assert(!adminLiveScript.includes("body.admin"), "Admin live bridge must not send request-provided admin identity.");
 assert(!adminLiveScript.includes("sk_") && !adminLiveScript.includes("whsec_"), "Admin live bridge must not include secret-looking values.");
+
+assert(
+  JSON.stringify(publicSocialBatch) === JSON.stringify(reviewSocialBatch),
+  "The public social draft batch must match the human-review source exactly.",
+);
+assert(publicSocialBatch.weekOf === "2026-08-03", "The public social batch must identify its review week.");
+assert(publicSocialBatch.reviewStatus === "draft", "The public social batch must remain draft until an admin approves individual posts.");
+assert(Array.isArray(publicSocialBatch.posts) && publicSocialBatch.posts.length === 7, "The public social batch must contain seven reviewed daily drafts.");
+assert(
+  new Set(publicSocialBatch.posts.map((post) => post.postId)).size === publicSocialBatch.posts.length,
+  "The public social batch must use unique deterministic post IDs.",
+);
+for (const post of publicSocialBatch.posts) {
+  assert(post.status === "draft", `${post.postId} must remain a draft before admin approval.`);
+  assert(post.caption.includes("https://theosfarm.com"), `${post.postId} must link to the production storefront.`);
+  assert(
+    Array.isArray(post.platforms) &&
+      post.platforms.join(",") === "facebook,instagram",
+    `${post.postId} must target the reviewed Facebook and Instagram pair.`,
+  );
+  assert(Number.isFinite(new Date(post.scheduledAt).getTime()), `${post.postId} must have a valid schedule.`);
+  const imageUrl = new URL(post.imageUrl);
+  assert(imageUrl.origin === "https://theosfarm.com", `${post.postId} must use a public Theo's Farm image.`);
+  await access(`.${imageUrl.pathname}`);
+}
 
 function createAdminFakeElement(name, value = "") {
   return {
@@ -450,6 +501,28 @@ function flushAdminActions() {
   }
   assert(!helpers.allowedStatuses.includes("refunded"), "Admin exported status list should not be expandable by mutating helper objects.");
   assert(!helpers.canTransitionStatus("needs_review", "refunded"), "Admin transitions should not be expandable by mutating helper objects.");
+  const normalizedSocialDraft = helpers.normalizeSocialDraft({
+    caption: "Approved only after review. https://theosfarm.com",
+    hashtags: ["#TheosFarm"],
+    imageUrl: "https://theosfarm.com/assets/theos-both-bags.jpg",
+    platforms: ["facebook", "instagram", "unsupported"],
+    postId: "2026-08-03-review-test",
+    scheduledAt: "2026-08-03T13:30:00.000Z",
+    status: "draft",
+  });
+  assert(normalizedSocialDraft.state === "draft", "Admin social normalization must preserve the source draft status.");
+  assert(normalizedSocialDraft.platforms.join(",") === "facebook,instagram", "Admin social normalization must discard unsupported platforms.");
+  const normalizedSocialException = helpers.normalizeSocialException({
+    facebookPostId: "facebook_verified",
+    instagramPostId: "instagram_verified",
+    lastErrorCode: "publishing_lease_expired",
+    platforms: ["facebook", "instagram"],
+    postId: "2026-08-03-review-test",
+    publishAttempts: 2,
+  });
+  assert(normalizedSocialException.facebookPostId === "facebook_verified", "Admin reconciliation must preserve safe Facebook provider IDs.");
+  assert(normalizedSocialException.instagramPostId === "instagram_verified", "Admin reconciliation must preserve safe Instagram provider IDs.");
+  assert(normalizedSocialException.publishAttempts === 2, "Admin reconciliation must preserve bounded publish attempts.");
   elements.statusFilter.value = "needs_review";
   elements.statusFilter.listeners.change[0]({ type: "change" });
   assert(elements.rows.innerHTML.includes("REQ-1001"), "Admin status filter listener should render current orders, not the browser event object.");

@@ -30,6 +30,21 @@
 .notification-metric span { color: var(--muted); font-size: 0.78rem; font-weight: 900; text-transform: uppercase; }
 .notification-table { min-width: 820px; }
 .notification-retry { border-color: #9b2c2c; color: #9b2c2c; background: #fff8f8; }
+.admin-social { display: grid; gap: 16px; }
+.admin-social-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.social-draft-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.social-draft { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: #fbfaf6; }
+.social-draft h3, .social-draft p { margin: 0; }
+.social-draft h3 { color: var(--ink); font-size: 1rem; }
+.social-draft p { color: var(--muted); line-height: 1.5; white-space: pre-line; }
+.social-draft-meta { display: flex; flex-wrap: wrap; gap: 6px 12px; color: var(--muted); font-size: 0.78rem; font-weight: 800; }
+.social-draft .admin-action { justify-self: start; border-color: var(--leaf); color: var(--leaf); background: #f2f8ee; }
+.social-draft .admin-action[data-state="queued"] { border-color: var(--field); color: var(--field); background: #f0f6f7; }
+.social-reconciliation-wrap { margin-top: 8px; }
+.social-reconciliation-table { min-width: 820px; }
+.social-reconciliation-table caption { padding: 0 0 10px; color: var(--muted); font-weight: 800; text-align: left; }
+.social-resolution-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.social-resolution-actions .admin-action[data-social-resolution="skip"] { border-color: #9b2c2c; color: #9b2c2c; background: #fff8f8; }
 .admin-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
 .admin-panel { padding: 20px; }
 .admin-panel-head { display: flex; justify-content: space-between; gap: 18px; align-items: start; margin-bottom: 18px; }
@@ -57,7 +72,7 @@
 .packing-row { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--line); }
 .packing-row strong { color: var(--ink); }
 @media (max-width: 900px) {
-  .admin-metrics, .admin-layout, .notification-metrics { grid-template-columns: 1fr; }
+  .admin-metrics, .admin-layout, .notification-metrics, .social-draft-grid { grid-template-columns: 1fr; }
   .admin-auth-panel { display: grid; }
   .admin-panel-head { display: grid; }
 }
