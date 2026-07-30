@@ -6,6 +6,7 @@ const require = createRequire(import.meta.url);
 const orderRequests = require("../order-request.js");
 
 const requiredFiles = [
+  ".github/workflows/ci.yml",
   "index.html",
   "styles.css",
   "script.js",
@@ -37,6 +38,7 @@ const requiredFiles = [
   "tools/smoke-static-package.mjs",
   "functions/.env.example",
   "functions/package.json",
+  "functions/tools/check-source.mjs",
   "functions/src/index.js",
   "functions/src/admin-auth.js",
   "functions/src/firebase-runtime.js",
@@ -83,6 +85,7 @@ const packageStaticScript = await readFile("tools/package-static.mjs", "utf8");
 const serveStaticScript = await readFile("tools/serve-static.mjs", "utf8");
 const smokeStaticPackageScript = await readFile("tools/smoke-static-package.mjs", "utf8");
 const functionsPackage = JSON.parse(await readFile("functions/package.json", "utf8"));
+const functionsCheckScript = await readFile("functions/tools/check-source.mjs", "utf8");
 const functionsEnvExample = await readFile("functions/.env.example", "utf8");
 const functionsIndex = await readFile("functions/src/index.js", "utf8");
 const functionsAdminAuth = await readFile("functions/src/admin-auth.js", "utf8");
@@ -183,9 +186,12 @@ assert(smokeStaticPackageScript.includes("checkoutEndpoint === \"/api/checkout-s
 assert(smokeStaticPackageScript.includes("functions"), "Static smoke check must verify backend functions are not exposed.");
 assert(smokeStaticPackageScript.includes("docs"), "Static smoke check must verify docs are not exposed.");
 assert(smokeStaticPackageScript.includes("STRIPE_SECRET_KEY"), "Static smoke check must scan for Stripe secret-looking values.");
-assert(functionsPackage.scripts?.check?.includes("node --test"), "Backend package must include a local test check.");
-assert(functionsPackage.scripts?.check?.includes("src/admin-auth.js"), "Backend package check must include admin auth helper syntax checks.");
-assert(functionsPackage.scripts?.check?.includes("src/admin-auth.test.js"), "Backend package check must include admin auth tests.");
+assert(packageJson.scripts?.check?.includes("npm run check:functions"), "Root check must run the backend check suite.");
+assert(functionsPackage.scripts?.check === "node tools/check-source.mjs", "Backend package must use the source-discovering check module.");
+assert(functionsCheckScript.includes('entry.name.endsWith(".js")'), "Backend check module must discover JavaScript source files.");
+assert(functionsCheckScript.includes('filePath.endsWith(".test.js")'), "Backend check module must discover test files.");
+assert(functionsCheckScript.includes('["--check", filePath]'), "Backend check module must syntax-check every discovered source file.");
+assert(functionsCheckScript.includes('["--test", ...testFiles]'), "Backend check module must run every discovered test file.");
 assert(functionsIndex.includes("checkoutSessionsHandler"), "Backend scaffold must export checkout session handling.");
 assert(functionsIndex.includes("stripeWebhookHandler"), "Backend scaffold must export Stripe webhook handling.");
 assert(functionsIndex.includes("adminOrderStatusHandler"), "Backend scaffold must export admin order status handling.");

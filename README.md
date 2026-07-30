@@ -140,7 +140,6 @@ Natural search phrases to keep in mind:
 npm run check
 npm run package:static
 npm run preview
-npm --prefix functions run check
 ```
 
 On Windows PowerShell, use `npm.cmd` if the local execution policy blocks `npm.ps1`:
@@ -149,8 +148,9 @@ On Windows PowerShell, use `npm.cmd` if the local execution policy blocks `npm.p
 npm.cmd run check
 npm.cmd run package:static
 npm.cmd run preview
-npm.cmd --prefix functions run check
 ```
+
+The root `check` command includes the complete Firebase Functions syntax and test suite. Use `npm --prefix functions run check:social` only when you need the smaller social-publishing check during focused development.
 
 The static package scripts remain useful for smoke checks and emergency static export, but Firebase Hosting is now the production target.
 
