@@ -9,6 +9,15 @@ assert.equal(summer.weekOf, "2026-08-03");
 assert.equal(summer.reviewStatus, "draft");
 assert.equal(summer.posts.length, 7);
 assert.equal(new Set(summer.posts.map((post) => post.postId)).size, 7);
+assert.deepEqual(summer.posts.map((post) => post.postId), [
+  "2026-08-03-farm-to-feeder",
+  "2026-08-04-cleaned-and-selected",
+  "2026-08-05-family-farm-story",
+  "2026-08-06-choose-your-bag",
+  "2026-08-07-packed-to-order",
+  "2026-08-08-protected-for-shipping",
+  "2026-08-09-keep-the-feeder-stocked",
+]);
 assert.deepEqual(summer.posts.map((post) => post.scheduledAt), [
   "2026-08-03T13:30:00.000Z",
   "2026-08-04T13:30:00.000Z",
@@ -32,7 +41,7 @@ for (const post of [...summer.posts, ...winter.posts]) {
 }
 
 const rotations = [0, 1, 2, 3].map((week) => (
-  generateWeeklyBatch(new Date(Date.UTC(2026, 0, 5 + (week * 7), 12)))
+  generateWeeklyBatch(new Date(Date.UTC(2026, 7, 3 + (week * 7), 12)))
 ));
 assert.equal(new Set(rotations.flatMap((batch) => batch.posts.map((post) => post.caption))).size, 28);
 
