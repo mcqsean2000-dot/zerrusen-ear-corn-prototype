@@ -1,0 +1,14 @@
+cluster_id,primary_intent,representative_queries,destination_url,page_type,status,business_relevance,first_party_advantage,notes
+KW-001,buy whole ear corn online,"buy whole ear corn online|whole ear corn for sale|order ear corn",https://theosfarm.com/,storefront,existing,5,5,"Homepage currently carries transactional and brand intent; reassess after product pages launch."
+KW-002,understand whole ear corn,"what is ear corn|whole ear corn|corn on the cob for wildlife",https://theosfarm.com/ear-corn/,pillar,planned,4,5,"Explain the product without wildlife health or feeding claims."
+KW-003,buy 20 lb ear corn,"20 lb ear corn|20 pound squirrel corn|small bag ear corn",https://theosfarm.com/20-lb-ear-corn/,product,planned,5,5,"Price and availability require live verification."
+KW-004,buy 40 lb ear corn,"40 lb ear corn|40 pound deer corn|large bag ear corn",https://theosfarm.com/40-lb-ear-corn/,product,planned,5,5,"Price and availability require live verification."
+KW-005,shipping whole ear corn,"ship ear corn|ear corn delivery|whole ear corn shipping",https://theosfarm.com/shipping-whole-ear-corn/,service,planned,5,5,"Use verified packaging process; do not promise transit or damage outcomes."
+KW-006,learn about Theo's Farm,"Theo's Farm|Zerrusen farm|Theo's Farm ear corn",https://theosfarm.com/about-the-farm/,about,planned,3,5,"Use only approved farm-history facts."
+KW-007,compare whole and loose corn,"whole ear corn vs loose corn|cob corn vs shelled corn",https://theosfarm.com/guides/whole-ear-corn-vs-loose-corn/,guide,backlog,4,4,"Comparison must remain factual and avoid nutrition or wildlife-performance claims."
+KW-008,choose corn for squirrel feeders,"ear corn for squirrel feeder|squirrel corn on cob|cob corn squirrel feeder",https://theosfarm.com/guides/ear-corn-for-squirrel-feeders/,guide,backlog,4,4,"Describe physical format and feeder compatibility only when verified."
+KW-009,store whole ear corn,"how to store ear corn|whole ear corn storage|store dried corn on cob",https://theosfarm.com/guides/how-to-store-whole-ear-corn/,guide,backlog,3,3,"Blocked until storage guidance is fact-reviewed."
+KW-010,choose bag size,"20 lb vs 40 lb ear corn|what size ear corn bag",https://theosfarm.com/guides/20-lb-vs-40-lb-ear-corn/,guide,backlog,5,5,"Base comparison on verified weights, prices, packaging, and customer use cases."
+KW-011,understand cleaning and packing,"how ear corn is cleaned|ear corn packed to order",https://theosfarm.com/guides/how-we-clean-and-pack-ear-corn/,guide,backlog,3,5,"Use PROCESS facts without superiority or safety implications."
+KW-012,understand ear corn names,"ear corn|cob corn|squirrel corn|deer corn|wildlife corn",https://theosfarm.com/guides/names-for-whole-ear-corn/,guide,backlog,3,4,"Define customer language naturally; avoid separate pages for every synonym."
+
