@@ -126,19 +126,12 @@
     return payload;
   }
 
-  async function loadSocialDraftBatch(fetchImpl = fetch) {
-    const response = await fetchImpl("/social-post-batches/2026-08-03.json", {
-      cache: "no-store",
-      headers: { accept: "application/json" },
-    });
-    if (!response || !response.ok) {
-      throw new Error("Social draft batch could not be loaded.");
+  async function loadSocialDraftBatch(now = new Date()) {
+    const generator = global.TheosWeeklySocialDrafts;
+    if (!generator || typeof generator.generateWeeklyBatch !== "function") {
+      throw new Error("Weekly social draft generator is unavailable.");
     }
-    const contentType = response.headers && response.headers.get("content-type") || "";
-    if (!contentType.toLowerCase().includes("application/json")) {
-      throw new Error("Social draft batch returned an unexpected response.");
-    }
-    return response.json();
+    return generator.generateWeeklyBatch(now);
   }
 
   function setAuthState(message, authorized, authenticated = authorized) {
