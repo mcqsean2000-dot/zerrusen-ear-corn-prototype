@@ -98,12 +98,12 @@
 
   function generateWeeklyBatch(now = new Date()) {
     const monday = upcomingMonday(now);
-    const epoch = Date.UTC(2026, 0, 5);
+    const epoch = Date.UTC(2026, 7, 3);
     const rotation = Math.floor((monday.getTime() - epoch) / 604800000) % 4;
     const posts = THEMES.map((variants, index) => {
       const scheduledDate = new Date(monday);
       scheduledDate.setUTCDate(monday.getUTCDate() + index);
-      const [slug, text, hashtags, imageUrl] = variants[(rotation + index) % variants.length];
+      const [slug, text, hashtags, imageUrl] = variants[rotation];
       const day = dateKey(scheduledDate);
       return {
         postId: `${day}-${slug}`,
