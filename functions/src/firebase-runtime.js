@@ -7,6 +7,7 @@ const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { onRequest } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret } = require("firebase-functions/params");
+const firebaseLogger = require("firebase-functions/logger");
 const Stripe = require("stripe");
 const {
   createFirebaseAdminAuthenticator,
@@ -29,6 +30,10 @@ const {
 const {
   createNotificationDeliveryRuntime,
 } = require("./notification-delivery-runtime");
+const {
+  createOperationalLogger,
+  createSanitizedOperationalError,
+} = require("./operational-logger");
 const {
   createNotificationReconciler,
 } = require("./notification-reconciliation");
@@ -54,6 +59,25 @@ const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
 const stripeWebhookSigningSecret = defineSecret("STRIPE_WEBHOOK_SIGNING_SECRET");
 
 let stripeClient;
+const runtimeLogger = createOperationalLogger({
+  writeError(event, reportableError, details) {
+    firebaseLogger.error(event, reportableError, details);
+  },
+  writeInfo(event, details) {
+    firebaseLogger.info(event, details);
+  },
+});
+
+async function runLoggedOperation(event, operation) {
+  try {
+    const result = await operation();
+    runtimeLogger.info(event, result);
+    return result;
+  } catch (error) {
+    runtimeLogger.error(`${event}_failed`, error);
+    throw createSanitizedOperationalError(`${event}_failed`, error);
+  }
+}
 
 function getStripeClient() {
   const secretKey = stripeSecretKey.value();
@@ -163,6 +187,7 @@ function runtimeOptions(env = runtimeEnv()) {
   return {
     authenticateAdminRequest,
     env,
+    logger: runtimeLogger,
     serverTimestamp,
     ...trustedBackend,
     adminStatusDependencies: {
@@ -188,7 +213,13 @@ const api = onRequest({
   region: "us-central1",
   secrets: [shippoApiToken, stripeSecretKey, stripeWebhookSigningSecret],
 }, (req, res) => {
-  return routeRequest(req, res, runtimeOptions());
+  return Promise.resolve(routeRequest(req, res, runtimeOptions())).catch((error) => {
+    runtimeLogger.error("api_request_unhandled", error, {
+      method: req.method,
+      path: new URL(req.url, "http://localhost").pathname,
+    });
+    throw createSanitizedOperationalError("api_request_unhandled", error);
+  });
 });
 
 const dailyFulfillmentSummary = onSchedule({
@@ -198,23 +229,24 @@ const dailyFulfillmentSummary = onSchedule({
   retryCount: 2,
   maxRetrySeconds: 900,
 }, async (event) => {
-  const env = dailySummaryEnv();
-  const app = firebaseApp();
-  const firestoreAdapter = createFirestoreAdapter({
-    firestore: getFirestore(app),
-    orderCollection: env.FIRESTORE_ORDER_COLLECTION,
-    serverTimestamp,
+  return runLoggedOperation("daily_fulfillment_summary_schedule", async () => {
+    const env = dailySummaryEnv();
+    const app = firebaseApp();
+    const firestoreAdapter = createFirestoreAdapter({
+      firestore: getFirestore(app),
+      orderCollection: env.FIRESTORE_ORDER_COLLECTION,
+      serverTimestamp,
+    });
+    const outbox = createDailyFulfillmentOutbox({
+      enqueueNotificationJobs: firestoreAdapter.enqueueNotificationJobs,
+      listPaidFulfillmentOrders: firestoreAdapter.listPaidFulfillmentOrders,
+    });
+    const handler = createFirebaseDailySummaryHandler({
+      env,
+      queueDailyFulfillmentSummary: outbox.queueDailyFulfillmentSummary,
+    });
+    return handler(event);
   });
-  const outbox = createDailyFulfillmentOutbox({
-    enqueueNotificationJobs: firestoreAdapter.enqueueNotificationJobs,
-    listPaidFulfillmentOrders: firestoreAdapter.listPaidFulfillmentOrders,
-  });
-  const handler = createFirebaseDailySummaryHandler({
-    env,
-    queueDailyFulfillmentSummary: outbox.queueDailyFulfillmentSummary,
-  });
-  const result = await handler(event);
-  console.info("daily_fulfillment_summary_schedule", result);
 });
 
 const notificationOutboxDelivery = onDocumentCreated({
@@ -223,23 +255,24 @@ const notificationOutboxDelivery = onDocumentCreated({
   retry: true,
   secrets: [resendApiKey],
 }, async (event) => {
-  const app = firebaseApp();
-  const firestoreAdapter = createFirestoreAdapter({
-    firestore: getFirestore(app),
-    serverTimestamp,
+  return runLoggedOperation("notification_outbox_delivery", async () => {
+    const app = firebaseApp();
+    const firestoreAdapter = createFirestoreAdapter({
+      firestore: getFirestore(app),
+      serverTimestamp,
+    });
+    const runtime = createNotificationDeliveryRuntime({
+      env: notificationDeliveryEnv(),
+      fetchImpl: globalThis.fetch,
+      persistence: {
+        claimNotificationJob: firestoreAdapter.claimNotificationJob,
+        recordNotificationFailure: firestoreAdapter.recordNotificationFailure,
+        recordNotificationSuccess: firestoreAdapter.recordNotificationSuccess,
+      },
+    });
+    const handler = createFirebaseNotificationDeliveryHandler({ runtime });
+    return handler(event);
   });
-  const runtime = createNotificationDeliveryRuntime({
-    env: notificationDeliveryEnv(),
-    fetchImpl: globalThis.fetch,
-    persistence: {
-      claimNotificationJob: firestoreAdapter.claimNotificationJob,
-      recordNotificationFailure: firestoreAdapter.recordNotificationFailure,
-      recordNotificationSuccess: firestoreAdapter.recordNotificationSuccess,
-    },
-  });
-  const handler = createFirebaseNotificationDeliveryHandler({ runtime });
-  const result = await handler(event);
-  console.info("notification_outbox_delivery", result);
 });
 
 const notificationOutboxReconciliation = onSchedule({
@@ -249,31 +282,32 @@ const notificationOutboxReconciliation = onSchedule({
   maxRetrySeconds: 600,
   secrets: [resendApiKey],
 }, async () => {
-  const app = firebaseApp();
-  const firestoreAdapter = createFirestoreAdapter({
-    firestore: getFirestore(app),
-    serverTimestamp,
+  return runLoggedOperation("notification_outbox_reconciliation", async () => {
+    const app = firebaseApp();
+    const firestoreAdapter = createFirestoreAdapter({
+      firestore: getFirestore(app),
+      serverTimestamp,
+    });
+    const env = notificationReconciliationEnv();
+    const runtime = createNotificationDeliveryRuntime({
+      env,
+      fetchImpl: globalThis.fetch,
+      persistence: {
+        claimNotificationJob: firestoreAdapter.claimNotificationJob,
+        recordNotificationFailure: firestoreAdapter.recordNotificationFailure,
+        recordNotificationSuccess: firestoreAdapter.recordNotificationSuccess,
+      },
+    });
+    const reconciler = createNotificationReconciler({
+      env,
+      listPendingNotificationJobs: firestoreAdapter.listPendingNotificationJobs,
+      recoverStaleNotificationJobs: firestoreAdapter.recoverStaleNotificationJobs,
+      runtime,
+    });
+    return reconciler.enabled
+      ? reconciler.run()
+      : { action: "disabled", missingConfiguration: reconciler.missingConfiguration };
   });
-  const env = notificationReconciliationEnv();
-  const runtime = createNotificationDeliveryRuntime({
-    env,
-    fetchImpl: globalThis.fetch,
-    persistence: {
-      claimNotificationJob: firestoreAdapter.claimNotificationJob,
-      recordNotificationFailure: firestoreAdapter.recordNotificationFailure,
-      recordNotificationSuccess: firestoreAdapter.recordNotificationSuccess,
-    },
-  });
-  const reconciler = createNotificationReconciler({
-    env,
-    listPendingNotificationJobs: firestoreAdapter.listPendingNotificationJobs,
-    recoverStaleNotificationJobs: firestoreAdapter.recoverStaleNotificationJobs,
-    runtime,
-  });
-  const result = reconciler.enabled
-    ? await reconciler.run()
-    : { action: "disabled", missingConfiguration: reconciler.missingConfiguration };
-  console.info("notification_outbox_reconciliation", result);
 });
 
 const socialPostPublishing = onSchedule({
@@ -282,25 +316,26 @@ const socialPostPublishing = onSchedule({
   retryCount: 0,
   secrets: [metaFacebookPageId, metaInstagramAccountId, metaPageAccessToken],
 }, async (event) => {
-  const app = firebaseApp();
-  const firestoreAdapter = createFirestoreAdapter({
-    firestore: getFirestore(app),
-    serverTimestamp,
+  return runLoggedOperation("social_post_publishing", async () => {
+    const app = firebaseApp();
+    const firestoreAdapter = createFirestoreAdapter({
+      firestore: getFirestore(app),
+      serverTimestamp,
+    });
+    const runtime = createSocialPostPublishingRuntime({
+      env: socialPublishingEnv(),
+      fetchImpl: globalThis.fetch,
+      persistence: {
+        claimDueSocialPost: firestoreAdapter.claimDueSocialPost,
+        completeSocialPostPublishing: firestoreAdapter.completeSocialPostPublishing,
+        recordSocialPostFailure: firestoreAdapter.recordSocialPostFailure,
+        recordSocialPostPlatformSuccess: firestoreAdapter.recordSocialPostPlatformSuccess,
+      },
+    });
+    return runtime.enabled
+      ? runtime.publishDueSocialPost({ now: new Date(event.scheduleTime) })
+      : { action: "disabled", missingConfiguration: runtime.missingConfiguration };
   });
-  const runtime = createSocialPostPublishingRuntime({
-    env: socialPublishingEnv(),
-    fetchImpl: globalThis.fetch,
-    persistence: {
-      claimDueSocialPost: firestoreAdapter.claimDueSocialPost,
-      completeSocialPostPublishing: firestoreAdapter.completeSocialPostPublishing,
-      recordSocialPostFailure: firestoreAdapter.recordSocialPostFailure,
-      recordSocialPostPlatformSuccess: firestoreAdapter.recordSocialPostPlatformSuccess,
-    },
-  });
-  const result = runtime.enabled
-    ? await runtime.publishDueSocialPost({ now: new Date(event.scheduleTime) })
-    : { action: "disabled", missingConfiguration: runtime.missingConfiguration };
-  console.info("social_post_publishing", result);
 });
 
 const socialPostReconciliation = onSchedule({
@@ -308,19 +343,20 @@ const socialPostReconciliation = onSchedule({
   schedule: "*/10 * * * *",
   retryCount: 0,
 }, async () => {
-  const app = firebaseApp();
-  const firestoreAdapter = createFirestoreAdapter({
-    firestore: getFirestore(app),
-    serverTimestamp,
+  return runLoggedOperation("social_post_reconciliation", async () => {
+    const app = firebaseApp();
+    const firestoreAdapter = createFirestoreAdapter({
+      firestore: getFirestore(app),
+      serverTimestamp,
+    });
+    const reconciler = createSocialPostReconciler({
+      env: socialReconciliationEnv(),
+      recoverStaleSocialPostClaims: firestoreAdapter.recoverStaleSocialPostClaims,
+    });
+    return reconciler.enabled
+      ? reconciler.run()
+      : { action: "disabled", missingConfiguration: reconciler.missingConfiguration };
   });
-  const reconciler = createSocialPostReconciler({
-    env: socialReconciliationEnv(),
-    recoverStaleSocialPostClaims: firestoreAdapter.recoverStaleSocialPostClaims,
-  });
-  const result = reconciler.enabled
-    ? await reconciler.run()
-    : { action: "disabled", missingConfiguration: reconciler.missingConfiguration };
-  console.info("social_post_reconciliation", result);
 });
 
 module.exports = {

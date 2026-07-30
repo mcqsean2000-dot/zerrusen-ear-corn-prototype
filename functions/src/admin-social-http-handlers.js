@@ -1,5 +1,7 @@
 "use strict";
 
+const { reportOperationalError } = require("./operational-logger");
+
 function resolveAdminSocialReconciliationLister(options) {
   if (typeof options.listAdminSocialPostReconciliation === "function") {
     return options.listAdminSocialPostReconciliation;
@@ -81,6 +83,10 @@ function createAdminSocialHttpHandlers({
           error: { code: error.code, message: "Check the admin identity and reconciliation result limit." },
         }, corsHeaders);
       }
+      reportOperationalError(options, "admin_social_reconciliation_failed", error, {
+        method: req.method,
+        path: "/api/admin/social-posts/reconciliation",
+      });
       return sendJson(res, 502, {
         error: {
           code: "admin_social_reconciliation_failed",
@@ -157,6 +163,10 @@ function createAdminSocialHttpHandlers({
           error: { code: error.code, message: "Social post is no longer awaiting reconciliation." },
         }, corsHeaders);
       }
+      reportOperationalError(options, "admin_social_reconciliation_update_failed", error, {
+        method: req.method,
+        path: "/api/admin/social-posts/reconciliation/resolve",
+      });
       return sendJson(res, 502, {
         error: {
           code: "admin_social_reconciliation_update_failed",
@@ -222,6 +232,10 @@ function createAdminSocialHttpHandlers({
           error: { code: error.code, message: "Check the social post content and schedule." },
         }, corsHeaders);
       }
+      reportOperationalError(options, "admin_social_queue_failed", error, {
+        method: req.method,
+        path: "/api/admin/social-posts/queue",
+      });
       return sendJson(res, 502, {
         error: {
           code: "admin_social_queue_failed",
