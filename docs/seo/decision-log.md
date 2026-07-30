@@ -60,3 +60,12 @@ Each entry records date, decision, owner, rationale, affected gates, and superse
 - Source: GitHub issue #45.
 - Status: Active.
 
+### SEO-DEC-007 — Search Console observed ownership differs from intended ownership
+
+- Date: 2026-07-30
+- Owner: Sean McQueen
+- Observation: The `theosfarm.com` domain property is verified and its sitemap is successful, but the verified Search Console session identifies Sean McQueen rather than the business Google account named in SEO-DEC-002.
+- Decision required: Confirm `theosfeedfarm@gmail.com` already has owner access, authorize adding it, or amend SEO-DEC-002 to make Sean McQueen's account the canonical owner.
+- Safe state: Keep the existing verified property and successful sitemap unchanged. Do not change Search Console users or permissions without explicit approval.
+- Source: Google Search Console property settings and GitHub issue #56.
+- Status: Pending owner decision.
