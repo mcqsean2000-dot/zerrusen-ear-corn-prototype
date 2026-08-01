@@ -60,3 +60,12 @@ Each entry records date, decision, owner, rationale, affected gates, and superse
 - Source: GitHub issue #45.
 - Status: Active.
 
+### SEO-DEC-007 — Align Search Console ownership with the business account
+
+- Date: 2026-07-30
+- Owner: Sean McQueen
+- Observation: The `theosfarm.com` domain property was verified and its sitemap was successful, but the only observed owner was Sean McQueen rather than the business Google account named in SEO-DEC-002.
+- Decision: On 2026-08-01, Sean authorized adding `theosfeedfarm@gmail.com` as an Owner and retaining Sean's existing verified owner access.
+- Result: Search Console confirmed two owners: `theosfeedfarm@gmail.com` as Owner and `mcqsean1982@gmail.com` as verified Owner.
+- Source: Google Search Console property settings and GitHub issue #56.
+- Status: Implemented 2026-08-01.

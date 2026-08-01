@@ -1,6 +1,6 @@
 # Theo's Farm SEO Measurement Plan
 
-Status: Definitions approved for implementation; integrations pending SEO-003 and SEO-004  
+Status: Search Console baseline recorded; GA4 integration pending SEO-004
 Business authorizer: Sean McQueen  
 Technical owner: Calvin Hagerstrom  
 Initial external data budget: $0 per month
@@ -17,7 +17,7 @@ Initial external data budget: $0 per month
 
 | Source | Purpose | Owner | Status |
 | --- | --- | --- | --- |
-| Google Search Console | Queries, pages, impressions, clicks, average position, indexation | `theosfeedfarm@gmail.com` | Pending SEO-003 |
+| Google Search Console | Queries, pages, impressions, clicks, average position, indexation | `theosfeedfarm@gmail.com`; Sean McQueen retained as verified owner | Connected; ownership aligned 2026-08-01 |
 | GA4 | Sessions, engagement, ecommerce funnel, purchases, revenue | `theosfeedfarm@gmail.com` | Pending SEO-004 |
 | Storefront order system | Authoritative orders and revenue reconciliation | Calvin | Existing; integration scope pending |
 | Repository crawl | Status, canonical, metadata, schema, links, indexability | Calvin | Pending SEO-006 |
@@ -50,6 +50,32 @@ Record at least:
 
 If historic data is unavailable, record the first complete 28-day period as the baseline and label earlier comparisons unavailable.
 
+## Search Console baseline
+
+Observed in Google Search Console on 2026-07-30:
+
+- Property: domain property `theosfarm.com`.
+- Verification: the signed-in Sean McQueen account reports “You are a verified owner.”
+- Property added: 2026-07-03.
+- Sitemap: `https://theosfarm.com/sitemap.xml`.
+- Sitemap submitted: 2026-07-02.
+- Sitemap last read: 2026-07-28.
+- Sitemap status: Success.
+- Sitemap discovery: 1 page and 0 videos.
+- Indexation overview: 1 indexed page and 3 not-indexed URLs.
+- Search performance overview: 9 total web-search clicks in the period displayed by the overview.
+- HTTPS overview: 1 HTTPS URL and 0 non-HTTPS URLs.
+- Product snippets: 2 valid and 0 invalid.
+- Merchant listings: 2 valid and 0 invalid.
+- Crawl stats: 156 crawl requests during the preceding 90 days.
+- `robots.txt`: Search Console reports all files valid.
+
+The Search Console interface did not expose the overview card's exact date range in the captured baseline. The click count is therefore an observed account value with an incomplete date range and must not be used for period-over-period attribution.
+
+### Ownership alignment
+
+On 2026-08-01, Sean McQueen explicitly authorized the ownership alignment required by SEO-DEC-002. Search Console then confirmed `theosfeedfarm@gmail.com` as an Owner of the `theosfarm.com` domain property. Sean McQueen's existing verified owner access was retained for operational continuity. No ownership verification token, password, or other credential was added to the repository.
+
 ## Attribution
 
 - Primary acquisition dimension: GA4 session default channel group.
@@ -75,4 +101,3 @@ Every AI-produced result must label statements as one of:
 - `Inferred`: interpretation requiring human judgment.
 
 The AI must not claim causation from timing alone.
-
