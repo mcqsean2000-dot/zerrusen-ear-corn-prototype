@@ -23,6 +23,15 @@
     ],
     "headers": [
       {
+        "source": "/admin.html",
+        "headers": [
+          {
+            "key": "X-Robots-Tag",
+            "value": "noindex, nofollow, noarchive"
+          }
+        ]
+      },
+      {
         "source": "**/*.@(html|css|js)",
         "headers": [
           {
