@@ -1,5 +1,9 @@
 {
   "siteUrl": "https://theosfarm.com",
+  "robotsDisallow": [
+    "/admin.html",
+    "/checkout/"
+  ],
   "indexablePages": [
     {
       "file": "index.html",
