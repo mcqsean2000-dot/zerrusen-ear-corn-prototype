@@ -1,7 +1,6 @@
 (function configureTheoAnalytics(root) {
   root.TheosAnalyticsConfig = {
-    // GA4 measurement IDs are public configuration, not credentials. Set this to
-    // the business-owned web stream's G-XXXXXXXXXX value during an approved deploy.
-    measurementId: "",
+    // GA4 measurement IDs are public configuration, not credentials.
+    measurementId: "G-KQSFKF42YM",
   };
 })(typeof globalThis !== "undefined" ? globalThis : window);

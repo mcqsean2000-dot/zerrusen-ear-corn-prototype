@@ -141,7 +141,7 @@ assert(gitignore.includes("dist/"), ".gitignore must keep generated static deplo
 assert(packageJson.scripts?.["package:static"] === "node tools/package-static.mjs", "Root package must include the static package script.");
 assert(packageJson.scripts?.["check:analytics"] === "node tools/check-analytics.mjs", "Root package must include GA4 contract checks.");
 assert(packageJson.scripts?.check?.includes("check:analytics"), "Root check must run GA4 contract checks.");
-assert(analyticsConfigScript.includes('measurementId: ""'), "GA4 config must fail closed until the approved public measurement ID is set.");
+assert(analyticsConfigScript.includes('measurementId: "G-KQSFKF42YM"'), "GA4 config must use the approved Theo's Farm web-stream measurement ID.");
 assert(analyticsScript.includes("checkout_error"), "Analytics runtime must include the checkout-error event.");
 assert(!analyticsScript.includes("email:"), "Analytics payloads must not include email fields.");
 assert(storefront.includes('<script src="analytics-config.js"></script>'), "Storefront must load analytics configuration.");

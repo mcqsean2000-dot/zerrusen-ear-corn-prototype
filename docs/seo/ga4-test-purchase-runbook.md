@@ -1,6 +1,6 @@
 # GA4 test-purchase runbook
 
-Status: Ready for approved execution; no purchase performed
+Status: Property and web stream created; reviewed production deployment and separately approved purchase remain pending
 
 ## Preconditions
 
@@ -32,3 +32,11 @@ Status: Ready for approved execution; no purchase performed
 - If the purchase appears more than once, treat SEO-004 as failed and fix deduplication before another test.
 - If GA4 and the trusted order disagree, the trusted order is authoritative. Record the discrepancy; do not report attributed revenue until resolved.
 - Do not place a second transaction merely to troubleshoot without renewed approval.
+
+## Activation record
+
+- 2026-08-01: Theo's Farm GA4 property and web stream created.
+- Stream ID: `15363981412`.
+- Measurement ID: `G-KQSFKF42YM`.
+- Repository activation prepared for review; production deployment has not been performed by this change.
+- No test purchase has been performed.
