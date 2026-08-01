@@ -1,0 +1,16 @@
+{
+  "siteUrl": "https://theosfarm.com",
+  "indexablePages": [
+    {
+      "file": "index.html",
+      "url": "/",
+      "orphanExempt": true
+    }
+  ],
+  "privatePages": [
+    {
+      "file": "admin.html",
+      "url": "/admin.html"
+    }
+  ]
+}
