@@ -7,6 +7,8 @@ const packageDir = process.argv[2] || path.join("dist", "godaddy-static");
 const requiredFiles = [
   "index.html",
   "styles.css",
+  "analytics-config.js",
+  "analytics.js",
   "order-request.js",
   "checkout-config.js",
   "script.js",
@@ -206,9 +208,11 @@ async function assertIndexReferences() {
   assert(html.includes("Theo's Farm"), "Packaged index.html should contain Theo's Farm branding.");
   assert(html.includes("Farm to Feeder"), "Packaged index.html should contain Farm to Feeder messaging.");
   assert(
-    html.indexOf("order-request.js") < html.indexOf("checkout-config.js") &&
+    html.indexOf("analytics-config.js") < html.indexOf("analytics.js") &&
+      html.indexOf("analytics.js") < html.indexOf("order-request.js") &&
+      html.indexOf("order-request.js") < html.indexOf("checkout-config.js") &&
       html.indexOf("checkout-config.js") < html.indexOf("script.js"),
-    "Packaged scripts must load order-request.js, checkout-config.js, then script.js.",
+    "Packaged scripts must load analytics config/runtime before order-request.js, checkout-config.js, and script.js.",
   );
 
   for (const ref of refs) {

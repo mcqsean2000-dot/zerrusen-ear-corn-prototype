@@ -10,6 +10,8 @@ const requiredFiles = [
   "index.html",
   "styles.css",
   "script.js",
+  "analytics-config.js",
+  "analytics.js",
   "order-request.js",
   "checkout-config.js",
   "seo-config.json",
@@ -70,6 +72,8 @@ const sitemap = await readFile("sitemap.xml", "utf8");
 const roadmap = await readFile("ROADMAP.md", "utf8");
 const jekyllConfig = await readFile("_config.yml", "utf8");
 const storefrontScript = await readFile("script.js", "utf8");
+const analyticsConfigScript = await readFile("analytics-config.js", "utf8");
+const analyticsScript = await readFile("analytics.js", "utf8");
 const orderRequestScript = await readFile("order-request.js", "utf8");
 const checkoutConfigScript = await readFile("checkout-config.js", "utf8");
 const admin = await readFile("admin.html", "utf8");
@@ -135,6 +139,13 @@ assert(gitignore.includes("admin-config.local.js"), ".gitignore must keep local 
 assert(gitignore.includes("!**/.env.example"), ".gitignore must allow safe example env files.");
 assert(gitignore.includes("dist/"), ".gitignore must keep generated static deploy packages out of git.");
 assert(packageJson.scripts?.["package:static"] === "node tools/package-static.mjs", "Root package must include the static package script.");
+assert(packageJson.scripts?.["check:analytics"] === "node tools/check-analytics.mjs", "Root package must include GA4 contract checks.");
+assert(packageJson.scripts?.check?.includes("check:analytics"), "Root check must run GA4 contract checks.");
+assert(analyticsConfigScript.includes('measurementId: ""'), "GA4 config must fail closed until the approved public measurement ID is set.");
+assert(analyticsScript.includes("checkout_error"), "Analytics runtime must include the checkout-error event.");
+assert(!analyticsScript.includes("email:"), "Analytics payloads must not include email fields.");
+assert(storefront.includes('<script src="analytics-config.js"></script>'), "Storefront must load analytics configuration.");
+assert(storefront.includes('<script src="analytics.js"></script>'), "Storefront must load the analytics runtime.");
 assert(packageJson.scripts?.["check:seo"] === "node tools/check-seo.mjs", "Root package must include the technical SEO audit.");
 assert(packageJson.scripts?.check?.includes("check:seo"), "Root check must run the technical SEO audit.");
 assert(packageJson.scripts?.["build:seo"] === "node tools/generate-seo-files.mjs", "Root package must generate crawler-control files.");

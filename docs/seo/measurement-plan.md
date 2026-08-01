@@ -1,6 +1,6 @@
 # Theo's Farm SEO Measurement Plan
 
-Status: Search Console baseline recorded; GA4 integration pending SEO-004
+Status: Search Console baseline recorded; GA4 event contract implemented; business stream and traced test purchase pending SEO-004
 Business authorizer: Sean McQueen  
 Technical owner: Calvin Hagerstrom  
 Initial external data budget: $0 per month
@@ -18,7 +18,7 @@ Initial external data budget: $0 per month
 | Source | Purpose | Owner | Status |
 | --- | --- | --- | --- |
 | Google Search Console | Queries, pages, impressions, clicks, average position, indexation | `theosfeedfarm@gmail.com`; Sean McQueen retained as verified owner | Connected; ownership aligned 2026-08-01 |
-| GA4 | Sessions, engagement, ecommerce funnel, purchases, revenue | `theosfeedfarm@gmail.com` | Pending SEO-004 |
+| GA4 | Sessions, engagement, ecommerce funnel, purchases, revenue | `theosfeedfarm@gmail.com` | Event layer ready; measurement ID, access test, and test purchase pending |
 | Storefront order system | Authoritative orders and revenue reconciliation | Calvin | Existing; integration scope pending |
 | Repository crawl | Status, canonical, metadata, schema, links, indexability | Calvin | Pending SEO-006 |
 | Google Merchant Center | Product visibility and feed diagnostics | `theosfeedfarm@gmail.com` | Deferred to SEO-005 |
@@ -35,6 +35,27 @@ Initial external data budget: $0 per month
 | `checkout_error` | Checkout cannot continue | `error_class`, `step` | Diagnostic |
 
 Do not send names, email addresses, street addresses, phone numbers, payment data, or free-form error messages to GA4.
+
+## GA4 implementation contract
+
+- `analytics-config.js` is the only public storefront configuration surface. Its `measurementId` remains blank until the business-owned GA4 web stream is confirmed and an approved deployment supplies its public `G-...` ID.
+- A blank or malformed measurement ID fails closed: no Google tag is loaded and no event is transmitted.
+- `analytics.js` permits only explicit ecommerce fields. It does not accept customer or address objects.
+- Product identity uses the canonical SKUs `ear-corn-20lb` and `ear-corn-40lb`.
+- Currency is always `USD`; item and shipping values are numeric dollars derived from integer cents.
+- Client-side `purchase` uses the Stripe Checkout Session ID as `transaction_id` and deduplicates it in browser storage. The storefront event is diagnostic; the trusted order system remains authoritative for paid status and revenue reconciliation.
+- `checkout_error` accepts only a bounded error class and funnel step. Raw exceptions and free-form messages are never transmitted.
+- Automated contract coverage runs through `npm run check:analytics` and the repository's required `npm run check`.
+
+### Remaining activation evidence
+
+SEO-004 remains open until all of the following are observed:
+
+1. `theosfeedfarm@gmail.com` owns or administers the GA4 property and web stream.
+2. The approved public measurement ID is added through a reviewed deployment.
+3. DebugView or Realtime shows `page_view`, `view_item`, `add_to_cart`, `begin_checkout`, and one deduplicated `purchase`.
+4. The same test transaction is reconciled to the trusted order record.
+5. The test date, transaction reference, observed events, gaps, and reviewer are recorded without customer PII.
 
 ## Baseline report
 
