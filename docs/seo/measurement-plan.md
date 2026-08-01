@@ -17,7 +17,7 @@ Initial external data budget: $0 per month
 
 | Source | Purpose | Owner | Status |
 | --- | --- | --- | --- |
-| Google Search Console | Queries, pages, impressions, clicks, average position, indexation | Intended owner: `theosfeedfarm@gmail.com`; verified owner observed: Sean McQueen | Connected; ownership alignment pending |
+| Google Search Console | Queries, pages, impressions, clicks, average position, indexation | `theosfeedfarm@gmail.com`; Sean McQueen retained as verified owner | Connected; ownership aligned 2026-08-01 |
 | GA4 | Sessions, engagement, ecommerce funnel, purchases, revenue | `theosfeedfarm@gmail.com` | Pending SEO-004 |
 | Storefront order system | Authoritative orders and revenue reconciliation | Calvin | Existing; integration scope pending |
 | Repository crawl | Status, canonical, metadata, schema, links, indexability | Calvin | Pending SEO-006 |
@@ -72,9 +72,9 @@ Observed in Google Search Console on 2026-07-30:
 
 The Search Console interface did not expose the overview card's exact date range in the captured baseline. The click count is therefore an observed account value with an incomplete date range and must not be used for period-over-period attribution.
 
-### Known ownership gap
+### Ownership alignment
 
-SEO-DEC-002 names `theosfeedfarm@gmail.com` as the intended Search Console owner. The verified session used for this baseline was Sean McQueen's Google account. Do not change Search Console users or permissions without explicit approval. SEO-003 remains open until the business account's ownership/access is confirmed or the governing decision is amended.
+On 2026-08-01, Sean McQueen explicitly authorized the ownership alignment required by SEO-DEC-002. Search Console then confirmed `theosfeedfarm@gmail.com` as an Owner of the `theosfarm.com` domain property. Sean McQueen's existing verified owner access was retained for operational continuity. No ownership verification token, password, or other credential was added to the repository.
 
 ## Attribution
 
