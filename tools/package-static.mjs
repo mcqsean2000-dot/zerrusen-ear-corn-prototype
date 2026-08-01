@@ -7,6 +7,8 @@ const defaultOutputDir = path.join("dist", "godaddy-static");
 const storefrontFiles = [
   "index.html",
   "styles.css",
+  "analytics-config.js",
+  "analytics.js",
   "order-request.js",
   "checkout-config.js",
   "script.js",

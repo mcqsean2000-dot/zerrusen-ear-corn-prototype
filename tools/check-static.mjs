@@ -10,6 +10,8 @@ const requiredFiles = [
   "index.html",
   "styles.css",
   "script.js",
+  "analytics-config.js",
+  "analytics.js",
   "order-request.js",
   "checkout-config.js",
   "admin.html",
@@ -69,6 +71,8 @@ const sitemap = await readFile("sitemap.xml", "utf8");
 const roadmap = await readFile("ROADMAP.md", "utf8");
 const jekyllConfig = await readFile("_config.yml", "utf8");
 const storefrontScript = await readFile("script.js", "utf8");
+const analyticsConfigScript = await readFile("analytics-config.js", "utf8");
+const analyticsScript = await readFile("analytics.js", "utf8");
 const orderRequestScript = await readFile("order-request.js", "utf8");
 const checkoutConfigScript = await readFile("checkout-config.js", "utf8");
 const admin = await readFile("admin.html", "utf8");
@@ -134,6 +138,13 @@ assert(gitignore.includes("admin-config.local.js"), ".gitignore must keep local 
 assert(gitignore.includes("!**/.env.example"), ".gitignore must allow safe example env files.");
 assert(gitignore.includes("dist/"), ".gitignore must keep generated static deploy packages out of git.");
 assert(packageJson.scripts?.["package:static"] === "node tools/package-static.mjs", "Root package must include the static package script.");
+assert(packageJson.scripts?.["check:analytics"] === "node tools/check-analytics.mjs", "Root package must include GA4 contract checks.");
+assert(packageJson.scripts?.check?.includes("check:analytics"), "Root check must run GA4 contract checks.");
+assert(analyticsConfigScript.includes('measurementId: ""'), "GA4 config must fail closed until the approved public measurement ID is set.");
+assert(analyticsScript.includes("checkout_error"), "Analytics runtime must include the checkout-error event.");
+assert(!analyticsScript.includes("email:"), "Analytics payloads must not include email fields.");
+assert(storefront.includes('<script src="analytics-config.js"></script>'), "Storefront must load analytics configuration.");
+assert(storefront.includes('<script src="analytics.js"></script>'), "Storefront must load the analytics runtime.");
 assert(packageJson.scripts?.["package:static:check"] === "node tools/package-static.mjs --check", "Root package must include the static package safety check.");
 assert(packageJson.scripts?.preview === "node tools/serve-static.mjs --port 4173", "Root package must include a local preview script.");
 assert(packageJson.scripts?.["preview:static"]?.includes("tools/serve-static.mjs --root dist/godaddy-static"), "Root package must include a packaged static preview script.");

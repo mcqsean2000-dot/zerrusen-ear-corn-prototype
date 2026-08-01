@@ -35,6 +35,15 @@ const checkoutResultCopy = document.querySelector("[data-checkout-result-copy]")
 const checkoutResultReference = document.querySelector("[data-checkout-result-reference]");
 const orderRequests = window.TheosOrderRequests;
 const checkoutConfig = window.TheosCheckoutConfig || {};
+const analytics = window.TheosAnalytics || {
+  initialize: () => false,
+  pageView: () => false,
+  viewItem: () => false,
+  addToCart: () => false,
+  beginCheckout: () => false,
+  purchase: () => false,
+  checkoutError: () => false,
+};
 const orderSubmitButton = orderForm.querySelector('button[type="submit"]');
 const checkoutFailureMessage = "Checkout could not be started. Please try again or contact Theo's Farm.";
 const shippingRatesFailureMessage = "Shipping rates could not be calculated. Please check the address or contact Theo's Farm.";
@@ -253,7 +262,14 @@ function renderCheckoutReturnState() {
   checkoutResult.focus({ preventScroll: true });
 
   if (state.type === "success") {
+    const completedItems = cart.map(({ sku, name, unitPriceCents, quantity }) => ({
+      sku,
+      name,
+      unitPriceCents,
+      quantity,
+    }));
     if (consumePendingCheckout(state.sessionId)) {
+      analytics.purchase(state.sessionId, completedItems, 0);
       clearCart();
     }
     checkoutResultKicker.textContent = "Checkout received";
@@ -653,6 +669,7 @@ async function requestCheckoutSession(endpoint, checkoutRequest) {
 async function startStripeCheckout(checkoutRequest, shippingRate) {
   const checkoutEndpoint = getCheckoutEndpoint();
   if (!checkoutEndpoint) {
+    analytics.checkoutError("checkout_configuration_missing", "checkout_handoff");
     orderStatus.textContent = shippingRateLabel(shippingRate) + " selected. Stripe checkout is not connected yet.";
     return;
   }
@@ -670,6 +687,7 @@ async function startStripeCheckout(checkoutRequest, shippingRate) {
   orderStatus.textContent = "Starting secure checkout...";
 
   try {
+    analytics.beginCheckout(cart, shippingRate.amountCents);
     const handoff = await requestCheckoutSession(checkoutEndpoint, {
       orderRequest: checkoutRequest.orderRequest,
       shippingAddress: checkoutRequest.shippingAddress,
@@ -678,6 +696,7 @@ async function startStripeCheckout(checkoutRequest, shippingRate) {
     rememberPendingCheckout(handoff.checkoutSessionId);
     window.location.assign(handoff.checkoutUrl);
   } catch (error) {
+    analytics.checkoutError("checkout_unavailable", "checkout_handoff");
     orderStatus.textContent = checkoutFailureMessage;
     setOrderSubmitButton(checkoutButtonLabel);
     if (continueToCheckoutButton) {
@@ -700,6 +719,7 @@ productButtons.forEach((button) => {
       cart.push({ sku, name, unitPriceCents, quantity: 1 });
     }
 
+    analytics.addToCart({ sku, name, unitPriceCents, quantity: 1 });
     clearSelectedShippingRate();
     orderStatus.textContent = "";
     renderCart();
@@ -759,6 +779,7 @@ orderForm.addEventListener("submit", async (event) => {
       renderShippingEstimates(payload.rates);
       orderStatus.textContent = "Review estimated shipping, then continue to checkout for final rates.";
     } catch (error) {
+      analytics.checkoutError("shipping_rates_unavailable", "shipping_estimate");
       orderStatus.textContent = shippingRatesFailureMessage;
       setOrderSubmitButton(shippingRatesButtonLabel);
     } finally {
@@ -787,6 +808,7 @@ orderForm.addEventListener("submit", async (event) => {
     renderShippingMethods(payload.rates, checkoutRequest);
     orderStatus.textContent = "Choose a shipping method to continue to Stripe Checkout.";
   } catch (error) {
+    analytics.checkoutError("shipping_rates_unavailable", "shipping_method");
     orderStatus.textContent = shippingRatesFailureMessage;
     setOrderSubmitButton(checkoutButtonLabel);
   } finally {
@@ -816,5 +838,8 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+analytics.initialize();
+analytics.pageView();
+productCatalog.forEach((product) => analytics.viewItem({ ...product, quantity: 1 }));
 renderCheckoutReturnState();
 renderCart();

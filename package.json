@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "check": "node tools/check-static.mjs && node tools/check-notification-release.mjs && npm run check:social-batch && npm run package:static:check && npm run check:functions",
+    "check": "node tools/check-static.mjs && npm run check:analytics && node tools/check-notification-release.mjs && npm run check:social-batch && npm run package:static:check && npm run check:functions",
+    "check:analytics": "node tools/check-analytics.mjs",
     "check:functions": "npm --prefix functions run check",
     "check:social-batch": "node tools/check-social-post-batch.mjs && node tools/check-social-weekly-drafts.mjs",
     "check:notification-release": "node tools/check-notification-release.mjs",
