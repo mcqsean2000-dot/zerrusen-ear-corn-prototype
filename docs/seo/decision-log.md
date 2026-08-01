@@ -29,7 +29,8 @@ Each entry records date, decision, owner, rationale, affected gates, and superse
 - Date: 2026-07-29
 - Owners: Sean McQueen and Calvin Hagerstrom
 - Decision: Defer Merchant Center until crawlable product pages, canonical product data, shipping details, pricing, and availability are verified.
-- Revisit: SEO-005.
+- SEO-005 checkpoint: On 2026-08-01, the live site had two valid Merchant listing entities but only one sitemap URL, no standalone product destinations, and no completed checkout/analytics trace. Deferral was confirmed.
+- Revisit: After SEO-004, SEO-006, SEO-007, SEO-009, and SEO-010 satisfy the prerequisites in `docs/seo/merchant-center-readiness.md`.
 - Source: GitHub issue #45.
 - Status: Active.
 
