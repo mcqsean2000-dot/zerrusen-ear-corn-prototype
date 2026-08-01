@@ -14,6 +14,7 @@ const requiredFiles = [
   "analytics.js",
   "order-request.js",
   "checkout-config.js",
+  "seo-config.json",
   "admin.html",
   "admin.css",
   "admin-config.js",
@@ -145,6 +146,39 @@ assert(analyticsScript.includes("checkout_error"), "Analytics runtime must inclu
 assert(!analyticsScript.includes("email:"), "Analytics payloads must not include email fields.");
 assert(storefront.includes('<script src="analytics-config.js"></script>'), "Storefront must load analytics configuration.");
 assert(storefront.includes('<script src="analytics.js"></script>'), "Storefront must load the analytics runtime.");
+assert(packageJson.scripts?.["check:seo"] === "node tools/check-seo.mjs", "Root package must include the technical SEO audit.");
+assert(packageJson.scripts?.check?.includes("check:seo"), "Root check must run the technical SEO audit.");
+assert(packageJson.scripts?.["build:seo"] === "node tools/generate-seo-files.mjs", "Root package must generate crawler-control files.");
+assert(packageJson.scripts?.["check:seo-files"] === "node tools/generate-seo-files.mjs --check", "Root package must check generated crawler-control files.");
+assert(packageJson.scripts?.check?.includes("check:seo-files"), "Root check must reject generated SEO file drift.");
+assert(admin.includes('name="robots" content="noindex, nofollow, noarchive"'), "Admin page must carry explicit noindex protection.");
+assert(robots.includes("Disallow: /admin.html"), "robots.txt must disallow the public admin entry.");
+assert(
+  firebaseConfig.hosting?.headers?.some((entry) => (
+    entry.source === "/admin.html" &&
+    entry.headers?.some((header) => header.key === "X-Robots-Tag" && header.value.includes("noindex"))
+  )),
+  "Firebase Hosting must send X-Robots-Tag noindex for the admin entry.",
+);
+assert(
+  firebaseConfig.hosting?.headers?.some((entry) => (
+    entry.source === "/checkout/**" &&
+    entry.headers?.some((header) => header.key === "X-Robots-Tag" && header.value.includes("noindex"))
+  )),
+  "Firebase Hosting must send X-Robots-Tag noindex for checkout return paths.",
+);
+assert(
+  firebaseConfig.hosting?.rewrites?.some((entry) => entry.source === "/checkout/success" && entry.destination === "/index.html"),
+  "Firebase Hosting must preserve the checkout success return route.",
+);
+assert(
+  firebaseConfig.hosting?.rewrites?.some((entry) => entry.source === "/checkout/cancel" && entry.destination === "/index.html"),
+  "Firebase Hosting must preserve the checkout cancel return route.",
+);
+assert(
+  !firebaseConfig.hosting?.rewrites?.some((entry) => entry.source === "**"),
+  "Firebase Hosting must not rewrite every unknown URL to the homepage.",
+);
 assert(packageJson.scripts?.["package:static:check"] === "node tools/package-static.mjs --check", "Root package must include the static package safety check.");
 assert(packageJson.scripts?.preview === "node tools/serve-static.mjs --port 4173", "Root package must include a local preview script.");
 assert(packageJson.scripts?.["preview:static"]?.includes("tools/serve-static.mjs --root dist/godaddy-static"), "Root package must include a packaged static preview script.");
