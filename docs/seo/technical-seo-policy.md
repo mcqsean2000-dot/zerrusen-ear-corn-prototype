@@ -31,6 +31,14 @@ Status: Automated foundation implemented in SEO-006
 
 The homepage is temporarily marked `orphanExempt` because it is the only indexable URL. Remove that exception as soon as SEO-008 adds a second indexable page.
 
+`seo-config.json` is also the canonical crawler-file manifest:
+
+- `npm run build:seo` regenerates `sitemap.xml` and `robots.txt`.
+- `npm run check:seo-files` fails when either committed file differs from the manifest.
+- New indexable routes must be added to the manifest in the same pull request as their HTML files and internal links.
+- Private paths must be added to `robotsDisallow` and receive an appropriate `X-Robots-Tag` header when they are publicly reachable.
+- Firebase keeps exact rewrites for `/checkout/success` and `/checkout/cancel`, both with `noindex` headers. It intentionally has no catch-all homepage rewrite, allowing unknown paths to return a real `404`.
+
 ## Runtime checks
 
 Repository CI cannot prove live status codes, redirects, rendered mobile behavior, Core Web Vitals, or Google eligibility. After every approved deployment:

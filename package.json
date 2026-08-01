@@ -1,7 +1,9 @@
 {
   "scripts": {
-    "check": "node tools/check-static.mjs && npm run check:seo && node tools/check-notification-release.mjs && npm run check:social-batch && npm run package:static:check && npm run check:functions",
+    "build:seo": "node tools/generate-seo-files.mjs",
+    "check": "node tools/check-static.mjs && npm run check:seo-files && npm run check:seo && node tools/check-notification-release.mjs && npm run check:social-batch && npm run package:static:check && npm run check:functions",
     "check:seo": "node tools/check-seo.mjs",
+    "check:seo-files": "node tools/generate-seo-files.mjs --check",
     "check:functions": "npm --prefix functions run check",
     "check:social-batch": "node tools/check-social-post-batch.mjs && node tools/check-social-weekly-drafts.mjs",
     "check:notification-release": "node tools/check-notification-release.mjs",
