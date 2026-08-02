@@ -1,14 +1,15 @@
 # Admin Emulator Test Plan
 
-This plan defines the Firebase emulator checks that should pass before connecting the admin UI to live Firestore order data. It is planning only: no deploy, no live Firebase project, no secrets, and no implementation are included here.
+This plan documents the executable Firebase emulator checks that must pass before connecting the admin UI to live Firestore order data. The tests use a local demo project only: no deploy, no live Firebase project, and no secrets are involved.
 
 ## Purpose
 
-Use the Firebase Auth and Firestore emulators to prove the order security boundary before the admin dashboard reads or writes production data.
+Use the Firestore emulator and deterministic local auth contexts to prove the order security boundary before the admin dashboard reads or writes production data.
 
 Current rule boundary to verify:
 
 - Public customers can create valid `orderRequests` documents.
+- Public order product details and subtotals must match the approved catalog values.
 - Public customers cannot read, update, or delete orders.
 - Authenticated non-admin users cannot read, update, or delete orders.
 - Authenticated admins with `admin: true` can read orders.
@@ -23,16 +24,11 @@ Run against a local Firebase project alias or emulator-only config. Do not use p
 
 ```bash
 npm install
-firebase emulators:start --only auth,firestore
-```
-
-In a second terminal, run the future rules test command once test files exist:
-
-```bash
+npm install --global firebase-tools@15.23.0
 npm run test:rules
 ```
 
-Current scaffold note: until executable emulator tests are added, `npm run test:rules` runs an offline validation that this plan and the current Firestore rules still reference the expected order security boundary.
+The command starts and stops an isolated Firestore emulator automatically. Java 21 or newer is required by current Firebase emulator tooling. Run `npm run test:rules:plan` for the fast offline documentation/rule-boundary check.
 
 Recommended final local verification before launch on PowerShell:
 

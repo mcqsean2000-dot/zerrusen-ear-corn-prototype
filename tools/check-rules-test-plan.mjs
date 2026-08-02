@@ -24,7 +24,6 @@ const backendOnlyFields = [
 ];
 
 includesAll(plan, [
-  "planning only",
   "npm run test:rules",
   "no deploy",
   "no live Firebase project",
@@ -42,6 +41,7 @@ includesAll(rules, [
   "function isAdmin()",
   "request.auth.token.admin == true",
   "function hasValidOrderShape()",
+  "function hasValidSubtotal()",
   "function hasValidAdminOrderUpdate()",
   "match /orderRequests/{orderRequestId}",
   "allow create: if hasValidOrderShape();",
@@ -80,6 +80,5 @@ for (const field of backendOnlyFields) {
   );
 }
 
-console.log("Rules test command scaffold passed.");
-console.log("Executable Firebase emulator rule tests are not implemented yet.");
-console.log("This offline check validates the documented rules-test plan and current Firestore rule boundary references.");
+console.log("Rules test plan check passed.");
+console.log("This offline check validates the documented test matrix and current Firestore rule boundary references.");

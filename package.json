@@ -1,7 +1,7 @@
 {
   "scripts": {
     "build:seo": "node tools/generate-seo-files.mjs",
-    "check": "node tools/check-static.mjs && npm run check:seo-files && npm run check:seo && npm run check:analytics && node tools/check-notification-release.mjs && npm run check:social-batch && npm run package:static:check && npm run check:functions",
+    "check": "node tools/check-static.mjs && npm run check:seo-files && npm run check:seo && npm run check:analytics && node tools/check-notification-release.mjs && npm run check:social-batch && npm run package:static:check && npm run test:rules:plan && npm run test:rules && npm run check:functions",
     "check:analytics": "node tools/check-analytics.mjs",
     "check:seo": "node tools/check-seo.mjs",
     "check:seo-files": "node tools/generate-seo-files.mjs --check",
@@ -13,9 +13,12 @@
     "preview": "node tools/serve-static.mjs --port 4173",
     "preview:static": "npm run package:static && node tools/serve-static.mjs --root dist/godaddy-static --port 4174",
     "smoke:static": "node tools/smoke-static-package.mjs",
-    "test:rules": "node tools/check-rules-test-plan.mjs"
+    "test:rules": "firebase emulators:exec --project demo-theos-farm --only firestore \"node --test tests/firestore.rules.test.mjs\"",
+    "test:rules:plan": "node tools/check-rules-test-plan.mjs"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "firebase": "^12.17.0",
     "sharp": "^0.35.3"
   }
 }

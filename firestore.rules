@@ -57,13 +57,15 @@ service cloud.firestore {
       return item is map
         && item.keys().hasOnly(['name', 'quantity', 'sku', 'unitPriceCents'])
         && item.keys().hasAll(['name', 'quantity', 'sku', 'unitPriceCents'])
-        && item.sku in ['ear-corn-20lb', 'ear-corn-40lb']
-        && item.name in ['20 lb Ear Corn Bag', '40 lb Ear Corn Bag']
+        && ((item.sku == 'ear-corn-20lb'
+            && item.name == '20 lb Ear Corn Bag'
+            && item.unitPriceCents == 1795)
+          || (item.sku == 'ear-corn-40lb'
+            && item.name == '40 lb Ear Corn Bag'
+            && item.unitPriceCents == 2995))
         && item.quantity is int
         && item.quantity >= 1
-        && item.quantity <= 50
-        && item.unitPriceCents is int
-        && item.unitPriceCents in [1795, 2995];
+        && item.quantity <= 50;
     }
 
     function hasValidItems() {
@@ -73,6 +75,16 @@ service cloud.firestore {
         && hasValidItem(request.resource.data.items[0])
         && (request.resource.data.items.size() == 1
           || hasValidItem(request.resource.data.items[1]));
+    }
+
+    function hasValidSubtotal() {
+      return (request.resource.data.items.size() == 1
+          && request.resource.data.subtotalCents
+            == request.resource.data.items[0].quantity * request.resource.data.items[0].unitPriceCents)
+        || (request.resource.data.items.size() == 2
+          && request.resource.data.subtotalCents
+            == request.resource.data.items[0].quantity * request.resource.data.items[0].unitPriceCents
+              + request.resource.data.items[1].quantity * request.resource.data.items[1].unitPriceCents);
     }
 
     function hasValidOrderShape() {
@@ -86,7 +98,8 @@ service cloud.firestore {
         && !('stripeCheckoutSessionId' in request.resource.data)
         && !('stripePaymentIntentId' in request.resource.data)
         && hasValidCustomer()
-        && hasValidItems();
+        && hasValidItems()
+        && hasValidSubtotal();
     }
 
     function hasOnlyAdminEditableOrderChanges() {

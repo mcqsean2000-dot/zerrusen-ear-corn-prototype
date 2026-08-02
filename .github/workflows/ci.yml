@@ -30,11 +30,20 @@ jobs:
           node-version: 22
           package-manager-cache: false
 
+      - name: Set up Java for Firebase emulators
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
       - name: Install storefront dependencies
         run: npm ci
 
       - name: Install backend dependencies
         run: npm ci --prefix functions
+
+      - name: Install Firebase CLI
+        run: npm install --global firebase-tools@15.23.0
 
       - name: Run repository checks
         run: npm run check

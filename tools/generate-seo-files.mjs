@@ -49,7 +49,8 @@ async function sync(file, expected) {
     return;
   }
   const current = await readFile(file, "utf8");
-  assert.equal(current, expected, `${file} has drifted; run npm run build:seo.`);
+  const normalizeLineEndings = (value) => value.replace(/\r\n?/g, "\n");
+  assert.equal(normalizeLineEndings(current), expected, `${file} has drifted; run npm run build:seo.`);
 }
 
 await sync("sitemap.xml", sitemap);

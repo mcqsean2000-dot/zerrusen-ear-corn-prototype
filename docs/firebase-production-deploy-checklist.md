@@ -36,7 +36,7 @@ Example setup:
 cp .firebaserc.example .firebaserc
 ```
 
-Then replace `replace-with-your-firebase-project-id` with the approved production project ID. Before any deploy, have a human confirm:
+The checked-in example intentionally contains a placeholder. The public Theo's Farm site currently identifies its Firebase project as `theos-farm-ear-corn`; copy that value only into the ignored local `.firebaserc` after the project owner grants the deploying Google account access. Before any deploy, a human must confirm:
 
 ```bash
 firebase use
