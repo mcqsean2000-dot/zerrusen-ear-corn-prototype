@@ -1,13 +1,16 @@
-# Theo's Farm Ear Corn Prototype
+# Theo's Farm Ear Corn Storefront
 
-Public preview:
+Production storefront:
+https://theosfarm.com/
+
+GitHub Pages preview:
 https://mcqsean2000-dot.github.io/zerrusen-ear-corn-prototype/
 
-This repo currently contains a static prototype for the Theo's Farm direct-to-consumer ear corn website. It is intentionally simple: two products, real client-provided product photos, farm story copy, delivery/shipping-focused messaging, and a lightweight cart drawer for demo purposes.
+This repo contains the Theo's Farm direct-to-consumer ear corn storefront and its Firebase backend foundation. The customer experience remains intentionally simple: two products, real client-provided photos, farm story copy, shipping-focused messaging, a cart and address flow, Shippo rates, and a Stripe Checkout handoff.
 
 ## Active Handoffs
 
-- `CALVIN_META_HANDOFF.md` - Meta/Facebook/Instagram setup tasks needed before no-daily-login social auto-publishing can be implemented.
+- `CALVIN_META_HANDOFF.md` - Meta/Facebook/Instagram credentials and controlled production tests needed before no-daily-login publishing can be enabled.
 
 ## Current Direction
 
@@ -26,6 +29,16 @@ This repo currently contains a static prototype for the Theo's Farm direct-to-co
 - Public hosting direction: Firebase Hosting.
 - Firebase/Firestore/Functions are the selected production foundation because the same Firebase ecosystem is already used for EasiTask and Debris Locator.
 - Old Zerrusen Farms informational site should remain separate from Theo's Farm as a separate business/site.
+
+## Active Production Gates
+
+- [#58](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/58) - trace one approved GA4 test purchase.
+- [#67](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/67) - restore Firebase deploy access and verify the release flow.
+- [#68](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/68) - approve product facts and remove the prototype disclaimer.
+- [#69](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/69) - activate and test Stripe, Shippo, webhook, and trusted order persistence.
+- [#70](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/70) - complete production Google admin sign-in.
+- [#71](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/71) - activate Resend notifications with controlled tests.
+- [#72](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/72) - configure Meta credentials and run controlled Facebook/Instagram tests.
 
 ## Client-Provided Business Notes
 
@@ -63,22 +76,22 @@ Natural search phrases to keep in mind:
 - deer corn
 - wildlife corn
 
-## Prototype Files
+## Project Files
 
 - `index.html` - static page content and layout
 - `styles.css` - responsive styling
-- `script.js` - demo cart drawer behavior
-- `checkout-config.js` - public static-host checkout endpoint placeholder, disabled by default
+- `script.js` - cart, address, shipping-rate, checkout, and success-state behavior
+- `checkout-config.js` - public relative Firebase Functions routes for shipping rates and Stripe Checkout session creation
 - `robots.txt` - crawl policy pointing search engines to the production sitemap
 - `sitemap.xml` - one-page production sitemap for the canonical Theo's Farm domain
 - `_config.yml` - GitHub Pages preview exclude list that keeps backend, docs, admin prototype, and tooling files out of the public Pages artifact
 - `CALVIN_META_HANDOFF.md` - Calvin-facing Meta setup checklist for social auto-publishing
-- `admin.html` - static admin fulfillment prototype
+- `admin.html` - Firebase-authenticated admin fulfillment shell
 - `admin.css` - admin shell styles
-- `admin-config.js` - disabled public admin Firebase config gate
+- `admin-config.js` - enabled Firebase Hosting auto-config and authenticated admin API route map
 - `admin-config.local.example.js` - ignored local admin config override template for local Firebase admin testing
 - `admin.js` - sample admin queue behavior plus auth-gated status, label action controls, and safe action feedback
-- `admin-live.js` - optional authenticated admin bridge for future Firebase email/password sign-in, reads/actions, and guarded admin endpoint posts
+- `admin-live.js` - authenticated Firebase admin bridge for sign-in, Firestore reads, and guarded admin endpoint actions
 - `package.json` - static validation script entry point
 - `tools/check-static.mjs` - no-dependency static prototype checks
 - `tools/package-static.mjs` - allowlist-based static host package generator kept as a fallback/export path
@@ -103,7 +116,7 @@ Natural search phrases to keep in mind:
 - `social-weekly-drafts.js` - deterministic four-week rotating generator for the next Monday-through-Sunday review batch
 - `firebase.json` - Firebase Hosting config and Firestore deploy targets for the chosen production path
 - `.firebaserc.example` - safe Firebase project alias template for local setup
-- `firestore.rules` - initial Firestore rules for prototype order requests
+- `firestore.rules` - tested Firestore rules for validated public order creation and claim-gated admin access
 - `firestore.indexes.json` - Firestore index definition for order request queues
 - `docs/firebase-hosting-readiness.md` - first Firebase setup, preview, deploy, and production verification notes
 - `docs/notification-production-activation.md` - staged, disabled-first Resend and Firebase notification activation runbook
@@ -124,13 +137,13 @@ Natural search phrases to keep in mind:
 ## Important Notes
 
 - Current prices are placeholders and should be confirmed before launch.
-- Current cart is connected to live Shippo shipping-rate lookup, but not yet connected to payment processing, inventory, order persistence, live email sends, or label purchase.
+- The customer flow is connected to relative Firebase API routes for Shippo rates and Stripe Checkout. Trusted order persistence, webhook handling, admin label purchase, and notification delivery are implemented; production secrets, enable flags, and end-to-end activation still require Firebase project access and controlled tests.
 - Completed Stripe Checkout events atomically mark the order paid, create deterministic customer/admin Firestore outbox jobs, and mark the Stripe event processed. Trusted composition can also query the bounded paid fulfillment queue and enqueue one idempotent daily summary. The Firebase runtime exports an 8:00 AM Central summary schedule, an outbox-created delivery trigger, and a bounded ten-minute reconciliation schedule. All remain inert unless their explicit enable flags and required server-side configuration are present. This work does not deploy or enable them.
 - The Firebase-hosted admin shell supports Google sign-in plus an email/password fallback. Fulfillment content and actions remain hidden until Firebase Auth returns an `admin: true` custom claim; signing in with an ordinary Google account does not grant access.
 - Authenticated admin API routes and visible admin controls can list social posts in `needs_reconciliation` and record an audited publish, retry-confirmed-safe, or skip resolution. The admin page automatically generates the next Monday-through-Sunday seven-post batch in Central Time, displays every caption/image/schedule for review, and queues the full week through one explicit confirmation. Each queue write remains individually validated and idempotent.
 - Production admin config is loaded from Firebase Hosting's public `/__/firebase/init.json` endpoint. Enable the Google provider, authorize the production domain, create the approved admin account, and grant its custom claim before launch.
 - For local admin testing only, copy `admin-config.local.example.js` to ignored `admin-config.local.js` and fill in approved Firebase public web config after Auth users and admin claims are ready. Do not commit the local override.
-- Keep `checkout-config.js` blank until a trusted backend endpoint is ready. For Firebase Hosting, set only the public checkout session URL there, never secrets.
+- Keep `checkout-config.js` limited to the public relative `/api/checkout-sessions` and `/api/shipping-rates` routes. Never place secrets in public storefront configuration.
 - Do not store raw payment information in the app. Use Stripe-hosted payment collection and Stripe customer/payment method IDs.
 - Public Firestore writes are limited to validated order request creation. Payment status and Stripe IDs should be written only by trusted backend code.
 - Do not reintroduce local pickup unless the client changes direction.
@@ -151,7 +164,7 @@ npm.cmd run package:static
 npm.cmd run preview
 ```
 
-The root `check` command includes the complete Firebase Functions syntax and test suite. Use `npm --prefix functions run check:social` only when you need the smaller social-publishing check during focused development.
+The root `check` command includes the complete Firebase Functions suite and executable Firestore emulator tests. Install Firebase CLI `15.23.0` and Java 21 or newer before running it. Use `npm --prefix functions run check:social` only when you need the smaller social-publishing check during focused development.
 
 The static package scripts remain useful for smoke checks and emergency static export, but Firebase Hosting is now the production target.
 
@@ -181,7 +194,7 @@ http://localhost:4174/
 
 ## Firebase Hosting Preview
 
-Firebase Hosting is the chosen production direction. Copy `.firebaserc.example` to `.firebaserc`, replace the placeholder with the real Theo's Farm Firebase project ID, and keep `.firebaserc` uncommitted.
+Firebase Hosting serves the production storefront. Copy `.firebaserc.example` to `.firebaserc`, replace the placeholder with the confirmed project ID `theos-farm-ear-corn` only after your Google account has project access, and keep `.firebaserc` uncommitted.
 
 ```bash
 firebase emulators:start --only hosting

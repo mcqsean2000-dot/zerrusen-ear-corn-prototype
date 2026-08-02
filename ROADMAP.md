@@ -12,13 +12,13 @@ Decision so far:
 - Use Firebase/Firestore/Functions as the production foundation because the same Firebase ecosystem is already used for EasiTask and Debris Locator.
 - Keep GitHub Pages only as the current prototype preview.
 
-Open tasks:
+Current status and open tasks:
 
-- Choose/register the new Theo's Farm domain.
-- Create or select the production Firebase project for Theo's Farm.
-- Copy `.firebaserc.example` to a local `.firebaserc` and point it at the Theo's Farm Firebase project ID.
-- Configure Firebase Hosting preview and production deploy flow.
-- Decide whether the new domain's DNS remains at the registrar or points through Firebase's custom-domain setup.
+- Domain selected and live: `https://theosfarm.com`.
+- Firebase project identified: `theos-farm-ear-corn`; `crhags@gmail.com` still requires project access for CLI deploys and configuration verification.
+- Firebase Hosting and the production domain are live. The 2026-08-02 storefront includes the reviewed GA4 measurement configuration.
+- Copy `.firebaserc.example` to an ignored local `.firebaserc` only after the deploying account has project access.
+- Document and verify the human-reviewed preview and production deploy flow after access is granted.
 - Use `docs/firebase-hosting-readiness.md` for first deploy checks.
 - Keep `docs/godaddy-static-deploy.md` only as a fallback/static export checklist.
 - Create a separate project/repo for the old Zerrusen Farms site if that site is restored.
@@ -204,36 +204,36 @@ Later:
 
 ## Phase 7: Production Build
 
-Likely stack:
+Current stack:
 
-- Frontend: Astro, Next.js, or another lightweight app framework
+- Frontend: static HTML, CSS, and JavaScript
 - Hosting: Firebase Hosting
 - Backend: Firebase Cloud Functions
 - Database: Firestore
 - Shipping: Shippo
 - Payments: Stripe Checkout
 - Email: Resend or Postmark
-- Admin auth: Firebase Auth with admin custom claims, Clerk, or similar
+- Admin auth: Firebase Auth with `admin: true` custom claims
 
 Build order:
 
-1. Confirm domain.
-2. Move static prototype into production app structure.
-3. Build product catalog and checkout flow.
+1. Confirm domain. Done: `theosfarm.com`.
+2. Keep the current static storefront while it remains maintainable; no framework migration is required for launch.
+3. Build product catalog and checkout flow. Implemented; production activation and one end-to-end test remain.
 4. Add Shippo rate quoting from server-owned package specs. Done.
 5. Add Stripe Checkout with selected shipping. Backend handoff implemented; production credentials/config still pending.
-6. Add order persistence.
-7. Add Stripe webhooks.
-8. Build admin fulfillment dashboard.
+6. Add order persistence. Implemented in trusted Firebase composition; production verification remains.
+7. Add Stripe webhooks. Implemented; production secret/configuration and delivery verification remain.
+8. Build admin fulfillment dashboard. Implemented; production Auth setup and claimed-admin smoke testing remain.
    - Static admin planning shell now exists at `admin.html`.
    - Backend admin label/status routes now require Firebase Auth admin custom-claim verification.
    - The storefront footer links to the Firebase-hosted admin page, with Google and email/password sign-in controls.
    - The admin bridge uses Firebase Hosting public auto config and hides fulfillment data until a refreshed ID token contains `admin: true`.
    - Next step is enabling the Google provider, authorizing `theosfarm.com`, creating the approved admin account, granting its custom claim, and verifying rules and sign-in in a Firebase preview.
-9. Add Shippo label purchase and tracking updates in admin.
+9. Add Shippo label purchase and tracking updates in admin. Implemented; controlled production verification remains.
 10. Add email notifications. Paid-order outbox queueing and guarded Firebase delivery wiring are implemented; provider account setup, deployment, and explicit enablement remain.
-11. Deploy the public storefront to Firebase Hosting.
-12. Point production domain.
+11. Deploy the public storefront to Firebase Hosting. Live; establish repeatable coordinator deploy access.
+12. Point production domain. Done: `theosfarm.com`.
 13. Run test orders.
 14. Launch.
 

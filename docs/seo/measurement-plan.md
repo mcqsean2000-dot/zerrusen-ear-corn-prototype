@@ -1,6 +1,6 @@
 # Theo's Farm SEO Measurement Plan
 
-Status: Search Console baseline recorded; GA4 property and web stream created; reviewed deployment and traced test purchase pending SEO-004
+Status: Search Console baseline recorded; GA4 property, web stream, and reviewed production deployment complete; traced test purchase pending SEO-004
 Business authorizer: Sean McQueen  
 Technical owner: Calvin Hagerstrom  
 Initial external data budget: $0 per month
@@ -18,7 +18,7 @@ Initial external data budget: $0 per month
 | Source | Purpose | Owner | Status |
 | --- | --- | --- | --- |
 | Google Search Console | Queries, pages, impressions, clicks, average position, indexation | `theosfeedfarm@gmail.com`; Sean McQueen retained as verified owner | Connected; ownership aligned 2026-08-01 |
-| GA4 | Sessions, engagement, ecommerce funnel, purchases, revenue | `theosfeedfarm@gmail.com` | Property and web stream created 2026-08-01; reviewed deployment and test purchase pending |
+| GA4 | Sessions, engagement, ecommerce funnel, purchases, revenue | `theosfeedfarm@gmail.com` | Property and web stream created 2026-08-01; measurement ID verified live 2026-08-02; traced test purchase pending |
 | Storefront order system | Authoritative orders and revenue reconciliation | Calvin | Existing; integration scope pending |
 | Repository crawl | Status, canonical, metadata, schema, links, indexability | Calvin | Pending SEO-006 |
 | Google Merchant Center | Product visibility and feed diagnostics | `theosfeedfarm@gmail.com` | Deferred to SEO-005 |
@@ -52,7 +52,7 @@ Do not send names, email addresses, street addresses, phone numbers, payment dat
 SEO-004 remains open until all of the following are observed:
 
 1. Confirm `theosfeedfarm@gmail.com` has ongoing administrator access to the GA4 property and web stream.
-2. Deploy the reviewed public measurement ID to production.
+2. Deploy the reviewed public measurement ID to production. Completed and verified 2026-08-02.
 3. DebugView or Realtime shows `page_view`, `view_item`, `add_to_cart`, `begin_checkout`, and one deduplicated `purchase`.
 4. The same test transaction is reconciled to the trusted order record.
 5. The test date, transaction reference, observed events, gaps, and reviewer are recorded without customer PII.

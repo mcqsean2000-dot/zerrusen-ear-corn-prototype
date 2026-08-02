@@ -89,9 +89,9 @@ The signed-in Google account must have access to the Firebase project and permis
 Have these values ready before entering Firebase configuration:
 
 - Facebook Page access token. Do not use a Facebook password or personal login token.
-- Facebook Page ID.
-- Instagram professional account ID for `theosfeedfarm`.
-- Meta Graph API version supported by the Meta app, including the `v` prefix.
+- Facebook Page ID: `1255914190935990`.
+- Instagram professional account ID for `theosfeedfarm`: `17841442263941373`.
+- Meta Graph API version used during setup: `v26.0`; confirm it remains supported before production activation.
 
 ### 3. Enter the secrets interactively
 
@@ -167,7 +167,7 @@ The backend now provides:
 5. A ten-minute stale-lease recovery schedule and authenticated reconciliation endpoints.
 6. Disabled-by-default gates for both publishing and recovery.
 
-The admin page does not yet expose the queue or reconciliation controls. Until those controls are added, the authenticated endpoint must be exercised with a Firebase admin ID token from a trusted test client.
+The authenticated admin page exposes weekly draft review/queue controls and reconciliation actions. Production use still requires Firebase Google sign-in, an `admin: true` custom claim, configured Meta secrets, deployed Functions, and explicit enablement of the publishing and reconciliation gates.
 
 ## Controlled Test Order
 
