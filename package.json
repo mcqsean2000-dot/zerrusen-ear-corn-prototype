@@ -1,15 +1,17 @@
 {
   "scripts": {
     "build:seo": "node tools/generate-seo-files.mjs",
-    "check": "node tools/check-static.mjs && npm run check:seo-files && npm run check:seo && npm run check:analytics && node tools/check-notification-release.mjs && npm run check:notification-tools && npm run check:social-batch && npm run check:social-activation-tools && npm run package:static:check && npm run test:rules:plan && npm run test:rules && npm run check:functions",
+    "check": "node tools/check-static.mjs && npm run check:seo-files && npm run check:seo && npm run check:analytics && node tools/check-notification-release.mjs && npm run check:notification-tools && npm run check:social-batch && npm run check:social-activation-tools && npm run check:commerce-activation-tools && npm run package:static:check && npm run test:rules:plan && npm run test:rules && npm run check:functions",
     "check:analytics": "node tools/check-analytics.mjs",
     "check:seo": "node tools/check-seo.mjs",
     "check:seo-files": "node tools/generate-seo-files.mjs --check",
     "check:functions": "npm --prefix functions run check",
+    "check:commerce-activation-tools": "node --test tools/commerce-activation-config.test.mjs",
     "check:social-batch": "node tools/check-social-post-batch.mjs && node tools/check-social-weekly-drafts.mjs",
     "check:social-activation-tools": "node --test tools/social-activation-config.test.mjs",
     "check:notification-release": "node tools/check-notification-release.mjs",
     "check:notification-tools": "node --test tools/notification-activation-config.test.mjs",
+    "commerce:preflight": "node tools/check-commerce-activation.mjs",
     "notification:preflight": "node tools/check-notification-activation.mjs",
     "social:preflight": "node tools/check-social-activation.mjs",
     "package:static": "node tools/package-static.mjs",

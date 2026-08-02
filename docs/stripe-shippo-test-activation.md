@@ -56,6 +56,7 @@ CORS_ALLOWED_ORIGINS=https://theosfarm.com,https://www.theosfarm.com
 FIREBASE_PROJECT_ID=theos-farm-ear-corn
 STRIPE_SUCCESS_URL=https://theosfarm.com/?checkout=success&session_id={CHECKOUT_SESSION_ID}
 STRIPE_CANCEL_URL=https://theosfarm.com/#delivery
+STRIPE_CURRENCY=usd
 FIRESTORE_ORDER_COLLECTION=orderRequests
 SHIP_FROM_NAME=<approved farm sender name>
 SHIP_FROM_STREET1=<approved sender street>
@@ -93,6 +94,16 @@ Subscribe only to the version-one events used by this repo:
 
 Each endpoint and mode has its own signing secret. Copy the secret from this exact test endpoint into Firebase Secret Manager. Do not reuse a Stripe CLI forwarding secret or a live-mode endpoint secret.
 
+## Local Configuration Preflight
+
+From the repo root, run the safe preflight against the ignored project environment file:
+
+```powershell
+npm run commerce:preflight -- functions/.env.theos-farm-ear-corn
+```
+
+The preflight rejects provider secrets in the environment file, verifies the exact project, origin, redirect, collection, currency, and sender-region configuration, requires the approved private sender fields to be present, and confirms notification/social schedules remain disabled. Its output omits the private street, city, and sender name. It does not access Firebase Secret Manager, validate secret values, contact Stripe or Shippo, authorize a deploy, or create an order.
+
 ## Pre-deploy Review
 
 From the repo root:
@@ -113,7 +124,7 @@ Record without secrets:
 - successful check counts;
 - confirmation that the working tree contains only reviewed changes.
 
-The expected automated baseline is 10 Firestore rules tests and 223 Functions/backend tests. If those counts change, record the new passing counts rather than treating the old numbers as a substitute for a successful run.
+The expected automated baseline is 10 Firestore rules tests and 230 Functions/backend tests. If those counts change, record the new passing counts rather than treating the old numbers as a substitute for a successful run.
 
 ## Scoped Deployment
 
