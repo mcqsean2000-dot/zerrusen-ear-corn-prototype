@@ -11,6 +11,7 @@ This repo contains the Theo's Farm direct-to-consumer ear corn storefront and it
 ## Active Handoffs
 
 - `CALVIN_META_HANDOFF.md` - Meta/Facebook/Instagram credentials and controlled production tests needed before no-daily-login publishing can be enabled.
+- `docs/sean-firebase-access-handoff.md` - Sean's project-access steps and Calvin's no-deploy verification checklist for Firebase issue #67.
 
 ## Current Direction
 
