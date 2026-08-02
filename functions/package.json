@@ -5,6 +5,7 @@
   "description": "Host-neutral trusted checkout scaffold for Theo's Farm Stripe Checkout handoff.",
   "main": "src/firebase-runtime.js",
   "scripts": {
+    "admin:claim": "node tools/set-admin-claim.js",
     "check": "node tools/check-source.mjs",
     "check:social": "node tools/check-source.mjs --social"
   },
