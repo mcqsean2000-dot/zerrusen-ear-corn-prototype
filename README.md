@@ -99,6 +99,7 @@ Natural search phrases to keep in mind:
 - `package.json` - static validation script entry point
 - `tools/check-static.mjs` - no-dependency static prototype checks
 - `tools/check-notification-activation.mjs` - safe local preflight for disabled Resend sender, recipient, reply-to, and rollout configuration
+- `tools/check-social-activation.mjs` - token-safe preflight for the disabled Meta Graph publishing and reconciliation configuration
 - `tools/package-static.mjs` - allowlist-based static host package generator kept as a fallback/export path
 - `tools/serve-static.mjs` - no-dependency local preview server for the repo root or generated static package
 - `functions/` - host-neutral trusted checkout and Stripe webhook scaffold, disabled by default

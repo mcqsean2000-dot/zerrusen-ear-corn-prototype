@@ -46,10 +46,6 @@ These should be added through Firebase secret management, not committed:
 - `META_FACEBOOK_PAGE_ID`
 - `META_INSTAGRAM_ACCOUNT_ID`
 
-Optional:
-
-- `META_GRAPH_API_VERSION`
-
 Set the three required secret values with the Firebase CLI from a trusted terminal. Do not put their values on a command line that will be retained in shell history; run each command and enter the value when prompted:
 
 ```powershell
@@ -60,11 +56,11 @@ firebase functions:secrets:set META_INSTAGRAM_ACCOUNT_ID
 
 The non-secret runtime settings must also be configured for the Functions environment:
 
-- `META_GRAPH_API_VERSION`
-- `SOCIAL_PUBLISHING_ENABLED=true`
-- `SOCIAL_RECONCILIATION_ENABLED=true`
+- `META_GRAPH_API_VERSION=v26.0`
+- `SOCIAL_PUBLISHING_ENABLED=false`
+- `SOCIAL_RECONCILIATION_ENABLED=false`
 
-Keep both enable flags off until the controlled test post has been reviewed and scheduled for a future time.
+Keep both enable flags off for the initial guarded deployment. Publishing may be enabled only for the controlled single-platform tests below; reconciliation remains off until both tests pass.
 
 ## Sean: Firebase Credential Setup
 
@@ -117,14 +113,22 @@ notepad functions\.env.PROJECT_ID
 Start with publishing and reconciliation disabled:
 
 ```dotenv
-META_GRAPH_API_VERSION=vXX.X
+META_GRAPH_API_VERSION=v26.0
 SOCIAL_PUBLISHING_ENABLED=false
 SOCIAL_RECONCILIATION_ENABLED=false
 ```
 
-Replace `vXX.X` with the version supported by the Meta app. Do not commit this `.env.PROJECT_ID` file; the repository already ignores it.
+Do not commit this `.env.PROJECT_ID` file; the repository already ignores it. If Meta requires a future Graph API version change, update the runtime, tests, and this runbook together before activation.
 
-### 5. Run the checks
+### 5. Run the disabled-state preflight and checks
+
+From the repository root, replace `PROJECT_ID` with the active Firebase project ID:
+
+```powershell
+npm run social:preflight -- functions/.env.PROJECT_ID
+```
+
+The preflight verifies only that the known Graph version is selected, both social gates are disabled, and no Meta secret key was placed in the environment file. It does not validate secret values, permissions, token duration, app review, Firebase access, or authorize a deployment.
 
 ```powershell
 cd functions
@@ -156,6 +160,14 @@ Use `functions:secrets:get` to inspect metadata. Do not use `functions:secrets:a
 
 After these steps succeed, stop with publishing disabled and report that Firebase configuration is ready. The controlled Facebook-only and Instagram-only tests should be scheduled and monitored separately.
 
+## Token Ownership And Renewal
+
+- Sean or the designated Theo's Farm business owner owns the Meta app/Page authorization and decides who may renew or revoke the token.
+- Calvin owns the technical Firebase configuration and the controlled publishing verification unless reassigned.
+- Record the token issue date, any expiration or data-access review date shown by Meta, the approving owner, and the next review date in a secure credential register. Do not record token values or renewal details in this repo, GitHub issues, or chat.
+- Review the credential after a Facebook password change, Page-role change, Meta app permission change, business ownership change, or before any expiration/review date shown by Meta.
+- Use `firebase functions:secrets:get` for metadata only. Never use `functions:secrets:access` while screen sharing or recording.
+
 ## Implemented Backend
 
 The backend now provides:
@@ -179,6 +191,8 @@ The authenticated admin page exposes weekly draft review/queue controls and reco
 6. Queue a separate reviewed Instagram-only post and verify its provider ID.
 7. Enable reconciliation only after the admin reconciliation UI or an equivalent trusted operating procedure is available.
 8. Approve the remaining weekly posts only after both single-platform tests succeed.
+
+For each controlled test, retain only sanitized evidence: scheduled time, platform, post/provider ID, final queue state, and reviewer. Never include the Page token in screenshots, logs, issues, or test records.
 
 ## Guardrails
 
