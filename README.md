@@ -12,6 +12,8 @@ This repo contains the Theo's Farm direct-to-consumer ear corn storefront and it
 
 - `CALVIN_META_HANDOFF.md` - Meta/Facebook/Instagram credentials and controlled production tests needed before no-daily-login publishing can be enabled.
 - `docs/sean-firebase-access-handoff.md` - Sean's project-access steps and Calvin's no-deploy verification checklist for Firebase issue #67.
+- `docs/product-facts-approval.md` - client approval sheet for product prices, availability, shipping package facts, and the launch disclaimer tracked in issue #68.
+- `docs/stripe-shippo-test-activation.md` - controlled test-mode activation and evidence runbook for Stripe, Shippo, webhook, Firestore, and GA4 issues #69 and #58.
 
 ## Current Direction
 
