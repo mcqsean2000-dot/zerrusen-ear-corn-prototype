@@ -82,6 +82,8 @@ assert(hasLeaseIndex, "Firestore indexes must include notification processing-le
 const activationSteps = [
   "Keep all three enable flags false",
   "functions/.env.<project-id>",
+  "npm run notification:preflight",
+  "Do not use it as `NOTIFICATION_FROM_EMAIL`",
   "firebase functions:secrets:set RESEND_API_KEY",
   "firebase deploy --only firestore:indexes",
   "firebase deploy --only functions",
