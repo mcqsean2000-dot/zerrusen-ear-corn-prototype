@@ -52,6 +52,8 @@ firebase hosting:sites:list --project theos-farm-ear-corn
 firebase functions:list --project theos-farm-ear-corn
 ```
 
+Use plain `firebase login:list` only. Do not add `--json`: Firebase CLI `15.23.0` can include OAuth token fields in that JSON response.
+
 Expected result:
 
 - `firebase projects:list` includes `theos-farm-ear-corn`.
@@ -75,6 +77,14 @@ git status --short
 ```
 
 The local `.firebaserc` must not appear in Git status and must not be committed.
+
+Run the repository preflight after the account can see the project and `.firebaserc` is configured:
+
+```powershell
+npm run firebase:access:preflight
+```
+
+The preflight is read-only. It verifies the minimum CLI version, approved account, visible public project ID, exact local default target, and Git ignore rule. It never prints raw Firebase command output and does not inspect Hosting, Functions, Auth, IAM, or secret values.
 
 ## Pre-Deploy Checks
 
