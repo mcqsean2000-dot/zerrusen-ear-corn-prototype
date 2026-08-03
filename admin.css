@@ -78,3 +78,17 @@
   .admin-auth-panel { display: grid; }
   .admin-panel-head { display: grid; }
 }
+
+@media print {
+  .admin-page > .site-header,
+  .admin-main > :not(.admin-layout),
+  .admin-layout > :not(#packing),
+  #packing .admin-note,
+  #packing [data-packing-print] { display: none !important; }
+  .admin-main,
+  .admin-layout,
+  #packing { display: block !important; width: 100%; margin: 0; padding: 0; }
+  #packing { border: 0; box-shadow: none; }
+  #packing .admin-panel-head { display: block; margin-bottom: 24px; }
+  #packing .packing-list { max-width: 420px; }
+}

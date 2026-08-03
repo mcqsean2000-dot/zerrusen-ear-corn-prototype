@@ -77,6 +77,7 @@ const analyticsScript = await readFile("analytics.js", "utf8");
 const orderRequestScript = await readFile("order-request.js", "utf8");
 const checkoutConfigScript = await readFile("checkout-config.js", "utf8");
 const admin = await readFile("admin.html", "utf8");
+const adminStyles = await readFile("admin.css", "utf8");
 const adminConfigScript = await readFile("admin-config.js", "utf8");
 const adminLocalConfigExample = await readFile("admin-config.local.example.js", "utf8");
 const adminScript = await readFile("admin.js", "utf8");
@@ -382,6 +383,10 @@ assert(admin.includes("data-admin-sign-out"), "Admin shell must render a sign-ou
 assert(admin.includes("data-admin-content hidden"), "Admin shell must hide fulfillment content before admin authorization.");
 assert(admin.includes("data-social-drafts"), "Admin shell must render the social draft review surface.");
 assert(admin.includes("data-social-reconciliation-rows"), "Admin shell must render the social reconciliation queue.");
+assert(admin.includes("data-packing-print"), "Admin shell must render the aggregate packing print control.");
+assert(adminStyles.includes("@media print"), "Admin stylesheet must define a packing print layout.");
+assert(adminStyles.includes(".admin-layout > :not(#packing)"), "Packing print layout must hide order details.");
+assert(adminStyles.includes("#packing .admin-note"), "Packing print layout must hide non-count helper text.");
 assert(adminConfigScript.includes("TheosAdminConfig"), "Admin config must expose the public admin config object.");
 assert(adminConfigScript.includes("enabled: true"), "Admin live mode must be enabled for the Firebase-hosted admin route.");
 assert(adminConfigScript.includes("autoConfig: true"), "Admin live mode must use Firebase Hosting public auto config.");
@@ -402,6 +407,7 @@ assert(adminScript.includes("normalizeAdminShipping"), "Admin shell must central
 assert(adminScript.includes("buildAdminOrderViewModel"), "Admin shell must centralize order view-model building.");
 assert(adminScript.includes("buildAdminShippingViewModel"), "Admin shell must centralize shipping view-model building.");
 assert(adminScript.includes("calculateAdminBagCounts"), "Admin shell must centralize bag-count calculations.");
+assert(adminScript.includes("printPackingList"), "Admin shell must centralize the packing print action.");
 assert(adminScript.includes("adminStatusTransitions"), "Admin shell must define constrained status transitions before live status updates.");
 assert(adminScript.includes("labelUrl"), "Admin shell should include trusted label URL display fields.");
 assert(adminScript.includes("trackingNumber"), "Admin shell should include trusted tracking number display fields.");
@@ -492,6 +498,7 @@ function createAdminHarness() {
     summary: createAdminFakeElement("summary"),
     rows: createAdminFakeElement("rows"),
     packingList: createAdminFakeElement("packingList"),
+    packingPrint: createAdminFakeElement("packingPrint"),
     statusFilter: createAdminFakeElement("statusFilter", "all"),
     actionStatus: createAdminFakeElement("actionStatus"),
   };
@@ -501,6 +508,7 @@ function createAdminHarness() {
         "[data-admin-summary]": elements.summary,
         "[data-order-rows]": elements.rows,
         "[data-packing-list]": elements.packingList,
+        "[data-packing-print]": elements.packingPrint,
         "[data-status-filter]": elements.statusFilter,
         "[data-admin-action-status]": elements.actionStatus,
         "[data-admin-auth-status]": createAdminFakeElement("authStatus"),
@@ -667,6 +675,11 @@ function flushAdminActions() {
   assert(fulfillmentSummary.readyToPackCount === 1, "Admin fulfillment summary should count ready_to_pack orders.");
   assert(fulfillmentSummary.packedCount === 1, "Admin fulfillment summary should count packed orders.");
   assert(helpers.getPackableOrders([{ status: "needs_review" }, { status: "packed" }]).length === 1, "Admin packing list should exclude needs_review orders.");
+  let printCalls = 0;
+  assert(helpers.printPackingList(() => { printCalls += 1; }), "Admin packing print helper should invoke an available print implementation.");
+  assert(printCalls === 1, "Admin packing print helper should invoke the print implementation exactly once.");
+  assert(!helpers.printPackingList(null), "Admin packing print helper should fail safely when printing is unavailable.");
+  assert(elements.packingPrint.listeners.click?.length === 1, "Admin packing print control should register one click handler.");
 
   assert(elements.summary.innerHTML.includes("Order requests"), "Admin script should render the offline summary.");
   assert(elements.rows.innerHTML.includes("REQ-1001"), "Admin script should render sample order rows.");

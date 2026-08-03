@@ -130,7 +130,7 @@ Core admin features:
 - Product quantities
 - Internal notes
 - Daily bag count summary
-- Export or print packing list
+- Print aggregate packing list. Implemented without customer or order details.
 
 Suggested statuses:
 

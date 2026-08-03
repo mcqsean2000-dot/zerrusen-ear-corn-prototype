@@ -154,10 +154,15 @@
         </div>
 
         <aside class="admin-panel" id="packing" aria-labelledby="packing-title">
-          <p class="eyebrow">Daily plan</p>
-          <h2 id="packing-title">Packing list</h2>
+          <div class="admin-panel-head">
+            <div>
+              <p class="eyebrow">Daily plan</p>
+              <h2 id="packing-title">Packing list</h2>
+            </div>
+            <button class="admin-action" type="button" data-packing-print>Print</button>
+          </div>
           <div class="packing-list" data-packing-list></div>
-          <p class="admin-note">Authenticated reads will use <code>orderRequests</code> after admin sign-in is configured.</p>
+          <p class="admin-note">Prints aggregate bag counts only. Customer and order details are excluded.</p>
         </aside>
       </section>
     </main>

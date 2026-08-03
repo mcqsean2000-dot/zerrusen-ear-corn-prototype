@@ -66,6 +66,7 @@ const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD
 const summary = document.querySelector("[data-admin-summary]");
 const rows = document.querySelector("[data-order-rows]");
 const packingList = document.querySelector("[data-packing-list]");
+const packingPrintButton = document.querySelector("[data-packing-print]");
 const statusFilter = document.querySelector("[data-status-filter]");
 const actionStatus = document.querySelector("[data-admin-action-status]");
 const notificationMetrics = document.querySelector("[data-notification-metrics]");
@@ -323,6 +324,17 @@ function buildAdminFulfillmentSummary(orders) {
 
 function getAdminPackableOrders(orders) {
   return normalizeAdminOrders(orders).filter((order) => order.status !== "needs_review");
+}
+
+function printPackingList(printImpl) {
+  const printer = typeof printImpl === "function"
+    ? printImpl
+    : typeof window !== "undefined" && typeof window.print === "function"
+      ? window.print.bind(window)
+      : null;
+  if (!printer) return false;
+  printer();
+  return true;
 }
 
 const adminOrders = normalizeAdminOrders(sampleOrders);
@@ -791,6 +803,7 @@ if (typeof window !== "undefined") {
     calculateBagCounts: calculateAdminBagCounts,
     buildFulfillmentSummary: buildAdminFulfillmentSummary,
     getPackableOrders: getAdminPackableOrders,
+    printPackingList,
     buildLabelActionViewModel: buildAdminLabelActionViewModel,
     canTransitionStatus: canTransitionAdminStatus,
     getAllowedStatusTransitions: getAllowedAdminStatusTransitions,
@@ -998,6 +1011,9 @@ rows.addEventListener("click", (event) => {
 });
 if (notificationRefreshButton) {
   notificationRefreshButton.addEventListener("click", refreshNotificationHealth);
+}
+if (packingPrintButton) {
+  packingPrintButton.addEventListener("click", () => printPackingList());
 }
 if (notificationRows) {
   notificationRows.addEventListener("click", (event) => {

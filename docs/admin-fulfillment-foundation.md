@@ -16,8 +16,11 @@ The shell uses sample order requests to model the first admin workflows:
 - see customer contact preference and shipping ZIP
 - scan product quantities and estimated subtotal
 - view daily bag counts for packing
+- print an aggregate packing summary for 20 lb, 40 lb, and total bag counts
 - review trusted shipping label and tracking fields after backend purchase
 - filter by fulfillment status
+
+The packing print view intentionally excludes customer names, contact details, order rows, notes, authentication controls, notification data, and social content.
 
 ## Authenticated Admin Readiness
 
