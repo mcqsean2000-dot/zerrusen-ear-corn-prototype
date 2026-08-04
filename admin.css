@@ -83,6 +83,8 @@
 .admin-order-detail-section { display: grid; gap: 6px; padding-top: 16px; border-top: 1px solid var(--line); }
 .admin-order-detail-section h3, .admin-order-detail-section p { margin: 0; }
 .admin-order-detail-section small { color: var(--muted); line-height: 1.45; }
+.admin-internal-notes { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.admin-internal-notes li { display: grid; gap: 4px; padding-left: 12px; border-left: 3px solid var(--corn); }
 .payment-pill { display: inline-flex; align-items: center; min-height: 30px; padding: 0 10px; border-radius: 999px; color: #fff; background: var(--leaf); font-size: 0.82rem; font-weight: 900; white-space: nowrap; }
 .payment-pill[data-payment-status="unpaid"] { color: var(--ink); background: var(--corn); }
 .payment-pill[data-payment-status="failed"] { color: #fff; background: #9b2c2c; }

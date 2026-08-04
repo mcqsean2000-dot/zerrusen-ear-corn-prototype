@@ -414,6 +414,7 @@ assert(adminScript.includes("printPackingList"), "Admin shell must centralize th
 assert(adminScript.includes("adminPaymentStatusLabels"), "Admin shell must use bounded trusted payment status labels.");
 assert(adminScript.includes("adminShippingStatusLabels"), "Admin shell must use derived trusted shipping status labels.");
 assert(adminScript.includes("buildAdminOrderDetailMarkup"), "Admin shell must centralize read-only order detail rendering.");
+assert(adminScript.includes("normalizeAdminInternalNotes"), "Admin shell must defensively normalize internal notes.");
 assert(adminScript.includes("adminStatusTransitions"), "Admin shell must define constrained status transitions before live status updates.");
 assert(adminScript.includes("labelUrl"), "Admin shell should include trusted label URL display fields.");
 assert(adminScript.includes("trackingNumber"), "Admin shell should include trusted tracking number display fields.");
@@ -625,6 +626,11 @@ function flushAdminActions() {
       shippingZip: "62401",
       note: "<script>alert(1)</script>",
     },
+    internalNotes: [
+      { body: " Admin-only packing note. ", createdByEmail: "admin@example.test", visibility: "admin" },
+      { body: "Do not display this note.", visibility: "customer" },
+      { body: "", visibility: "admin" },
+    ],
     paymentStatus: "paid",
     shippingCarrier: "UPS",
     shippingService: "Ground",
@@ -643,6 +649,16 @@ function flushAdminActions() {
   assert(normalized.id === "firestore-doc-id", "Admin order normalization should trim document IDs.");
   assert(normalized.status === "needs_review", "Unknown admin order statuses should normalize back to needs_review.");
   assert(normalized.customer.preferredContact === "text", "Admin order normalization should lower-case contact preference.");
+  assert(normalized.internalNotes.length === 1, "Admin order normalization should keep only non-empty admin-visible notes.");
+  assert(normalized.internalNotes[0].body === "Admin-only packing note.", "Admin internal note normalization should trim note bodies.");
+  assert(helpers.normalizeOrder(normalized).internalNotes.length === 1, "Admin internal note normalization should be idempotent.");
+  const boundedNotes = helpers.normalizeInternalNotes(Array.from({ length: 12 }, () => ({
+    body: "x".repeat(600),
+    createdByEmail: "admin@example.test",
+    visibility: "admin",
+  })));
+  assert(boundedNotes.length === 10, "Admin internal note normalization should cap the rendered note count.");
+  assert(boundedNotes[0].body.length === 500, "Admin internal note normalization should cap each rendered body.");
   assert(normalized.paymentStatus === "paid", "Admin order normalization should preserve payment status.");
   assert(normalized.shipping.carrier === "UPS", "Admin order normalization should preserve trusted shipping carrier.");
   assert(normalized.shipping.labelUrl === "https://example.com/label.pdf", "Admin order normalization should preserve safe label URLs.");
@@ -669,6 +685,8 @@ function flushAdminActions() {
   });
   assert(detailMarkup.includes("Payment"), "Admin order detail should include bounded payment status.");
   assert(detailMarkup.includes("Label ready"), "Admin order detail should include derived shipping progress.");
+  assert(detailMarkup.includes("Admin-only packing note."), "Admin order detail should include normalized internal notes.");
+  assert(!detailMarkup.includes("Do not display this note."), "Admin order detail must omit non-admin notes.");
   assert(!detailMarkup.includes("cs_secret_detail") && !detailMarkup.includes("pi_secret_detail"), "Admin order detail must omit raw Stripe identifiers.");
 
   const unpaidLabelAction = helpers.buildLabelActionViewModel({ paymentStatus: "unpaid", shippingRateId: "rate_unpaid" });
@@ -735,6 +753,7 @@ function flushAdminActions() {
   assert(elements.orderDetailDialog.open, "Admin order detail trigger should open the native dialog.");
   assert(elements.orderDetailTitle.textContent === "REQ-1002", "Admin order detail should identify the selected order.");
   assert(elements.orderDetailBody.innerHTML.includes("Rate selected"), "Admin order detail should render the selected order's shipping progress.");
+  assert(elements.orderDetailBody.innerHTML.includes("Confirm the box count"), "Admin order detail should render bounded internal notes for the selected order.");
   elements.orderDetailClose.listeners.click[0]({ type: "click" });
   assert(!elements.orderDetailDialog.open, "Admin order detail close control should close the dialog.");
   assert(elements.rows.innerHTML.includes('data-status-endpoint="/api/admin/order-status"'), "Admin status controls should point at the trusted backend endpoint.");

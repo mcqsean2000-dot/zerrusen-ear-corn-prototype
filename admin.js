@@ -29,6 +29,9 @@ const adminBagSkus = Object.freeze({
   "ear-corn-40lb": "forty",
 });
 
+const adminInternalNoteLimit = 10;
+const adminInternalNoteBodyLimit = 500;
+
 const sampleOrders = [
   {
     id: "REQ-1001",
@@ -52,6 +55,11 @@ const sampleOrders = [
     shippingCurrency: "USD",
     shippingPackageCount: 2,
     shippingPackageRateIds: ["rate_large_1", "rate_large_2"],
+    internalNotes: [{
+      body: "Packed fresh inventory only. Confirm the box count before label purchase.",
+      createdByEmail: "admin@example.test",
+      visibility: "admin",
+    }],
     items: [{ sku: "ear-corn-40lb", name: "40 lb Ear Corn Bag", quantity: 2, unitPriceCents: 2995 }],
   },
   {
@@ -169,6 +177,20 @@ function normalizeAdminCustomer(customer) {
   };
 }
 
+function normalizeAdminInternalNotes(notes) {
+  if (!Array.isArray(notes)) return [];
+  return notes.slice(0, adminInternalNoteLimit).map((note) => {
+    const body = asText(note?.body).slice(0, adminInternalNoteBodyLimit);
+    const visibility = asText(note?.visibility).toLowerCase();
+    if (!body || visibility !== "admin") return null;
+    return {
+      body,
+      createdByEmail: asText(note?.createdByEmail).slice(0, 160),
+      visibility: "admin",
+    };
+  }).filter(Boolean);
+}
+
 function normalizeAdminShipping(order) {
   const source = order?.shipping || order || {};
   const packageRateIds = Array.isArray(source?.packageRateIds || source?.shippingPackageRateIds)
@@ -199,6 +221,7 @@ function normalizeAdminOrder(order) {
   return {
     id: asText(order?.id) || "Unassigned",
     customer: normalizeAdminCustomer(order?.customer),
+    internalNotes: normalizeAdminInternalNotes(order?.internalNotes),
     paymentStatus: normalizeAdminPaymentStatus(order?.paymentStatus),
     shipping: normalizeAdminShipping(order),
     status: normalizeAdminStatus(order?.status),
@@ -238,6 +261,7 @@ function buildAdminOrderViewModel(order) {
     statusLabel: adminStatusLabels[normalizedOrder.status],
     allowedNextStatuses: getAllowedAdminStatusTransitions(normalizedOrder.status),
     itemSummary,
+    internalNotes: normalizedOrder.internalNotes,
     paymentStatus: normalizedOrder.paymentStatus,
     paymentStatusLabel: adminPaymentStatusLabels[normalizedOrder.paymentStatus],
     shipping,
@@ -332,6 +356,9 @@ function buildAdminOrderDetailMarkup(order) {
   const trackingMarkup = viewModel.shipping.trackingUrl
     ? '<a class="admin-link" href="' + escapeHtml(viewModel.shipping.trackingUrl) + '" target="_blank" rel="noreferrer">' + escapeHtml(viewModel.shipping.trackingLabel) + "</a>"
     : escapeHtml(viewModel.shipping.trackingLabel);
+  const internalNotesMarkup = viewModel.internalNotes.length
+    ? '<ul class="admin-internal-notes">' + viewModel.internalNotes.map((note) => "<li><p>" + escapeHtml(note.body) + "</p>" + (note.createdByEmail ? "<small>Added by " + escapeHtml(note.createdByEmail) + "</small>" : "") + "</li>").join("") + "</ul>"
+    : '<p class="admin-note">No internal notes.</p>';
   return [
     '<dl class="admin-order-detail-grid">',
     "<div><dt>Payment</dt><dd>" + escapeHtml(viewModel.paymentStatusLabel) + "</dd></div>",
@@ -343,7 +370,8 @@ function buildAdminOrderDetailMarkup(order) {
     "</dl>",
     '<div class="admin-order-detail-section"><h3>Items</h3><p>' + escapeHtml(viewModel.itemSummary) + "</p><small>" + escapeHtml(viewModel.subtotalLabel) + " estimated subtotal</small></div>",
     '<div class="admin-order-detail-section"><h3>Customer</h3><p>' + escapeHtml(viewModel.customerName) + "</p><small>ZIP " + escapeHtml(viewModel.shippingZip) + " - " + escapeHtml(viewModel.contact) + " - prefers " + escapeHtml(viewModel.preferredContact) + "</small></div>",
-    '<div class="admin-order-detail-section"><h3>Notes</h3><p>' + escapeHtml(viewModel.note) + "</p></div>",
+    '<div class="admin-order-detail-section"><h3>Customer note</h3><p>' + escapeHtml(viewModel.note) + "</p></div>",
+    '<div class="admin-order-detail-section"><h3>Internal notes</h3>' + internalNotesMarkup + "</div>",
     '<div class="admin-order-detail-section"><h3>Tracking</h3><p>' + trackingMarkup + "</p></div>",
   ].join("");
 }
@@ -875,6 +903,7 @@ if (typeof window !== "undefined") {
     statusTransitions: adminStatusTransitions,
     normalizeOrder: normalizeAdminOrder,
     normalizeOrders: normalizeAdminOrders,
+    normalizeInternalNotes: normalizeAdminInternalNotes,
     buildOrderViewModel: buildAdminOrderViewModel,
     buildOrderDetailMarkup: buildAdminOrderDetailMarkup,
     buildShippingViewModel: buildAdminShippingViewModel,

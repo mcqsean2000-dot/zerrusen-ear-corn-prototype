@@ -14,6 +14,7 @@ The shell uses sample order requests to model the first admin workflows:
 
 - review new order requests
 - open a read-only order detail dialog built from normalized fulfillment data
+- review up to 10 bounded admin-only internal notes without exposing author UIDs
 - see customer contact preference and shipping ZIP
 - scan product quantities and estimated subtotal
 - view bounded trusted payment status as paid, pending, or failed without exposing Stripe IDs
@@ -24,6 +25,8 @@ The shell uses sample order requests to model the first admin workflows:
 - filter by fulfillment status
 
 The packing print view intentionally excludes customer names, contact details, order rows, notes, authentication controls, notification data, and social content.
+
+Internal notes are currently read-only in the browser. A future append action must use a trusted authenticated backend route, derive the admin identity server-side, and preserve the documented audit shape.
 
 ## Authenticated Admin Readiness
 
