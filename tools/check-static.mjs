@@ -1190,6 +1190,7 @@ function createStorefrontHarness({
   storedCart = null,
   storedPendingCheckout = null,
 } = {}) {
+  const analyticsCalls = [];
   const elements = {
     cartDrawer: createFakeElement("cartDrawer"),
     cartItems: createFakeElement("cartItems"),
@@ -1303,6 +1304,15 @@ function createStorefrontHarness({
   };
 
   const window = {
+    TheosAnalytics: {
+      initialize: (...args) => analyticsCalls.push(["initialize", ...args]),
+      pageView: (...args) => analyticsCalls.push(["page_view", ...args]),
+      viewItem: (...args) => analyticsCalls.push(["view_item", ...args]),
+      addToCart: (...args) => analyticsCalls.push(["add_to_cart", ...args]),
+      beginCheckout: (...args) => analyticsCalls.push(["begin_checkout", ...args]),
+      purchase: (...args) => analyticsCalls.push(["purchase", ...args]),
+      checkoutError: (...args) => analyticsCalls.push(["checkout_error", ...args]),
+    },
     TheosCheckoutConfig: { checkoutEndpoint, shippingRatesEndpoint },
     TheosOrderRequests: orderRequests,
     localStorage,
@@ -1335,6 +1345,7 @@ function createStorefrontHarness({
 
   return {
     addButtons,
+    analyticsCalls,
     elements,
     location,
     localStorage,
@@ -1416,12 +1427,29 @@ function createStorefrontHarness({
   const harness = createStorefrontHarness({
     href: "https://theos.example/checkout/success?session_id=cs_test_clear_cart",
     storedCart: JSON.stringify([{ sku: "ear-corn-40lb", quantity: 1 }]),
-    storedPendingCheckout: "cs_test_clear_cart",
+    storedPendingCheckout: JSON.stringify({
+      version: 2,
+      sessionId: "cs_test_clear_cart",
+      items: [{
+        sku: "ear-corn-40lb",
+        quantity: 1,
+        name: "customer@example.com",
+        unitPriceCents: 1,
+      }],
+      shippingCents: 1842,
+      customerEmail: "customer@example.com",
+    }),
   });
 
   assert(harness.elements.cartCount.textContent === 0, "Matching checkout success returns should clear the saved cart.");
   assert(harness.localStorage.getItem("theos-farm-cart-v1") === "[]", "Matching checkout success returns should persist the cleared cart.");
   assert(harness.localStorage.getItem("theos-farm-pending-checkout-v1") === null, "Consumed checkout sessions should be removed.");
+  const purchaseCall = harness.analyticsCalls.find(([eventName]) => eventName === "purchase");
+  assert(purchaseCall?.[1] === "cs_test_clear_cart", "Checkout success should report the matching session to analytics.");
+  assert(purchaseCall?.[2]?.[0]?.sku === "ear-corn-40lb", "Checkout success should report the canonical pending item snapshot.");
+  assert(purchaseCall?.[2]?.[0]?.name === "40 lb Ear Corn Bag" && purchaseCall?.[2]?.[0]?.unitPriceCents === 2995, "Checkout success must restore canonical product facts instead of stored display data.");
+  assert(!JSON.stringify(purchaseCall).includes("customer@example.com"), "Checkout success analytics must omit extra customer-controlled pending fields.");
+  assert(purchaseCall?.[3] === 1842, "Checkout success should report the server-returned shipping amount.");
 }
 
 {
@@ -1520,6 +1548,11 @@ function createStorefrontHarness({
   assert(requests[2].body.shippingAddress.zip === "62401", "Checkout request must include the shipping address used for re-rating.");
   assert(requests[2].body.selectedShippingRate.rateId === "[\"rate_20\",\"rate_40\"]", "Checkout request must include the selected shipping rate id.");
   assert(harness.location.assignedUrl === "https://checkout.stripe.com/c/pay/cs_test_123", "Valid checkout handoff should redirect to Stripe Checkout.");
+  const pendingCheckout = JSON.parse(harness.localStorage.getItem("theos-farm-pending-checkout-v1"));
+  assert(pendingCheckout.sessionId === "cs_test_123", "Checkout handoff should persist the matching session for return correlation.");
+  assert(pendingCheckout.items.length === 1 && pendingCheckout.items[0].sku === "ear-corn-20lb", "Checkout handoff should persist only canonical SKU and quantity facts.");
+  assert(pendingCheckout.shippingCents === 4342, "Checkout handoff should persist the selected server-returned shipping amount.");
+  assert(!JSON.stringify(pendingCheckout).includes("Customer Name") && !JSON.stringify(pendingCheckout).includes("62401"), "Pending analytics state must omit customer and address data.");
 }
 
 assert(storefrontScript.includes("requestCheckoutSession"), "Storefront should retain the future Stripe Checkout handoff path.");

@@ -121,15 +121,59 @@ function clearCart() {
   persistCart();
 }
 
-function rememberPendingCheckout(checkoutSessionId) {
+function isCheckoutSessionId(value) {
+  return /^cs_[A-Za-z0-9_]+$/.test(String(value || "").trim());
+}
+
+function normalizePendingCheckoutItems(items) {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  const normalized = [];
+  const normalizedSkus = new Set();
+  items.forEach((item) => {
+    const product = productCatalog.get(String(item && item.sku || ""));
+    const quantity = Number(item && item.quantity);
+    if (
+      !product ||
+      normalizedSkus.has(product.sku) ||
+      !Number.isInteger(quantity) ||
+      quantity < 1 ||
+      quantity > 50
+    ) {
+      return;
+    }
+
+    normalizedSkus.add(product.sku);
+    normalized.push({ ...product, quantity });
+  });
+  return normalized;
+}
+
+function rememberPendingCheckout(checkoutSessionId, items, shippingCents) {
   const storage = getCartStorage();
   const sessionId = String(checkoutSessionId || "").trim();
-  if (!storage || !/^cs_/.test(sessionId)) {
+  const normalizedItems = normalizePendingCheckoutItems(items);
+  const normalizedShippingCents = Number(shippingCents);
+  if (
+    !storage ||
+    !isCheckoutSessionId(sessionId) ||
+    !normalizedItems.length ||
+    !Number.isInteger(normalizedShippingCents) ||
+    normalizedShippingCents < 0 ||
+    normalizedShippingCents > 1000000
+  ) {
     return;
   }
 
   try {
-    storage.setItem(PENDING_CHECKOUT_STORAGE_KEY, sessionId);
+    storage.setItem(PENDING_CHECKOUT_STORAGE_KEY, JSON.stringify({
+      version: 2,
+      sessionId,
+      items: normalizedItems.map(({ sku, quantity }) => ({ sku, quantity })),
+      shippingCents: normalizedShippingCents,
+    }));
   } catch (error) {
     // Storage can be unavailable in private browsing or restricted embeds.
   }
@@ -138,18 +182,46 @@ function rememberPendingCheckout(checkoutSessionId) {
 function consumePendingCheckout(checkoutSessionId) {
   const storage = getCartStorage();
   const sessionId = String(checkoutSessionId || "").trim();
-  if (!storage || !/^cs_/.test(sessionId)) {
-    return false;
+  if (!storage || !isCheckoutSessionId(sessionId)) {
+    return null;
   }
 
   try {
-    if (storage.getItem(PENDING_CHECKOUT_STORAGE_KEY) !== sessionId) {
-      return false;
+    const storedValue = storage.getItem(PENDING_CHECKOUT_STORAGE_KEY);
+    let pendingCheckout = null;
+
+    if (storedValue === sessionId) {
+      pendingCheckout = {
+        sessionId,
+        items: normalizePendingCheckoutItems(cart),
+        shippingCents: 0,
+      };
+    } else {
+      const parsed = JSON.parse(storedValue || "null");
+      const parsedShippingCents = Number(parsed && parsed.shippingCents);
+      if (
+        parsed &&
+        parsed.version === 2 &&
+        parsed.sessionId === sessionId &&
+        Number.isInteger(parsedShippingCents) &&
+        parsedShippingCents >= 0 &&
+        parsedShippingCents <= 1000000
+      ) {
+        pendingCheckout = {
+          sessionId,
+          items: normalizePendingCheckoutItems(parsed.items),
+          shippingCents: parsedShippingCents,
+        };
+      }
+    }
+
+    if (!pendingCheckout || !pendingCheckout.items.length) {
+      return null;
     }
     storage.removeItem(PENDING_CHECKOUT_STORAGE_KEY);
-    return true;
+    return pendingCheckout;
   } catch (error) {
-    return false;
+    return null;
   }
 }
 
@@ -262,14 +334,9 @@ function renderCheckoutReturnState() {
   checkoutResult.focus({ preventScroll: true });
 
   if (state.type === "success") {
-    const completedItems = cart.map(({ sku, name, unitPriceCents, quantity }) => ({
-      sku,
-      name,
-      unitPriceCents,
-      quantity,
-    }));
-    if (consumePendingCheckout(state.sessionId)) {
-      analytics.purchase(state.sessionId, completedItems, 0);
+    const pendingCheckout = consumePendingCheckout(state.sessionId);
+    if (pendingCheckout) {
+      analytics.purchase(state.sessionId, pendingCheckout.items, pendingCheckout.shippingCents);
       clearCart();
     }
     checkoutResultKicker.textContent = "Checkout received";
@@ -693,7 +760,7 @@ async function startStripeCheckout(checkoutRequest, shippingRate) {
       shippingAddress: checkoutRequest.shippingAddress,
       selectedShippingRate: shippingRate,
     });
-    rememberPendingCheckout(handoff.checkoutSessionId);
+    rememberPendingCheckout(handoff.checkoutSessionId, cart, shippingRate.amountCents);
     window.location.assign(handoff.checkoutUrl);
   } catch (error) {
     analytics.checkoutError("checkout_unavailable", "checkout_handoff");

@@ -43,7 +43,7 @@ Do not send names, email addresses, street addresses, phone numbers, payment dat
 - `analytics.js` permits only explicit ecommerce fields. It does not accept customer or address objects.
 - Product identity uses the canonical SKUs `ear-corn-20lb` and `ear-corn-40lb`.
 - Currency is always `USD`; item and shipping values are numeric dollars derived from integer cents.
-- Client-side `purchase` uses the Stripe Checkout Session ID as `transaction_id` and deduplicates it in browser storage. The storefront event is diagnostic; the trusted order system remains authoritative for paid status and revenue reconciliation.
+- Client-side `purchase` uses the Stripe Checkout Session ID as `transaction_id` and deduplicates it in browser storage. Before redirect, the storefront stores only the matching session ID, canonical SKU/quantity lines, and bounded server-returned shipping cents so the return event does not lose shipping revenue or persist customer data. The storefront event is diagnostic; the trusted order system remains authoritative for paid status and revenue reconciliation.
 - `checkout_error` accepts only a bounded error class and funnel step. Raw exceptions and free-form messages are never transmitted.
 - Automated contract coverage runs through `npm run check:analytics` and the repository's required `npm run check`.
 

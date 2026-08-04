@@ -8,6 +8,7 @@
   const measurementId = String(config.measurementId || "").trim();
   const enabled = /^G-[A-Z0-9]+$/i.test(measurementId);
   const purchaseStoragePrefix = "theos-farm-ga4-purchase-v1:";
+  const sentPurchaseIds = new Set();
 
   function getStorage() {
     try {
@@ -43,6 +44,26 @@
     }
     root.gtag("event", eventName, parameters);
     return true;
+  }
+
+  function wasPurchaseSent(storage, transactionId) {
+    if (sentPurchaseIds.has(transactionId)) {
+      return true;
+    }
+    try {
+      return Boolean(storage && storage.getItem(purchaseStoragePrefix + transactionId) === "sent");
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function rememberPurchase(storage, transactionId) {
+    sentPurchaseIds.add(transactionId);
+    try {
+      if (storage) storage.setItem(purchaseStoragePrefix + transactionId, "sent");
+    } catch (error) {
+      // The in-memory guard still prevents duplicate events on this page.
+    }
   }
 
   function initialize() {
@@ -110,8 +131,7 @@
     if (!/^cs_[A-Za-z0-9_]+$/.test(safeTransactionId) || !safeItems.length) return false;
 
     const storage = getStorage();
-    const dedupeKey = purchaseStoragePrefix + safeTransactionId;
-    if (storage && storage.getItem(dedupeKey) === "sent") return false;
+    if (wasPurchaseSent(storage, safeTransactionId)) return false;
 
     const sent = send("purchase", {
       transaction_id: safeTransactionId,
@@ -120,7 +140,7 @@
       shipping: Number((Number(shippingCents || 0) / 100).toFixed(2)),
       items: safeItems,
     });
-    if (sent && storage) storage.setItem(dedupeKey, "sent");
+    if (sent) rememberPurchase(storage, safeTransactionId);
     return sent;
   }
 
