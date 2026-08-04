@@ -175,6 +175,7 @@
     if (global.TheosAdminOrders && typeof global.TheosAdminOrders.setActions === "function") {
       global.TheosAdminOrders.setActions({
         endpoints: {
+          internalNote: endpointFor("internalNote"),
           labelPurchase: endpointFor("labelPurchase"),
           notificationHealth: endpointFor("notificationHealth"),
           notificationRetry: endpointFor("notificationRetry"),

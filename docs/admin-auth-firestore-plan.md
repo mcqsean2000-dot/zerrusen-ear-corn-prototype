@@ -54,6 +54,7 @@ Implemented backend boundary:
 - It does not write Stripe, payment, customer, item, subtotal, shipping-label, or raw payment fields.
 - `functions/src/admin-auth.js` verifies Firebase Auth bearer tokens and requires an `admin: true` custom claim before returning the server-derived admin actor.
 - `functions/src/index.js` exposes `POST /api/admin/order-status` as the trusted HTTP boundary for authenticated admin status updates. The route fails closed with `admin_auth_dependency_missing` unless a trusted runtime injects admin authentication, and with `admin_status_dependency_missing` unless the status persistence adapter is injected.
+- `functions/src/index.js` exposes `POST /api/admin/order-notes` as the trusted append-only boundary for internal notes. It derives note authorship from the verified Firebase admin token, accepts only a bounded body and order ID, and omits the author UID from its browser response.
 - The Firebase runtime wires `updateAdminOrderStatus` only with Firebase Admin Auth token verification, so browser JavaScript cannot choose the `admin.uid` or `admin.email` used for audit fields.
 
 ## Trusted Field Plan

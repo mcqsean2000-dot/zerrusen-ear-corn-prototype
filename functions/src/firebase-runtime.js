@@ -193,6 +193,9 @@ function runtimeOptions(env = runtimeEnv()) {
     adminStatusDependencies: {
       updateAdminOrderStatus: firestoreAdapter.updateAdminOrderStatus,
     },
+    adminNoteDependencies: {
+      appendAdminInternalNote: firestoreAdapter.appendAdminInternalNote,
+    },
     adminNotificationDependencies: {
       listAdminNotificationJobs: firestoreAdapter.listAdminNotificationJobs,
       requeueAdminNotificationJob: firestoreAdapter.requeueAdminNotificationJob,

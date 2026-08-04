@@ -8,6 +8,7 @@
       projectId: "replace-with-firebase-project-id",
     }),
     endpoints: Object.freeze({
+      internalNote: "/api/admin/order-notes",
       labelPurchase: "/api/admin/shippo-labels",
       statusUpdate: "/api/admin/order-status",
     }),

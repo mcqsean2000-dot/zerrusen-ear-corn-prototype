@@ -396,6 +396,7 @@ assert(adminConfigScript.includes("autoConfig: true"), "Admin live mode must use
 assert(adminConfigScript.includes("apiKey: \"\""), "Admin config must keep Firebase API key blank by default.");
 assert(adminConfigScript.includes("projectId: \"\""), "Admin config must keep Firebase project ID blank by default.");
 assert(adminConfigScript.includes("/api/admin/order-status"), "Admin config must point status actions at the trusted backend endpoint.");
+assert(adminConfigScript.includes("/api/admin/order-notes"), "Admin config must point internal notes at the trusted backend endpoint.");
 assert(adminConfigScript.includes("/api/admin/shippo-labels"), "Admin config must point label actions at the trusted backend endpoint.");
 assert(adminConfigScript.includes("/api/admin/social-posts/queue"), "Admin config must point social approvals at the trusted backend endpoint.");
 assert(adminConfigScript.includes("/api/admin/social-posts/reconciliation"), "Admin config must point social exception reads at the trusted backend endpoint.");
@@ -688,6 +689,10 @@ function flushAdminActions() {
   assert(detailMarkup.includes("Admin-only packing note."), "Admin order detail should include normalized internal notes.");
   assert(!detailMarkup.includes("Do not display this note."), "Admin order detail must omit non-admin notes.");
   assert(!detailMarkup.includes("cs_secret_detail") && !detailMarkup.includes("pi_secret_detail"), "Admin order detail must omit raw Stripe identifiers.");
+  assert(!detailMarkup.includes("data-admin-internal-note-form"), "Static admin order detail must not expose note writes before authentication.");
+  const authenticatedDetailMarkup = helpers.buildOrderDetailMarkup(normalized, true);
+  assert(authenticatedDetailMarkup.includes("data-admin-internal-note-form"), "Authenticated admin order detail should expose the trusted note form.");
+  assert(authenticatedDetailMarkup.includes('maxlength="500"'), "Admin internal note input should enforce the backend body limit.");
 
   const unpaidLabelAction = helpers.buildLabelActionViewModel({ paymentStatus: "unpaid", shippingRateId: "rate_unpaid" });
   assert(unpaidLabelAction.state === "blocked", "Admin label action should block unpaid orders.");
@@ -767,6 +772,7 @@ function flushAdminActions() {
   const adminActionCalls = [];
   helpers.setActions({
     endpoints: {
+      internalNote: "/api/admin/order-notes",
       labelPurchase: "/api/admin/shippo-labels",
       statusUpdate: "/api/admin/order-status",
     },
@@ -774,6 +780,16 @@ function flushAdminActions() {
       adminActionCalls.push(request);
       if (request.endpoint === "/api/admin/order-status") {
         return Promise.resolve({ orderRequestId: request.body.orderRequestId, status: request.body.status });
+      }
+      if (request.endpoint === "/api/admin/order-notes") {
+        return Promise.resolve({
+          orderRequestId: request.body.orderRequestId,
+          note: {
+            body: request.body.body,
+            createdByEmail: "admin@example.test",
+            visibility: "admin",
+          },
+        });
       }
       return Promise.resolve({
         orderRequestId: request.body.orderRequestId,
@@ -791,6 +807,30 @@ function flushAdminActions() {
   assert(helpers.hasActions(), "Admin helper should report live actions after authenticated wiring is set.");
   assert(elements.rows.innerHTML.includes('<button class="admin-action" type="button" data-label-action="auth_required"'), "Auth-ready label buttons should be enabled only after live admin wiring is set.");
   assert(!elements.rows.innerHTML.includes('data-current-status="ready_to_pack" data-status-endpoint="/api/admin/order-status" disabled'), "Auth-ready status controls should be enabled after live admin wiring is set.");
+
+  helpers.openOrderDetail("REQ-1002");
+  assert(elements.orderDetailBody.innerHTML.includes("data-admin-internal-note-form"), "Signed-in order detail should render the internal note form.");
+  const noteInput = { value: "  Place on the top pallet.  " };
+  const noteSubmit = { disabled: false };
+  const noteForm = {
+    dataset: { adminInternalNoteForm: "", orderId: "REQ-1002" },
+    querySelector(selector) {
+      return selector === "[data-admin-internal-note-body]" ? noteInput : noteSubmit;
+    },
+  };
+  let noteDefaultPrevented = false;
+  elements.orderDetailBody.listeners.submit[0]({
+    target: noteForm,
+    preventDefault() { noteDefaultPrevented = true; },
+  });
+  await flushAdminActions();
+  const noteCall = adminActionCalls.find((call) => call.endpoint === "/api/admin/order-notes");
+  assert(noteDefaultPrevented, "Admin internal note submit should prevent browser navigation.");
+  assert(noteCall?.body.orderRequestId === "REQ-1002", "Admin internal note action should send only the selected order id.");
+  assert(noteCall?.body.body === "Place on the top pallet.", "Admin internal note action should trim the bounded note body.");
+  assert(noteCall?.body.admin === undefined, "Admin internal note action must not send a browser-supplied admin identity.");
+  assert(elements.actionStatus.textContent === "Internal note saved.", "Admin internal note action should announce a successful save.");
+  assert(elements.orderDetailBody.innerHTML.includes("Place on the top pallet."), "Saved internal note should appear in the open detail dialog.");
 
   elements.rows.listeners.change[0]({
     target: {
@@ -827,6 +867,7 @@ function flushAdminActions() {
   const { elements, helpers } = createAdminHarness();
   helpers.setActions({
     endpoints: {
+      internalNote: "/api/admin/order-notes",
       labelPurchase: "/api/admin/shippo-labels",
       statusUpdate: "/api/admin/order-status",
     },
@@ -920,6 +961,7 @@ function flushAdminActions() {
           projectId: "theos-project",
         },
         endpoints: {
+          internalNote: "/api/admin/order-notes",
           labelPurchase: "/api/admin/shippo-labels",
           statusUpdate: "/api/admin/order-status",
         },

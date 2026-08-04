@@ -275,6 +275,21 @@ function resolveAdminStatusUpdater(options) {
   return null;
 }
 
+function resolveAdminInternalNoteAppender(options) {
+  if (typeof options.appendAdminInternalNote === "function") {
+    return options.appendAdminInternalNote;
+  }
+
+  if (
+    options.adminNoteDependencies &&
+    typeof options.adminNoteDependencies.appendAdminInternalNote === "function"
+  ) {
+    return options.adminNoteDependencies.appendAdminInternalNote;
+  }
+
+  return null;
+}
+
 function resolveAdminNotificationLister(options) {
   if (typeof options.listAdminNotificationJobs === "function") {
     return options.listAdminNotificationJobs;
@@ -981,6 +996,114 @@ async function adminOrderStatusHandler(req, res, options = {}) {
   }
 }
 
+async function adminOrderInternalNoteHandler(req, res, options = {}) {
+  const env = options.env || process.env;
+  const corsHeaders = buildCorsHeaders(req, env);
+
+  if (req.method === "OPTIONS") {
+    return sendCorsPreflight(req, res, env);
+  }
+
+  if (req.method !== "POST") {
+    return sendJson(res, 405, {
+      error: {
+        code: "method_not_allowed",
+        message: "Use POST to append an admin internal note.",
+      },
+    }, { allow: "POST, OPTIONS", ...corsHeaders });
+  }
+
+  const admin = await requireAuthenticatedAdmin(req, res, options, corsHeaders);
+  if (!admin) {
+    return null;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(req);
+  } catch (error) {
+    return sendJson(res, 400, {
+      error: {
+        code: "invalid_json",
+        message: "Send a valid JSON admin internal note request.",
+      },
+    }, corsHeaders);
+  }
+
+  const appendInternalNote = resolveAdminInternalNoteAppender(options);
+  if (typeof appendInternalNote !== "function") {
+    return sendJson(res, 501, {
+      error: {
+        code: "admin_internal_note_dependency_missing",
+        message: "Admin internal notes require a trusted order persistence adapter.",
+      },
+      mock: true,
+      ...safeSetupDetails(env, ["appendAdminInternalNote"]),
+    }, corsHeaders);
+  }
+
+  try {
+    const result = await appendInternalNote({
+      admin,
+      body: body.body,
+      orderRequestId: body.orderRequestId,
+    });
+
+    return sendJson(res, 200, {
+      note: {
+        body: result.note.body,
+        createdAt: result.note.createdAt,
+        createdByEmail: result.note.createdByEmail,
+        visibility: "admin",
+      },
+      orderRequestId: result.id,
+    }, corsHeaders);
+  } catch (error) {
+    if (
+      error.code === "admin_actor_invalid" ||
+      error.code === "order_request_id_missing" ||
+      error.code === "admin_internal_note_missing" ||
+      error.code === "admin_internal_note_too_long"
+    ) {
+      return sendJson(res, 400, {
+        error: {
+          code: error.code,
+          message: "Check the order and enter an internal note of 500 characters or fewer.",
+        },
+      }, corsHeaders);
+    }
+
+    if (error.code === "order_request_not_found") {
+      return sendJson(res, 404, {
+        error: {
+          code: "order_request_not_found",
+          message: "Order request was not found.",
+        },
+      }, corsHeaders);
+    }
+
+    if (error.code === "admin_internal_note_limit_reached") {
+      return sendJson(res, 409, {
+        error: {
+          code: error.code,
+          message: "This order has reached the internal note limit.",
+        },
+      }, corsHeaders);
+    }
+
+    reportOperationalError(options, "admin_internal_note_append_failed", error, {
+      method: req.method,
+      path: "/api/admin/order-notes",
+    });
+    return sendJson(res, 502, {
+      error: {
+        code: "admin_internal_note_append_failed",
+        message: "Internal note could not be saved. Please retry after checking the order.",
+      },
+    }, corsHeaders);
+  }
+}
+
 async function adminNotificationHealthHandler(req, res, options = {}) {
   const env = options.env || process.env;
   const corsHeaders = buildCorsHeaders(req, env);
@@ -1247,6 +1370,10 @@ function routeRequest(req, res, options = {}) {
     return adminOrderStatusHandler(req, res, options);
   }
 
+  if (path === "/api/admin/order-notes") {
+    return adminOrderInternalNoteHandler(req, res, options);
+  }
+
   if (path === "/api/admin/notifications") {
     return adminNotificationHealthHandler(req, res, options);
   }
@@ -1312,6 +1439,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  adminOrderInternalNoteHandler,
   adminNotificationHealthHandler,
   adminNotificationRetryHandler,
   adminSocialReconciliationHandler,
@@ -1329,6 +1457,7 @@ module.exports = {
   resolveShippingRateCreator,
   resolveShippingLabelPurchaser,
   resolveAdminStatusUpdater,
+  resolveAdminInternalNoteAppender,
   resolveAdminAuthenticator,
   resolveAdminNotificationLister,
   resolveAdminNotificationRequeuer,

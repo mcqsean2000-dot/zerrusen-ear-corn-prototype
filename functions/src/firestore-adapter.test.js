@@ -679,6 +679,94 @@ test("admin status updates require admin identity and an existing order", async 
   );
 });
 
+test("appends an admin internal note atomically with server-derived audit identity", async () => {
+  const firestore = new MemoryFirestore();
+  const createdAt = new Date("2026-08-04T15:00:00.000Z");
+  const adapter = createFirestoreAdapter({ firestore, now: () => createdAt });
+
+  await adapter.createOrderRequest({
+    orderRequest: {
+      ...trustedOrderRequest,
+      internalNotes: [{
+        body: "Existing note",
+        createdAt: new Date("2026-08-03T15:00:00.000Z"),
+        createdByEmail: "first@example.test",
+        createdByUid: "first-admin",
+        visibility: "admin",
+      }],
+    },
+  });
+  const result = await adapter.appendAdminInternalNote({
+    admin: {
+      email: "admin@example.test",
+      uid: "admin-user-001",
+    },
+    body: "  Pack the small ears together.  ",
+    orderRequestId: "orderRequests_1",
+  });
+
+  assert.equal(result.id, "orderRequests_1");
+  assert.deepEqual(result.note, {
+    body: "Pack the small ears together.",
+    createdAt,
+    createdByEmail: "admin@example.test",
+    createdByUid: "admin-user-001",
+    visibility: "admin",
+  });
+  const savedOrder = collectionDocs(firestore, "orderRequests").get("orderRequests_1");
+  assert.equal(savedOrder.internalNotes.length, 2);
+  assert.deepEqual(savedOrder.internalNotes[1], result.note);
+  assert.deepEqual(savedOrder.audit, {
+    lastAction: "internal_note_added",
+    updatedAt: createdAt,
+    updatedByEmail: "admin@example.test",
+    updatedByUid: "admin-user-001",
+  });
+});
+
+test("admin internal notes reject invalid bodies and missing orders", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({ firestore });
+  const admin = { email: "admin@example.test", uid: "admin-user-001" };
+
+  await adapter.createOrderRequest({ orderRequest: trustedOrderRequest });
+  await assert.rejects(
+    adapter.appendAdminInternalNote({ admin, body: "   ", orderRequestId: "orderRequests_1" }),
+    (error) => error.code === "admin_internal_note_missing",
+  );
+  await assert.rejects(
+    adapter.appendAdminInternalNote({ admin, body: "x".repeat(501), orderRequestId: "orderRequests_1" }),
+    (error) => error.code === "admin_internal_note_too_long",
+  );
+  await assert.rejects(
+    adapter.appendAdminInternalNote({ admin, body: "Valid note", orderRequestId: "missing" }),
+    (error) => error.code === "order_request_not_found",
+  );
+});
+
+test("admin internal notes enforce the stored note limit", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({ firestore });
+  const internalNotes = Array.from({ length: 100 }, (_, index) => ({
+    body: `Note ${index + 1}`,
+    createdAt: new Date("2026-08-03T15:00:00.000Z"),
+    createdByEmail: "admin@example.test",
+    createdByUid: "admin-user-001",
+    visibility: "admin",
+  }));
+
+  await adapter.createOrderRequest({ orderRequest: { ...trustedOrderRequest, internalNotes } });
+  await assert.rejects(
+    adapter.appendAdminInternalNote({
+      admin: { email: "admin@example.test", uid: "admin-user-001" },
+      body: "One too many",
+      orderRequestId: "orderRequests_1",
+    }),
+    (error) => error.code === "admin_internal_note_limit_reached",
+  );
+  assert.equal(collectionDocs(firestore, "orderRequests").get("orderRequests_1").internalNotes.length, 100);
+});
+
 test("records admin label purchase with tracking fields and audit metadata", async () => {
   const firestore = new MemoryFirestore();
   const adapter = createFirestoreAdapter({

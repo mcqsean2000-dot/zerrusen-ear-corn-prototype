@@ -179,7 +179,7 @@ function normalizeAdminCustomer(customer) {
 
 function normalizeAdminInternalNotes(notes) {
   if (!Array.isArray(notes)) return [];
-  return notes.slice(0, adminInternalNoteLimit).map((note) => {
+  return notes.slice(-adminInternalNoteLimit).map((note) => {
     const body = asText(note?.body).slice(0, adminInternalNoteBodyLimit);
     const visibility = asText(note?.visibility).toLowerCase();
     if (!body || visibility !== "admin") return null;
@@ -351,7 +351,7 @@ function buildAdminShippingViewModel(shipping) {
   };
 }
 
-function buildAdminOrderDetailMarkup(order) {
+function buildAdminOrderDetailMarkup(order, actionsEnabled = false) {
   const viewModel = buildAdminOrderViewModel(order);
   const trackingMarkup = viewModel.shipping.trackingUrl
     ? '<a class="admin-link" href="' + escapeHtml(viewModel.shipping.trackingUrl) + '" target="_blank" rel="noreferrer">' + escapeHtml(viewModel.shipping.trackingLabel) + "</a>"
@@ -359,6 +359,15 @@ function buildAdminOrderDetailMarkup(order) {
   const internalNotesMarkup = viewModel.internalNotes.length
     ? '<ul class="admin-internal-notes">' + viewModel.internalNotes.map((note) => "<li><p>" + escapeHtml(note.body) + "</p>" + (note.createdByEmail ? "<small>Added by " + escapeHtml(note.createdByEmail) + "</small>" : "") + "</li>").join("") + "</ul>"
     : '<p class="admin-note">No internal notes.</p>';
+  const internalNoteFormMarkup = actionsEnabled
+    ? [
+      '<form class="admin-internal-note-form" data-admin-internal-note-form data-order-id="' + escapeHtml(viewModel.id) + '">',
+      '<label for="admin-internal-note-' + escapeHtml(viewModel.id) + '">Add internal note</label>',
+      '<textarea id="admin-internal-note-' + escapeHtml(viewModel.id) + '" name="internalNoteBody" maxlength="' + adminInternalNoteBodyLimit + '" rows="3" required data-admin-internal-note-body></textarea>',
+      '<button class="admin-action" type="submit">Save note</button>',
+      "</form>",
+    ].join("")
+    : "";
   return [
     '<dl class="admin-order-detail-grid">',
     "<div><dt>Payment</dt><dd>" + escapeHtml(viewModel.paymentStatusLabel) + "</dd></div>",
@@ -371,7 +380,7 @@ function buildAdminOrderDetailMarkup(order) {
     '<div class="admin-order-detail-section"><h3>Items</h3><p>' + escapeHtml(viewModel.itemSummary) + "</p><small>" + escapeHtml(viewModel.subtotalLabel) + " estimated subtotal</small></div>",
     '<div class="admin-order-detail-section"><h3>Customer</h3><p>' + escapeHtml(viewModel.customerName) + "</p><small>ZIP " + escapeHtml(viewModel.shippingZip) + " - " + escapeHtml(viewModel.contact) + " - prefers " + escapeHtml(viewModel.preferredContact) + "</small></div>",
     '<div class="admin-order-detail-section"><h3>Customer note</h3><p>' + escapeHtml(viewModel.note) + "</p></div>",
-    '<div class="admin-order-detail-section"><h3>Internal notes</h3>' + internalNotesMarkup + "</div>",
+    '<div class="admin-order-detail-section"><h3>Internal notes</h3>' + internalNotesMarkup + internalNoteFormMarkup + "</div>",
     '<div class="admin-order-detail-section"><h3>Tracking</h3><p>' + trackingMarkup + "</p></div>",
   ].join("");
 }
@@ -421,7 +430,7 @@ function openAdminOrderDetail(orderId) {
   const order = currentAdminOrders.find((candidate) => candidate.id === normalizedId);
   if (!order) return false;
   orderDetailTitle.textContent = order.id;
-  orderDetailBody.innerHTML = buildAdminOrderDetailMarkup(order);
+  orderDetailBody.innerHTML = buildAdminOrderDetailMarkup(order, internalNoteActionsReady());
   if (typeof orderDetailDialog.showModal === "function") {
     orderDetailDialog.showModal();
   } else {
@@ -463,6 +472,7 @@ function hasAdminActions() {
       typeof currentAdminActions.postAdminJson === "function" &&
       currentAdminActions.user &&
       currentAdminActions.endpoints &&
+      asText(currentAdminActions.endpoints.internalNote) &&
       asText(currentAdminActions.endpoints.labelPurchase) &&
       asText(currentAdminActions.endpoints.statusUpdate),
   );
@@ -996,6 +1006,49 @@ function render(orders = currentAdminOrders) {
   renderPackingList(visibleOrders);
 }
 
+async function handleInternalNoteAction(form) {
+  if (!internalNoteActionsReady() || !form) return;
+  const orderRequestId = asText(form.dataset?.orderId);
+  const bodyInput = typeof form.querySelector === "function"
+    ? form.querySelector("[data-admin-internal-note-body]")
+    : null;
+  const submitButton = typeof form.querySelector === "function"
+    ? form.querySelector('button[type="submit"]')
+    : null;
+  const body = asText(bodyInput?.value);
+
+  if (!orderRequestId || !body || body.length > adminInternalNoteBodyLimit) {
+    setAdminActionStatus("Enter an internal note of 500 characters or fewer.", "error");
+    return;
+  }
+
+  if (submitButton) submitButton.disabled = true;
+  try {
+    setAdminActionStatus("Saving internal note...");
+    const result = await currentAdminActions.postAdminJson({
+      endpoint: currentAdminActions.endpoints.internalNote,
+      user: currentAdminActions.user,
+      body: { orderRequestId, body },
+    });
+    const existingOrder = currentAdminOrders.find((order) => order.id === orderRequestId);
+    const note = normalizeAdminInternalNotes([result.note])[0];
+    if (!existingOrder || !note) {
+      throw new Error("Saved internal note response was incomplete.");
+    }
+    updateCurrentAdminOrder(orderRequestId, {
+      internalNotes: [...existingOrder.internalNotes, note],
+    });
+    const updatedOrder = currentAdminOrders.find((order) => order.id === orderRequestId);
+    if (orderDetailBody && updatedOrder) {
+      orderDetailBody.innerHTML = buildAdminOrderDetailMarkup(updatedOrder, true);
+    }
+    setAdminActionStatus("Internal note saved.");
+  } catch (error) {
+    if (submitButton) submitButton.disabled = false;
+    setAdminActionStatus("Internal note could not be saved. Check admin access and try again.", "error");
+  }
+}
+
 async function handleStatusAction(target) {
   if (!hasAdminActions()) return;
   const orderRequestId = asText(target?.dataset?.orderId);
@@ -1124,6 +1177,23 @@ rows.addEventListener("click", (event) => {
 });
 if (orderDetailCloseButton) {
   orderDetailCloseButton.addEventListener("click", closeAdminOrderDetail);
+}
+if (orderDetailBody) {
+  orderDetailBody.addEventListener("submit", (event) => {
+    if (event.target && event.target.dataset && event.target.dataset.adminInternalNoteForm !== undefined) {
+      event.preventDefault();
+      handleInternalNoteAction(event.target);
+    }
+  });
+}
+
+function internalNoteActionsReady() {
+  return Boolean(
+    currentAdminActions &&
+      typeof currentAdminActions.postAdminJson === "function" &&
+      currentAdminActions.user &&
+      asText(currentAdminActions.endpoints?.internalNote),
+  );
 }
 if (notificationRefreshButton) {
   notificationRefreshButton.addEventListener("click", refreshNotificationHealth);

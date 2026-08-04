@@ -6,6 +6,7 @@ const { createOperationalLogger } = require("./operational-logger");
 const {
   adminNotificationHealthHandler,
   adminNotificationRetryHandler,
+  adminOrderInternalNoteHandler,
   adminOrderStatusHandler,
   adminShippingLabelsHandler,
   adminSocialPostQueueHandler,
@@ -692,6 +693,87 @@ test("admin order status handler rejects non-admin authenticated accounts", asyn
 
   assert.equal(res.statusCode, 403);
   assert.equal(parseJson(res).error.code, "admin_forbidden");
+});
+
+test("admin internal note handler appends through trusted identity without returning the uid", async () => {
+  const req = mockReq({
+    body: {
+      admin: {
+        email: "spoofed@example.test",
+        uid: "spoofed-user",
+      },
+      body: "  Keep this box upright.  ",
+      orderRequestId: "order_123",
+    },
+  });
+  const res = mockRes();
+  let appendArgs = null;
+
+  await adminOrderInternalNoteHandler(req, res, {
+    authenticateAdminRequest,
+    adminNoteDependencies: {
+      appendAdminInternalNote(args) {
+        appendArgs = args;
+        return {
+          id: args.orderRequestId,
+          note: {
+            body: args.body.trim(),
+            createdAt: new Date("2026-08-04T15:00:00.000Z"),
+            createdByEmail: args.admin.email,
+            createdByUid: args.admin.uid,
+            visibility: "admin",
+          },
+        };
+      },
+    },
+    env: {},
+  });
+
+  const response = parseJson(res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(appendArgs.admin.email, "admin@example.test");
+  assert.equal(appendArgs.admin.uid, "admin-user-001");
+  assert.equal(appendArgs.body, "  Keep this box upright.  ");
+  assert.equal(response.orderRequestId, "order_123");
+  assert.equal(response.note.body, "Keep this box upright.");
+  assert.equal(response.note.createdByEmail, "admin@example.test");
+  assert.equal(response.note.createdByUid, undefined);
+});
+
+test("admin internal note handler maps validation and note-limit errors safely", async () => {
+  for (const [errorCode, expectedStatus] of [
+    ["admin_internal_note_missing", 400],
+    ["admin_internal_note_too_long", 400],
+    ["admin_internal_note_limit_reached", 409],
+  ]) {
+    const req = mockReq({ body: { body: "note", orderRequestId: "order_123" } });
+    const res = mockRes();
+    await adminOrderInternalNoteHandler(req, res, {
+      authenticateAdminRequest,
+      appendAdminInternalNote() {
+        const error = new Error("Expected test error.");
+        error.code = errorCode;
+        throw error;
+      },
+      env: {},
+    });
+    assert.equal(res.statusCode, expectedStatus);
+    assert.equal(parseJson(res).error.code, errorCode);
+  }
+});
+
+test("admin internal note handler reports missing trusted persistence dependency", async () => {
+  const req = mockReq({ body: { body: "note", orderRequestId: "order_123" } });
+  const res = mockRes();
+
+  await adminOrderInternalNoteHandler(req, res, {
+    authenticateAdminRequest,
+    env: { NODE_ENV: "development" },
+  });
+
+  assert.equal(res.statusCode, 501);
+  assert.equal(parseJson(res).error.code, "admin_internal_note_dependency_missing");
+  assert.deepEqual(parseJson(res).setupRequired, ["appendAdminInternalNote"]);
 });
 
 test("admin shipping label handler reports missing trusted persistence dependency", async () => {

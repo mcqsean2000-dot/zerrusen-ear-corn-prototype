@@ -34,10 +34,16 @@ Authenticated admin tooling should update fulfillment status through:
 POST /api/admin/order-status
 ```
 
+Authenticated admin tooling should append internal notes through:
+
+```text
+POST /api/admin/order-notes
+```
+
 ## Files
 
 - `functions/src/order-validation.js` keeps the server-owned product catalog, validates storefront drafts, recalculates subtotals, rejects client-supplied trusted fields, and builds safe Stripe metadata.
-- `functions/src/index.js` exports lightweight route handlers for checkout sessions, Stripe webhooks, admin status updates, and admin shipping label purchase. Public checkout routes are disabled by default unless environment configuration and trusted adapters are provided. Admin routes also require authenticated Firebase admin custom-claim verification before they call trusted persistence or Shippo adapters.
+- `functions/src/index.js` exports lightweight route handlers for checkout sessions, Stripe webhooks, admin status and internal-note updates, and admin shipping label purchase. Public checkout routes are disabled by default unless environment configuration and trusted adapters are provided. Admin routes also require authenticated Firebase admin custom-claim verification before they call trusted persistence or Shippo adapters.
 - `functions/src/admin-auth.js` verifies Firebase Auth bearer tokens and derives the admin actor from an `admin: true` custom claim. Admin route handlers must use this server-derived actor rather than `body.admin` supplied by browser JavaScript.
 - `functions/src/checkout-adapter.js` builds the production-adjacent Stripe Checkout handoff using injected trusted storage and Stripe functions only. It does not import Stripe, Firebase, or make network calls by itself.
 - `functions/src/stripe-api-adapter.js` provides the SDK-agnostic Stripe API boundary for future injection. It wraps a Stripe-like client passed in by trusted runtime code, forwards hosted Checkout Session params to `checkout.sessions.create`, and forwards raw webhook payloads to `webhooks.constructEvent` without importing Stripe or storing secrets.

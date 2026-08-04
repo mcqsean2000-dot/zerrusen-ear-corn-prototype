@@ -128,7 +128,7 @@ Core admin features:
 - Shipping status. Implemented as read-only needs-rate, rate-selected, or label-ready progress.
 - Customer contact info
 - Product quantities
-- Internal notes. Bounded read-only display implemented; trusted append action remains.
+- Internal notes. Bounded display and trusted authenticated append action implemented.
 - Daily bag count summary
 - Print aggregate packing list. Implemented without customer or order details.
 

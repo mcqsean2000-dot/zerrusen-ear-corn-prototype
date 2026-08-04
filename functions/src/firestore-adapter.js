@@ -32,6 +32,8 @@ const ADMIN_NOTIFICATION_STATUSES = Object.freeze([
   "sent",
   "failed",
 ]);
+const ADMIN_INTERNAL_NOTE_BODY_LIMIT = 500;
+const ADMIN_INTERNAL_NOTE_LIMIT = 100;
 const ADMIN_STATUS_TRANSITIONS = Object.freeze({
   needs_review: Object.freeze(["ready_to_pack"]),
   ready_to_pack: Object.freeze(["needs_review", "packed"]),
@@ -441,6 +443,7 @@ function createFirestoreAdapter(options = {}) {
   const timestamp = isFunction(options.serverTimestamp)
     ? options.serverTimestamp
     : () => options.serverTimestamp || SERVER_TIMESTAMP_SENTINEL;
+  const now = isFunction(options.now) ? options.now : () => new Date();
 
   const socialPostPersistence = createFirestoreSocialPostPersistence({
     collectionRef: (collection) => collectionRef(
@@ -558,6 +561,77 @@ function createFirestoreAdapter(options = {}) {
       id,
       status: transition.to,
     };
+  }
+
+  async function appendAdminInternalNote({ admin, collection, orderRequestId, body }) {
+    const id = cleanText(orderRequestId);
+    if (!id) {
+      const error = new Error("orderRequestId is required to append an admin internal note.");
+      error.code = "order_request_id_missing";
+      throw error;
+    }
+
+    if (typeof body !== "string" || !body.trim()) {
+      const error = new Error("A non-empty internal note body is required.");
+      error.code = "admin_internal_note_missing";
+      throw error;
+    }
+
+    const noteBody = body.trim();
+    if (noteBody.length > ADMIN_INTERNAL_NOTE_BODY_LIMIT) {
+      const error = new Error("Internal note body exceeds the supported length.");
+      error.code = "admin_internal_note_too_long";
+      throw error;
+    }
+
+    const actor = validateAdminActor(admin);
+    const orders = collectionRef(firestore, orderCollectionName(options, collection));
+    const ref = orders.doc(id);
+    const createdAt = now();
+    const note = {
+      body: noteBody,
+      createdAt,
+      createdByEmail: actor.email,
+      createdByUid: actor.uid,
+      visibility: "admin",
+    };
+    const audit = {
+      lastAction: "internal_note_added",
+      updatedAt: createdAt,
+      updatedByEmail: actor.email,
+      updatedByUid: actor.uid,
+    };
+
+    if (!isFunction(firestore.runTransaction)) {
+      const error = new Error("Firestore transactions are required to append internal notes.");
+      error.code = "firestore_transaction_missing";
+      throw error;
+    }
+
+    await firestore.runTransaction(async (transaction) => {
+      const existingOrder = normalizeSnapshot(await transaction.get(ref));
+      if (!existingOrder) {
+        const error = new Error("Order request was not found for internal note append.");
+        error.code = "order_request_not_found";
+        throw error;
+      }
+
+      const internalNotes = Array.isArray(existingOrder.internalNotes)
+        ? existingOrder.internalNotes
+        : [];
+      if (internalNotes.length >= ADMIN_INTERNAL_NOTE_LIMIT) {
+        const error = new Error("Order request has reached the internal note limit.");
+        error.code = "admin_internal_note_limit_reached";
+        throw error;
+      }
+
+      transaction.update(ref, {
+        audit,
+        internalNotes: [...internalNotes, note],
+      });
+    });
+
+    return { audit, id, note };
   }
 
   async function prepareAdminLabelPurchase({ admin, collection, orderRequestId, rateId }) {
@@ -1166,6 +1240,7 @@ function createFirestoreAdapter(options = {}) {
 
   return {
     ...socialPostPersistence,
+    appendAdminInternalNote,
     claimStripeEventProcessing,
     claimNotificationJob,
     completePaidOrderEvent,
@@ -1192,6 +1267,8 @@ function createFirestoreAdapter(options = {}) {
 }
 
 module.exports = {
+  ADMIN_INTERNAL_NOTE_BODY_LIMIT,
+  ADMIN_INTERNAL_NOTE_LIMIT,
   ADMIN_NOTIFICATION_STATUSES,
   ADMIN_ORDER_STATUSES,
   ADMIN_STATUS_TRANSITIONS,

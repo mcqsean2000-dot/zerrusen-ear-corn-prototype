@@ -14,7 +14,8 @@ The shell uses sample order requests to model the first admin workflows:
 
 - review new order requests
 - open a read-only order detail dialog built from normalized fulfillment data
-- review up to 10 bounded admin-only internal notes without exposing author UIDs
+- review up to 10 recent bounded admin-only internal notes without exposing author UIDs
+- append a 500-character internal note through the authenticated trusted backend
 - see customer contact preference and shipping ZIP
 - scan product quantities and estimated subtotal
 - view bounded trusted payment status as paid, pending, or failed without exposing Stripe IDs
@@ -26,7 +27,7 @@ The shell uses sample order requests to model the first admin workflows:
 
 The packing print view intentionally excludes customer names, contact details, order rows, notes, authentication controls, notification data, and social content.
 
-Internal notes are currently read-only in the browser. A future append action must use a trusted authenticated backend route, derive the admin identity server-side, and preserve the documented audit shape.
+Internal notes use `POST /api/admin/order-notes`. The browser submits only the order ID and bounded note body; the trusted backend derives the author UID/email from the verified Firebase admin token, appends atomically, caps storage at 100 notes, updates the audit record, and omits the author UID from its response.
 
 ## Authenticated Admin Readiness
 

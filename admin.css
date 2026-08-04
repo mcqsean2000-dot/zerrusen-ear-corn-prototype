@@ -85,6 +85,10 @@
 .admin-order-detail-section small { color: var(--muted); line-height: 1.45; }
 .admin-internal-notes { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
 .admin-internal-notes li { display: grid; gap: 4px; padding-left: 12px; border-left: 3px solid var(--corn); }
+.admin-internal-note-form { display: grid; gap: 8px; margin-top: 10px; }
+.admin-internal-note-form label { font-size: 0.78rem; font-weight: 900; text-transform: uppercase; }
+.admin-internal-note-form textarea { width: 100%; min-height: 84px; resize: vertical; }
+.admin-internal-note-form .admin-action { justify-self: start; }
 .payment-pill { display: inline-flex; align-items: center; min-height: 30px; padding: 0 10px; border-radius: 999px; color: #fff; background: var(--leaf); font-size: 0.82rem; font-weight: 900; white-space: nowrap; }
 .payment-pill[data-payment-status="unpaid"] { color: var(--ink); background: var(--corn); }
 .payment-pill[data-payment-status="failed"] { color: #fff; background: #9b2c2c; }
