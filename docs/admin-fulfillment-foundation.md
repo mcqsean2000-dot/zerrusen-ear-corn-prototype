@@ -13,6 +13,7 @@ http://localhost:4173/admin.html
 The shell uses sample order requests to model the first admin workflows:
 
 - review new order requests
+- open a read-only order detail dialog built from normalized fulfillment data
 - see customer contact preference and shipping ZIP
 - scan product quantities and estimated subtotal
 - view bounded trusted payment status as paid, pending, or failed without exposing Stripe IDs

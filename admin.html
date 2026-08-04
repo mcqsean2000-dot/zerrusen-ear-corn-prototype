@@ -166,6 +166,19 @@
           <p class="admin-note">Prints aggregate bag counts only. Customer and order details are excluded.</p>
         </aside>
       </section>
+
+      <dialog class="admin-order-dialog" data-order-detail-dialog aria-labelledby="order-detail-title">
+        <div class="admin-order-dialog-shell">
+          <div class="admin-order-dialog-head">
+            <div>
+              <p class="eyebrow">Order detail</p>
+              <h2 id="order-detail-title" data-order-detail-title>Order request</h2>
+            </div>
+            <button class="admin-dialog-close" type="button" data-order-detail-close aria-label="Close order details" title="Close">&times;</button>
+          </div>
+          <div data-order-detail-body></div>
+        </div>
+      </dialog>
     </main>
 
     <script src="admin-config.js"></script>

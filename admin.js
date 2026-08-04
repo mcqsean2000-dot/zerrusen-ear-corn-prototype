@@ -91,6 +91,10 @@ const socialDraftsRefreshButton = document.querySelector("[data-social-drafts-re
 const socialWeekApproveButton = document.querySelector("[data-social-week-approve]");
 const socialReconciliationRefreshButton = document.querySelector("[data-social-reconciliation-refresh]");
 const socialReconciliationRows = document.querySelector("[data-social-reconciliation-rows]");
+const orderDetailDialog = document.querySelector("[data-order-detail-dialog]");
+const orderDetailTitle = document.querySelector("[data-order-detail-title]");
+const orderDetailBody = document.querySelector("[data-order-detail-body]");
+const orderDetailCloseButton = document.querySelector("[data-order-detail-close]");
 
 function asText(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -323,6 +327,27 @@ function buildAdminShippingViewModel(shipping) {
   };
 }
 
+function buildAdminOrderDetailMarkup(order) {
+  const viewModel = buildAdminOrderViewModel(order);
+  const trackingMarkup = viewModel.shipping.trackingUrl
+    ? '<a class="admin-link" href="' + escapeHtml(viewModel.shipping.trackingUrl) + '" target="_blank" rel="noreferrer">' + escapeHtml(viewModel.shipping.trackingLabel) + "</a>"
+    : escapeHtml(viewModel.shipping.trackingLabel);
+  return [
+    '<dl class="admin-order-detail-grid">',
+    "<div><dt>Payment</dt><dd>" + escapeHtml(viewModel.paymentStatusLabel) + "</dd></div>",
+    "<div><dt>Fulfillment</dt><dd>" + escapeHtml(viewModel.statusLabel) + "</dd></div>",
+    "<div><dt>Shipping</dt><dd>" + escapeHtml(viewModel.shipping.statusLabel) + "</dd></div>",
+    "<div><dt>Carrier</dt><dd>" + escapeHtml(viewModel.shipping.carrierService) + "</dd></div>",
+    "<div><dt>Shipping amount</dt><dd>" + escapeHtml(viewModel.shipping.amountLabel) + "</dd></div>",
+    "<div><dt>Packages</dt><dd>" + escapeHtml(viewModel.shipping.packageLabel) + "</dd></div>",
+    "</dl>",
+    '<div class="admin-order-detail-section"><h3>Items</h3><p>' + escapeHtml(viewModel.itemSummary) + "</p><small>" + escapeHtml(viewModel.subtotalLabel) + " estimated subtotal</small></div>",
+    '<div class="admin-order-detail-section"><h3>Customer</h3><p>' + escapeHtml(viewModel.customerName) + "</p><small>ZIP " + escapeHtml(viewModel.shippingZip) + " - " + escapeHtml(viewModel.contact) + " - prefers " + escapeHtml(viewModel.preferredContact) + "</small></div>",
+    '<div class="admin-order-detail-section"><h3>Notes</h3><p>' + escapeHtml(viewModel.note) + "</p></div>",
+    '<div class="admin-order-detail-section"><h3>Tracking</h3><p>' + trackingMarkup + "</p></div>",
+  ].join("");
+}
+
 function calculateAdminBagCounts(orders) {
   return normalizeAdminOrders(orders).reduce((counts, order) => {
     order.items.forEach((item) => {
@@ -359,6 +384,31 @@ function printPackingList(printImpl) {
       : null;
   if (!printer) return false;
   printer();
+  return true;
+}
+
+function openAdminOrderDetail(orderId) {
+  if (!orderDetailDialog || !orderDetailTitle || !orderDetailBody) return false;
+  const normalizedId = asText(orderId);
+  const order = currentAdminOrders.find((candidate) => candidate.id === normalizedId);
+  if (!order) return false;
+  orderDetailTitle.textContent = order.id;
+  orderDetailBody.innerHTML = buildAdminOrderDetailMarkup(order);
+  if (typeof orderDetailDialog.showModal === "function") {
+    orderDetailDialog.showModal();
+  } else {
+    orderDetailDialog.hidden = false;
+  }
+  return true;
+}
+
+function closeAdminOrderDetail() {
+  if (!orderDetailDialog) return false;
+  if (typeof orderDetailDialog.close === "function") {
+    orderDetailDialog.close();
+  } else {
+    orderDetailDialog.hidden = true;
+  }
   return true;
 }
 
@@ -826,11 +876,14 @@ if (typeof window !== "undefined") {
     normalizeOrder: normalizeAdminOrder,
     normalizeOrders: normalizeAdminOrders,
     buildOrderViewModel: buildAdminOrderViewModel,
+    buildOrderDetailMarkup: buildAdminOrderDetailMarkup,
     buildShippingViewModel: buildAdminShippingViewModel,
     calculateBagCounts: calculateAdminBagCounts,
     buildFulfillmentSummary: buildAdminFulfillmentSummary,
     getPackableOrders: getAdminPackableOrders,
     printPackingList,
+    openOrderDetail: openAdminOrderDetail,
+    closeOrderDetail: closeAdminOrderDetail,
     buildLabelActionViewModel: buildAdminLabelActionViewModel,
     canTransitionStatus: canTransitionAdminStatus,
     getAllowedStatusTransitions: getAllowedAdminStatusTransitions,
@@ -884,7 +937,7 @@ function renderRows(orders) {
     ].join("");
     return [
       "<tr>",
-      "<td><strong>" + escapeHtml(viewModel.customerName) + "</strong><small>" + escapeHtml(viewModel.id) + " - ZIP " + escapeHtml(viewModel.shippingZip) + "</small></td>",
+      "<td><strong>" + escapeHtml(viewModel.customerName) + "</strong><small>" + escapeHtml(viewModel.id) + " - ZIP " + escapeHtml(viewModel.shippingZip) + '</small><button class="admin-detail-trigger" type="button" data-order-detail="' + escapeHtml(viewModel.id) + '">View details</button></td>',
       "<td>" + escapeHtml(viewModel.itemSummary) + "<small>" + escapeHtml(viewModel.subtotalLabel) + " estimated subtotal</small></td>",
       '<td><span class="payment-pill" data-payment-status="' + escapeHtml(viewModel.paymentStatus) + '">' + escapeHtml(viewModel.paymentStatusLabel) + "</span></td>",
       '<td><span class="status-pill" data-status="' + escapeHtml(viewModel.status) + '">' + escapeHtml(viewModel.statusLabel) + "</span>" + statusSelectMarkup + "</td>",
@@ -1033,10 +1086,16 @@ rows.addEventListener("change", (event) => {
   }
 });
 rows.addEventListener("click", (event) => {
+  if (event.target && event.target.dataset && event.target.dataset.orderDetail) {
+    openAdminOrderDetail(event.target.dataset.orderDetail);
+  }
   if (event.target && event.target.dataset && event.target.dataset.labelAction) {
     handleLabelAction(event.target);
   }
 });
+if (orderDetailCloseButton) {
+  orderDetailCloseButton.addEventListener("click", closeAdminOrderDetail);
+}
 if (notificationRefreshButton) {
   notificationRefreshButton.addEventListener("click", refreshNotificationHealth);
 }

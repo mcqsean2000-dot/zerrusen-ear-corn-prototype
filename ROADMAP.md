@@ -123,7 +123,7 @@ The admin side should make fulfillment easy for the farm.
 Core admin features:
 
 - Order list
-- Order detail
+- Order detail. Implemented as a read-only normalized admin dialog.
 - Payment status. Implemented as a read-only trusted admin indicator.
 - Shipping status. Implemented as read-only needs-rate, rate-selected, or label-ready progress.
 - Customer contact info

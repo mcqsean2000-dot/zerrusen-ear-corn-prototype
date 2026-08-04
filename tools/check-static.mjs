@@ -385,6 +385,8 @@ assert(admin.includes("data-social-drafts"), "Admin shell must render the social
 assert(admin.includes("data-social-reconciliation-rows"), "Admin shell must render the social reconciliation queue.");
 assert(admin.includes("data-packing-print"), "Admin shell must render the aggregate packing print control.");
 assert(admin.includes('<th scope="col">Payment</th>'), "Admin shell must include a visible payment status column.");
+assert(admin.includes("data-order-detail-dialog"), "Admin shell must render a native order detail dialog.");
+assert(admin.includes("data-order-detail-close"), "Admin order detail dialog must include an explicit close control.");
 assert(adminStyles.includes("@media print"), "Admin stylesheet must define a packing print layout.");
 assert(adminStyles.includes(".admin-layout > :not(#packing)"), "Packing print layout must hide order details.");
 assert(adminStyles.includes("#packing .admin-note"), "Packing print layout must hide non-count helper text.");
@@ -411,6 +413,7 @@ assert(adminScript.includes("calculateAdminBagCounts"), "Admin shell must centra
 assert(adminScript.includes("printPackingList"), "Admin shell must centralize the packing print action.");
 assert(adminScript.includes("adminPaymentStatusLabels"), "Admin shell must use bounded trusted payment status labels.");
 assert(adminScript.includes("adminShippingStatusLabels"), "Admin shell must use derived trusted shipping status labels.");
+assert(adminScript.includes("buildAdminOrderDetailMarkup"), "Admin shell must centralize read-only order detail rendering.");
 assert(adminScript.includes("adminStatusTransitions"), "Admin shell must define constrained status transitions before live status updates.");
 assert(adminScript.includes("labelUrl"), "Admin shell should include trusted label URL display fields.");
 assert(adminScript.includes("trackingNumber"), "Admin shell should include trusted tracking number display fields.");
@@ -486,12 +489,22 @@ function createAdminFakeElement(name, value = "") {
     name,
     value,
     dataset: {},
+    hidden: true,
     innerHTML: "",
     textContent: "",
+    open: false,
     listeners: {},
     addEventListener(type, handler) {
       this.listeners[type] = this.listeners[type] || [];
       this.listeners[type].push(handler);
+    },
+    showModal() {
+      this.hidden = false;
+      this.open = true;
+    },
+    close() {
+      this.hidden = true;
+      this.open = false;
     },
   };
 }
@@ -502,6 +515,10 @@ function createAdminHarness() {
     rows: createAdminFakeElement("rows"),
     packingList: createAdminFakeElement("packingList"),
     packingPrint: createAdminFakeElement("packingPrint"),
+    orderDetailDialog: createAdminFakeElement("orderDetailDialog"),
+    orderDetailTitle: createAdminFakeElement("orderDetailTitle"),
+    orderDetailBody: createAdminFakeElement("orderDetailBody"),
+    orderDetailClose: createAdminFakeElement("orderDetailClose"),
     statusFilter: createAdminFakeElement("statusFilter", "all"),
     actionStatus: createAdminFakeElement("actionStatus"),
   };
@@ -512,6 +529,10 @@ function createAdminHarness() {
         "[data-order-rows]": elements.rows,
         "[data-packing-list]": elements.packingList,
         "[data-packing-print]": elements.packingPrint,
+        "[data-order-detail-dialog]": elements.orderDetailDialog,
+        "[data-order-detail-title]": elements.orderDetailTitle,
+        "[data-order-detail-body]": elements.orderDetailBody,
+        "[data-order-detail-close]": elements.orderDetailClose,
         "[data-status-filter]": elements.statusFilter,
         "[data-admin-action-status]": elements.actionStatus,
         "[data-admin-auth-status]": createAdminFakeElement("authStatus"),
@@ -641,6 +662,14 @@ function flushAdminActions() {
   assert(viewModel.shipping.hasLabel, "Admin view model should mark orders with a trusted label URL.");
   assert(viewModel.labelAction.state === "complete", "Admin label action should show completed labels as non-purchasable.");
   assert(viewModel.subtotalLabel === "$45.89", "Admin view model should format subtotal labels.");
+  const detailMarkup = helpers.buildOrderDetailMarkup({
+    ...normalized,
+    stripeCheckoutSessionId: "cs_secret_detail",
+    stripePaymentIntentId: "pi_secret_detail",
+  });
+  assert(detailMarkup.includes("Payment"), "Admin order detail should include bounded payment status.");
+  assert(detailMarkup.includes("Label ready"), "Admin order detail should include derived shipping progress.");
+  assert(!detailMarkup.includes("cs_secret_detail") && !detailMarkup.includes("pi_secret_detail"), "Admin order detail must omit raw Stripe identifiers.");
 
   const unpaidLabelAction = helpers.buildLabelActionViewModel({ paymentStatus: "unpaid", shippingRateId: "rate_unpaid" });
   assert(unpaidLabelAction.state === "blocked", "Admin label action should block unpaid orders.");
@@ -701,6 +730,13 @@ function flushAdminActions() {
   assert(elements.rows.innerHTML.includes('data-shipping-status="needs_rate"'), "Admin rows should identify orders that still need a trusted shipping rate.");
   assert(elements.rows.innerHTML.includes('data-shipping-status="rate_selected"'), "Admin rows should identify orders with a trusted selected rate.");
   assert(elements.rows.innerHTML.includes('data-shipping-status="label_ready"'), "Admin rows should identify orders with trusted label data.");
+  const detailButton = { dataset: { orderDetail: "REQ-1002" } };
+  elements.rows.listeners.click[0]({ target: detailButton });
+  assert(elements.orderDetailDialog.open, "Admin order detail trigger should open the native dialog.");
+  assert(elements.orderDetailTitle.textContent === "REQ-1002", "Admin order detail should identify the selected order.");
+  assert(elements.orderDetailBody.innerHTML.includes("Rate selected"), "Admin order detail should render the selected order's shipping progress.");
+  elements.orderDetailClose.listeners.click[0]({ type: "click" });
+  assert(!elements.orderDetailDialog.open, "Admin order detail close control should close the dialog.");
   assert(elements.rows.innerHTML.includes('data-status-endpoint="/api/admin/order-status"'), "Admin status controls should point at the trusted backend endpoint.");
   assert(elements.rows.innerHTML.includes("Tracking pending"), "Admin script should render label/tracking status in sample rows.");
   assert(elements.rows.innerHTML.includes("9400100000000000000000"), "Admin script should render trusted tracking numbers in sample rows.");

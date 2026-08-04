@@ -67,6 +67,22 @@
 .admin-action[data-label-action="auth_required"] { border-color: var(--leaf); color: var(--leaf); background: #f2f8ee; }
 .admin-action[data-label-action="complete"] { border-color: var(--field); color: var(--field); background: #f0f6f7; }
 .admin-action:disabled { cursor: not-allowed; opacity: 0.78; }
+.admin-detail-trigger { margin-top: 8px; border: 0; padding: 0; color: var(--field); background: transparent; font-weight: 900; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.admin-detail-trigger:hover, .admin-detail-trigger:focus-visible { color: var(--leaf); }
+.admin-order-dialog { width: min(680px, calc(100% - 32px)); max-height: calc(100vh - 48px); border: 1px solid var(--line); border-radius: 8px; padding: 0; color: var(--ink); background: #fff; box-shadow: 0 24px 70px rgba(37, 33, 27, 0.24); }
+.admin-order-dialog::backdrop { background: rgba(37, 33, 27, 0.58); }
+.admin-order-dialog-shell { display: grid; gap: 20px; padding: 22px; }
+.admin-order-dialog-head { display: flex; justify-content: space-between; gap: 18px; align-items: start; }
+.admin-order-dialog-head h2 { margin: 0; }
+.admin-dialog-close { display: inline-grid; place-items: center; width: 36px; height: 36px; flex: 0 0 36px; border: 1px solid var(--line); border-radius: 7px; padding: 0; color: var(--ink); background: #fbfaf6; font-size: 1.5rem; line-height: 1; }
+.admin-dialog-close:hover, .admin-dialog-close:focus-visible { border-color: var(--field); color: var(--field); }
+.admin-order-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; border-top: 1px solid var(--line); }
+.admin-order-detail-grid div { display: grid; gap: 4px; padding: 12px 8px 12px 0; border-bottom: 1px solid var(--line); }
+.admin-order-detail-grid dt { color: var(--muted); font-size: 0.76rem; font-weight: 900; text-transform: uppercase; }
+.admin-order-detail-grid dd { margin: 0; font-weight: 900; }
+.admin-order-detail-section { display: grid; gap: 6px; padding-top: 16px; border-top: 1px solid var(--line); }
+.admin-order-detail-section h3, .admin-order-detail-section p { margin: 0; }
+.admin-order-detail-section small { color: var(--muted); line-height: 1.45; }
 .payment-pill { display: inline-flex; align-items: center; min-height: 30px; padding: 0 10px; border-radius: 999px; color: #fff; background: var(--leaf); font-size: 0.82rem; font-weight: 900; white-space: nowrap; }
 .payment-pill[data-payment-status="unpaid"] { color: var(--ink); background: var(--corn); }
 .payment-pill[data-payment-status="failed"] { color: #fff; background: #9b2c2c; }
@@ -84,6 +100,7 @@
   .admin-metrics, .admin-layout, .notification-metrics, .social-draft-grid { grid-template-columns: 1fr; }
   .admin-auth-panel { display: grid; }
   .admin-panel-head { display: grid; }
+  .admin-order-detail-grid { grid-template-columns: 1fr; }
 }
 
 @media print {
