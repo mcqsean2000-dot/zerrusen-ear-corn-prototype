@@ -16,8 +16,8 @@ test("accepts supported Firebase CLI versions", () => {
 });
 
 test("requires the approved Firebase account in plain login output", () => {
-  assert.equal(validateFirebaseAccountListing("Logged in as crhags@gmail.com"), true);
-  assert.throws(() => validateFirebaseAccountListing("Logged in as other@example.com"), /crhags@gmail\.com/);
+  assert.equal(validateFirebaseAccountListing("Logged in as theosfeedfarm@gmail.com"), true);
+  assert.throws(() => validateFirebaseAccountListing("Logged in as other@example.com"), /theosfeedfarm@gmail\.com/);
 });
 
 test("requires the approved project in a successful project listing", () => {

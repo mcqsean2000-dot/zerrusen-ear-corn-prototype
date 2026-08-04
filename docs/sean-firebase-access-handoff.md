@@ -6,7 +6,7 @@ This handoff resolves [issue #67](https://github.com/mcqsean2000-dot/zerrusen-ea
 
 - Firebase project ID: `theos-farm-ear-corn`
 - Production domain: `https://theosfarm.com`
-- Account requiring deploy access: `crhags@gmail.com`
+- Account requiring deploy access: `theosfeedfarm@gmail.com`
 
 The project ID and Firebase web configuration are public identifiers. Stripe, Shippo, Resend, Meta, and webhook values remain secrets and must never be placed in this repository or an issue comment.
 
@@ -16,7 +16,7 @@ Only a project Owner, or a member allowed to change IAM policy, can add or chang
 
 1. Open the Firebase console for `theos-farm-ear-corn`.
 2. Open **Project settings** and then **Users and permissions**.
-3. Add `crhags@gmail.com` as a project member.
+3. Add `theosfeedfarm@gmail.com` as a project member.
 4. Grant only the roles needed for the approved work. This repository needs Hosting, Cloud Functions, Firestore rules/indexes, Authentication administration, and Secret Manager setup.
 
 A practical least-privilege starting set is:
@@ -44,7 +44,7 @@ Allow several minutes for IAM propagation. Then run these from the repository ro
 
 ```powershell
 firebase login:list
-firebase login:use crhags@gmail.com
+firebase login:use theosfeedfarm@gmail.com
 firebase projects:list
 firebase use theos-farm-ear-corn
 firebase use

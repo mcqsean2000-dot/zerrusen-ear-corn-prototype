@@ -1,4 +1,4 @@
-const EXPECTED_ACCOUNT = "crhags@gmail.com";
+const EXPECTED_ACCOUNT = "theosfeedfarm@gmail.com";
 const EXPECTED_PROJECT_ID = "theos-farm-ear-corn";
 const MINIMUM_FIREBASE_CLI_VERSION = Object.freeze([15, 23, 0]);
 

@@ -15,7 +15,7 @@ Decision so far:
 Current status and open tasks:
 
 - Domain selected and live: `https://theosfarm.com`.
-- Firebase project identified: `theos-farm-ear-corn`; `crhags@gmail.com` still requires project access for CLI deploys and configuration verification.
+- Firebase project identified: `theos-farm-ear-corn`; the approved business/deploy account `theosfeedfarm@gmail.com` still requires project access for CLI deploys and configuration verification.
 - Firebase Hosting and the production domain are live. The 2026-08-02 storefront includes the reviewed GA4 measurement configuration.
 - Copy `.firebaserc.example` to an ignored local `.firebaserc` only after the deploying account has project access.
 - Document and verify the human-reviewed preview and production deploy flow after access is granted.

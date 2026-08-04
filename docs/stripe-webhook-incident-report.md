@@ -29,8 +29,8 @@ The current local Firebase CLI check found:
 
 - Firebase CLI installed and working at `C:\Users\crhag\AppData\Roaming\npm\firebase.cmd`.
 - Firebase CLI version `15.23.0`.
-- CLI logged in as `crhags@gmail.com`.
-- `firebase projects:list` returned no visible Firebase projects for that login.
+- CLI was historically logged in as `crhags@gmail.com`; that account is not the approved Theo's Farm deployment identity.
+- `firebase projects:list` returned no visible Firebase projects for that historical login.
 - No local `.firebaserc` exists in the repo checkout.
 
 ## Likely Cause
@@ -117,6 +117,6 @@ Then verify:
 
 ## Remaining Risk
 
-- Firebase project access is not currently available to `crhags@gmail.com`, so deploy cannot proceed from this machine until access or project selection is fixed.
+- Firebase project access is not currently available to the approved business/deploy account `theosfeedfarm@gmail.com`, so deploy cannot proceed from this machine until access or project selection is fixed.
 - The Stripe webhook signing secret must come from the exact Stripe test webhook endpoint configured in the Stripe Dashboard.
 - If Stripe test Checkout is active before the webhook is fixed, order fulfillment must be manually reviewed in Stripe Dashboard and Firebase/Firestore.
