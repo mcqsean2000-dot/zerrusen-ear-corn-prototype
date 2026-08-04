@@ -384,6 +384,7 @@ assert(admin.includes("data-admin-content hidden"), "Admin shell must hide fulfi
 assert(admin.includes("data-social-drafts"), "Admin shell must render the social draft review surface.");
 assert(admin.includes("data-social-reconciliation-rows"), "Admin shell must render the social reconciliation queue.");
 assert(admin.includes("data-packing-print"), "Admin shell must render the aggregate packing print control.");
+assert(admin.includes('<th scope="col">Payment</th>'), "Admin shell must include a visible payment status column.");
 assert(adminStyles.includes("@media print"), "Admin stylesheet must define a packing print layout.");
 assert(adminStyles.includes(".admin-layout > :not(#packing)"), "Packing print layout must hide order details.");
 assert(adminStyles.includes("#packing .admin-note"), "Packing print layout must hide non-count helper text.");
@@ -408,6 +409,7 @@ assert(adminScript.includes("buildAdminOrderViewModel"), "Admin shell must centr
 assert(adminScript.includes("buildAdminShippingViewModel"), "Admin shell must centralize shipping view-model building.");
 assert(adminScript.includes("calculateAdminBagCounts"), "Admin shell must centralize bag-count calculations.");
 assert(adminScript.includes("printPackingList"), "Admin shell must centralize the packing print action.");
+assert(adminScript.includes("adminPaymentStatusLabels"), "Admin shell must use bounded trusted payment status labels.");
 assert(adminScript.includes("adminStatusTransitions"), "Admin shell must define constrained status transitions before live status updates.");
 assert(adminScript.includes("labelUrl"), "Admin shell should include trusted label URL display fields.");
 assert(adminScript.includes("trackingNumber"), "Admin shell should include trusted tracking number display fields.");
@@ -549,6 +551,7 @@ function flushAdminActions() {
   assert(!helpers.canTransitionStatus("ready_to_pack", "refunded"), "Admin status transition should block statuses outside the current boundary.");
   assert(Object.isFrozen(helpers.allowedStatuses), "Admin allowed status list should be immutable from the exported helper surface.");
   assert(Object.isFrozen(helpers.statusLabels), "Admin status labels should be immutable from the exported helper surface.");
+  assert(Object.isFrozen(helpers.paymentStatusLabels), "Admin payment status labels should be immutable from the exported helper surface.");
   assert(Object.isFrozen(helpers.statusTransitions), "Admin status transitions should be immutable from the exported helper surface.");
   assert(Object.isFrozen(helpers.statusTransitions.needs_review), "Admin status transition arrays should be immutable from the exported helper surface.");
   try {
@@ -626,6 +629,7 @@ function flushAdminActions() {
 
   const viewModel = helpers.buildOrderViewModel(normalized);
   assert(viewModel.statusLabel === "Needs review", "Admin view model should include status labels.");
+  assert(viewModel.paymentStatusLabel === "Paid", "Admin view model should include a bounded trusted payment label.");
   assert(viewModel.itemSummary.includes("2 x 20 lb Ear Corn Bag"), "Admin view model should include item summaries.");
   assert(viewModel.shipping.carrierService === "UPS Ground", "Admin view model should include carrier and service labels.");
   assert(viewModel.shipping.amountLabel === "$18.42 shipping", "Admin view model should format shipping amount labels.");
@@ -687,6 +691,9 @@ function flushAdminActions() {
   assert(elements.rows.innerHTML.includes('data-label-endpoint="/api/admin/shippo-labels"'), "Admin rows should keep label action routing on the trusted backend endpoint.");
   assert(elements.rows.innerHTML.includes('<button class="admin-action" type="button" disabled'), "Admin label action buttons should remain disabled in the static shell.");
   assert(elements.rows.innerHTML.includes('data-status-action="update"'), "Admin rows should render guarded status action controls.");
+  assert(elements.rows.innerHTML.includes('data-payment-status="paid"'), "Admin rows should render trusted paid status.");
+  assert(elements.rows.innerHTML.includes('data-payment-status="unpaid"'), "Admin rows should render pending status for unpaid orders.");
+  assert(!helpers.buildOrderViewModel({ paymentStatus: "<script>" }).paymentStatusLabel.includes("script"), "Admin payment labels must not echo unknown source values.");
   assert(elements.rows.innerHTML.includes('data-status-endpoint="/api/admin/order-status"'), "Admin status controls should point at the trusted backend endpoint.");
   assert(elements.rows.innerHTML.includes("Tracking pending"), "Admin script should render label/tracking status in sample rows.");
   assert(elements.rows.innerHTML.includes("9400100000000000000000"), "Admin script should render trusted tracking numbers in sample rows.");

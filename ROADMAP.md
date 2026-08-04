@@ -124,7 +124,7 @@ Core admin features:
 
 - Order list
 - Order detail
-- Payment status
+- Payment status. Implemented as a read-only trusted admin indicator.
 - Shipping status
 - Customer contact info
 - Product quantities

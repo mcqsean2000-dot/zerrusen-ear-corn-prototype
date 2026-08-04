@@ -6,6 +6,12 @@ const adminStatusLabels = Object.freeze({
 
 const adminAllowedStatuses = Object.freeze(Object.keys(adminStatusLabels));
 
+const adminPaymentStatusLabels = Object.freeze({
+  paid: "Paid",
+  unpaid: "Payment pending",
+  failed: "Payment failed",
+});
+
 const adminStatusTransitions = Object.freeze({
   needs_review: Object.freeze(["ready_to_pack"]),
   ready_to_pack: Object.freeze(["needs_review", "packed"]),
@@ -115,6 +121,13 @@ function normalizeAdminStatus(status) {
   return isAllowedAdminStatus(status) ? status : "needs_review";
 }
 
+function normalizeAdminPaymentStatus(status) {
+  const normalizedStatus = asText(status).toLowerCase();
+  return Object.prototype.hasOwnProperty.call(adminPaymentStatusLabels, normalizedStatus)
+    ? normalizedStatus
+    : "unpaid";
+}
+
 function getAllowedAdminStatusTransitions(status) {
   return isAllowedAdminStatus(status) ? adminStatusTransitions[status].slice() : [];
 }
@@ -176,7 +189,7 @@ function normalizeAdminOrder(order) {
   return {
     id: asText(order?.id) || "Unassigned",
     customer: normalizeAdminCustomer(order?.customer),
-    paymentStatus: asText(order?.paymentStatus) || "unpaid",
+    paymentStatus: normalizeAdminPaymentStatus(order?.paymentStatus),
     shipping: normalizeAdminShipping(order),
     status: normalizeAdminStatus(order?.status),
     subtotalCents,
@@ -216,6 +229,7 @@ function buildAdminOrderViewModel(order) {
     allowedNextStatuses: getAllowedAdminStatusTransitions(normalizedOrder.status),
     itemSummary,
     paymentStatus: normalizedOrder.paymentStatus,
+    paymentStatusLabel: adminPaymentStatusLabels[normalizedOrder.paymentStatus],
     shipping,
     labelAction,
     subtotalLabel: cents(normalizedOrder.subtotalCents),
@@ -794,6 +808,7 @@ function updateCurrentAdminOrder(orderId, patch) {
 if (typeof window !== "undefined") {
   window.TheosAdminOrders = {
     allowedStatuses: adminAllowedStatuses,
+    paymentStatusLabels: adminPaymentStatusLabels,
     statusLabels: adminStatusLabels,
     statusTransitions: adminStatusTransitions,
     normalizeOrder: normalizeAdminOrder,
@@ -859,6 +874,7 @@ function renderRows(orders) {
       "<tr>",
       "<td><strong>" + escapeHtml(viewModel.customerName) + "</strong><small>" + escapeHtml(viewModel.id) + " - ZIP " + escapeHtml(viewModel.shippingZip) + "</small></td>",
       "<td>" + escapeHtml(viewModel.itemSummary) + "<small>" + escapeHtml(viewModel.subtotalLabel) + " estimated subtotal</small></td>",
+      '<td><span class="payment-pill" data-payment-status="' + escapeHtml(viewModel.paymentStatus) + '">' + escapeHtml(viewModel.paymentStatusLabel) + "</span></td>",
       '<td><span class="status-pill" data-status="' + escapeHtml(viewModel.status) + '">' + escapeHtml(viewModel.statusLabel) + "</span>" + statusSelectMarkup + "</td>",
       "<td><strong>" + escapeHtml(viewModel.shipping.carrierService) + "</strong><small>" + escapeHtml(viewModel.shipping.amountLabel) + " - " + escapeHtml(viewModel.shipping.packageLabel) + "</small><small>" + labelMarkup + " - " + trackingMarkup + "</small></td>",
       "<td>" + escapeHtml(viewModel.contact) + "<small>Prefers " + escapeHtml(viewModel.preferredContact) + "</small></td>",
