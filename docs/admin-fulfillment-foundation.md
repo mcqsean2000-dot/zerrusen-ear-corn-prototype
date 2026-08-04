@@ -16,6 +16,7 @@ The shell uses sample order requests to model the first admin workflows:
 - see customer contact preference and shipping ZIP
 - scan product quantities and estimated subtotal
 - view bounded trusted payment status as paid, pending, or failed without exposing Stripe IDs
+- view shipping progress derived from trusted rate, label, transaction, and tracking fields
 - view daily bag counts for packing
 - print an aggregate packing summary for 20 lb, 40 lb, and total bag counts
 - review trusted shipping label and tracking fields after backend purchase

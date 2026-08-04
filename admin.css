@@ -70,6 +70,10 @@
 .payment-pill { display: inline-flex; align-items: center; min-height: 30px; padding: 0 10px; border-radius: 999px; color: #fff; background: var(--leaf); font-size: 0.82rem; font-weight: 900; white-space: nowrap; }
 .payment-pill[data-payment-status="unpaid"] { color: var(--ink); background: var(--corn); }
 .payment-pill[data-payment-status="failed"] { color: #fff; background: #9b2c2c; }
+.shipping-pill { display: inline-flex; align-items: center; min-height: 26px; margin: 0 0 8px; padding: 0 8px; border-radius: 999px; color: var(--ink); background: var(--corn); font-size: 0.74rem; font-weight: 900; white-space: nowrap; }
+.shipping-pill + strong { display: block; }
+.shipping-pill[data-shipping-status="rate_selected"] { color: #fff; background: var(--field); }
+.shipping-pill[data-shipping-status="label_ready"] { color: #fff; background: var(--leaf); }
 .status-pill { display: inline-flex; align-items: center; min-height: 30px; padding: 0 10px; color: #fff; background: var(--leaf); border-radius: 999px; font-size: 0.82rem; font-weight: 900; }
 .status-pill[data-status="needs_review"] { color: var(--ink); background: var(--corn); }
 .status-pill[data-status="packed"] { background: var(--field); }

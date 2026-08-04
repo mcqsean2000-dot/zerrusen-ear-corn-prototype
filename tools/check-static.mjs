@@ -410,6 +410,7 @@ assert(adminScript.includes("buildAdminShippingViewModel"), "Admin shell must ce
 assert(adminScript.includes("calculateAdminBagCounts"), "Admin shell must centralize bag-count calculations.");
 assert(adminScript.includes("printPackingList"), "Admin shell must centralize the packing print action.");
 assert(adminScript.includes("adminPaymentStatusLabels"), "Admin shell must use bounded trusted payment status labels.");
+assert(adminScript.includes("adminShippingStatusLabels"), "Admin shell must use derived trusted shipping status labels.");
 assert(adminScript.includes("adminStatusTransitions"), "Admin shell must define constrained status transitions before live status updates.");
 assert(adminScript.includes("labelUrl"), "Admin shell should include trusted label URL display fields.");
 assert(adminScript.includes("trackingNumber"), "Admin shell should include trusted tracking number display fields.");
@@ -552,6 +553,7 @@ function flushAdminActions() {
   assert(Object.isFrozen(helpers.allowedStatuses), "Admin allowed status list should be immutable from the exported helper surface.");
   assert(Object.isFrozen(helpers.statusLabels), "Admin status labels should be immutable from the exported helper surface.");
   assert(Object.isFrozen(helpers.paymentStatusLabels), "Admin payment status labels should be immutable from the exported helper surface.");
+  assert(Object.isFrozen(helpers.shippingStatusLabels), "Admin shipping status labels should be immutable from the exported helper surface.");
   assert(Object.isFrozen(helpers.statusTransitions), "Admin status transitions should be immutable from the exported helper surface.");
   assert(Object.isFrozen(helpers.statusTransitions.needs_review), "Admin status transition arrays should be immutable from the exported helper surface.");
   try {
@@ -634,6 +636,8 @@ function flushAdminActions() {
   assert(viewModel.shipping.carrierService === "UPS Ground", "Admin view model should include carrier and service labels.");
   assert(viewModel.shipping.amountLabel === "$18.42 shipping", "Admin view model should format shipping amount labels.");
   assert(viewModel.shipping.trackingLabel === "TRACK123", "Admin view model should include tracking labels.");
+  assert(viewModel.shipping.status === "label_ready", "Admin view model should derive label-ready status from trusted shipping fields.");
+  assert(viewModel.shipping.statusLabel === "Label ready", "Admin view model should label trusted shipping progress.");
   assert(viewModel.shipping.hasLabel, "Admin view model should mark orders with a trusted label URL.");
   assert(viewModel.labelAction.state === "complete", "Admin label action should show completed labels as non-purchasable.");
   assert(viewModel.subtotalLabel === "$45.89", "Admin view model should format subtotal labels.");
@@ -694,6 +698,9 @@ function flushAdminActions() {
   assert(elements.rows.innerHTML.includes('data-payment-status="paid"'), "Admin rows should render trusted paid status.");
   assert(elements.rows.innerHTML.includes('data-payment-status="unpaid"'), "Admin rows should render pending status for unpaid orders.");
   assert(!helpers.buildOrderViewModel({ paymentStatus: "<script>" }).paymentStatusLabel.includes("script"), "Admin payment labels must not echo unknown source values.");
+  assert(elements.rows.innerHTML.includes('data-shipping-status="needs_rate"'), "Admin rows should identify orders that still need a trusted shipping rate.");
+  assert(elements.rows.innerHTML.includes('data-shipping-status="rate_selected"'), "Admin rows should identify orders with a trusted selected rate.");
+  assert(elements.rows.innerHTML.includes('data-shipping-status="label_ready"'), "Admin rows should identify orders with trusted label data.");
   assert(elements.rows.innerHTML.includes('data-status-endpoint="/api/admin/order-status"'), "Admin status controls should point at the trusted backend endpoint.");
   assert(elements.rows.innerHTML.includes("Tracking pending"), "Admin script should render label/tracking status in sample rows.");
   assert(elements.rows.innerHTML.includes("9400100000000000000000"), "Admin script should render trusted tracking numbers in sample rows.");

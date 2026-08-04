@@ -12,6 +12,12 @@ const adminPaymentStatusLabels = Object.freeze({
   failed: "Payment failed",
 });
 
+const adminShippingStatusLabels = Object.freeze({
+  needs_rate: "Needs rate",
+  rate_selected: "Rate selected",
+  label_ready: "Label ready",
+});
+
 const adminStatusTransitions = Object.freeze({
   needs_review: Object.freeze(["ready_to_pack"]),
   ready_to_pack: Object.freeze(["needs_review", "packed"]),
@@ -298,6 +304,9 @@ function buildAdminShippingViewModel(shipping) {
   const trackingNumber = asText(shipping?.trackingNumber);
   const trackingUrl = safeUrl(shipping?.trackingUrl);
   const labelUrl = safeUrl(shipping?.labelUrl);
+  const hasPurchasedLabel = Boolean(labelUrl || asText(shipping?.shippoTransactionId) || trackingNumber);
+  const hasSelectedRate = getAdminLabelRateIds(shipping).length > 0;
+  const status = hasPurchasedLabel ? "label_ready" : hasSelectedRate ? "rate_selected" : "needs_rate";
 
   return {
     amountLabel,
@@ -309,6 +318,8 @@ function buildAdminShippingViewModel(shipping) {
     trackingLabel: trackingNumber || "Tracking pending",
     trackingNumber,
     trackingUrl,
+    status,
+    statusLabel: adminShippingStatusLabels[status],
   };
 }
 
@@ -809,6 +820,7 @@ if (typeof window !== "undefined") {
   window.TheosAdminOrders = {
     allowedStatuses: adminAllowedStatuses,
     paymentStatusLabels: adminPaymentStatusLabels,
+    shippingStatusLabels: adminShippingStatusLabels,
     statusLabels: adminStatusLabels,
     statusTransitions: adminStatusTransitions,
     normalizeOrder: normalizeAdminOrder,
@@ -876,7 +888,7 @@ function renderRows(orders) {
       "<td>" + escapeHtml(viewModel.itemSummary) + "<small>" + escapeHtml(viewModel.subtotalLabel) + " estimated subtotal</small></td>",
       '<td><span class="payment-pill" data-payment-status="' + escapeHtml(viewModel.paymentStatus) + '">' + escapeHtml(viewModel.paymentStatusLabel) + "</span></td>",
       '<td><span class="status-pill" data-status="' + escapeHtml(viewModel.status) + '">' + escapeHtml(viewModel.statusLabel) + "</span>" + statusSelectMarkup + "</td>",
-      "<td><strong>" + escapeHtml(viewModel.shipping.carrierService) + "</strong><small>" + escapeHtml(viewModel.shipping.amountLabel) + " - " + escapeHtml(viewModel.shipping.packageLabel) + "</small><small>" + labelMarkup + " - " + trackingMarkup + "</small></td>",
+      '<td><span class="shipping-pill" data-shipping-status="' + escapeHtml(viewModel.shipping.status) + '">' + escapeHtml(viewModel.shipping.statusLabel) + "</span><strong>" + escapeHtml(viewModel.shipping.carrierService) + "</strong><small>" + escapeHtml(viewModel.shipping.amountLabel) + " - " + escapeHtml(viewModel.shipping.packageLabel) + "</small><small>" + labelMarkup + " - " + trackingMarkup + "</small></td>",
       "<td>" + escapeHtml(viewModel.contact) + "<small>Prefers " + escapeHtml(viewModel.preferredContact) + "</small></td>",
       "<td>" + escapeHtml(viewModel.note) + "</td>",
       "<td>" + actionMarkup + "</td>",
