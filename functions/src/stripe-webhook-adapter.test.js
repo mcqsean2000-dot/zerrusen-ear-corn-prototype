@@ -219,6 +219,113 @@ test("maps payment_intent.payment_failed to trusted failed fields when an order 
   });
 });
 
+test("maps a full charge.refunded event to trusted refunded and canceled fields", async () => {
+  const { calls, deps } = baseDeps();
+  const adapter = createStripeWebhookEventAdapter(deps);
+
+  const result = await adapter({
+    event: {
+      id: "evt_charge_refunded",
+      type: "charge.refunded",
+      data: {
+        object: {
+          id: "ch_test_123",
+          payment_intent: "pi_test_123",
+          amount: 3685,
+          amount_refunded: 3685,
+          refunded: true,
+        },
+      },
+    },
+    env,
+    serverTimestamp: "SERVER_TIMESTAMP",
+  });
+
+  assert.deepEqual(result, {
+    eventId: "evt_charge_refunded",
+    eventType: "charge.refunded",
+    action: "updated_order",
+    orderRequestId: "order_123",
+  });
+  assert.deepEqual(calls[2], {
+    type: "updateOrderRequest",
+    collection: "orderRequests",
+    orderRequestId: "order_123",
+    fields: {
+      stripePaymentIntentId: "pi_test_123",
+      paymentStatus: "refunded",
+      stripePaymentStatus: "refunded",
+      checkoutStatus: "refunded",
+      fulfillmentStatus: "canceled",
+      refundedAt: "SERVER_TIMESTAMP",
+      lastStripeEventId: "evt_charge_refunded",
+      lastStripeEventAt: "SERVER_TIMESTAMP",
+      trustedUpdatedAt: "SERVER_TIMESTAMP",
+    },
+  });
+  assert.equal(calls.at(-1).type, "markStripeEventProcessed");
+});
+
+test("does not cancel fulfillment for a partial charge refund", async () => {
+  const { calls, deps } = baseDeps();
+  const adapter = createStripeWebhookEventAdapter(deps);
+
+  const result = await adapter({
+    event: {
+      id: "evt_charge_partially_refunded",
+      type: "charge.refunded",
+      data: {
+        object: {
+          id: "ch_test_123",
+          payment_intent: "pi_test_123",
+          amount: 3685,
+          amount_refunded: 1000,
+          refunded: false,
+        },
+      },
+    },
+    env,
+  });
+
+  assert.deepEqual(result, {
+    eventId: "evt_charge_partially_refunded",
+    eventType: "charge.refunded",
+    action: "no_op",
+    reason: "partial_refund_not_terminal",
+  });
+  assert.equal(calls.some((call) => call.type === "updateOrderRequest"), false);
+  assert.equal(calls.at(-1).type, "markStripeEventProcessed");
+});
+
+test("replayed charge.refunded events do not update an order twice", async () => {
+  const { calls, deps } = baseDeps({
+    claimStripeEventProcessing({ eventId, eventType }) {
+      calls.push({ type: "claimStripeEventProcessing", eventId, eventType });
+      return false;
+    },
+  });
+  const adapter = createStripeWebhookEventAdapter(deps);
+
+  const result = await adapter({
+    event: {
+      id: "evt_charge_refunded_replay",
+      type: "charge.refunded",
+      data: {
+        object: {
+          payment_intent: "pi_test_123",
+          amount: 3685,
+          amount_refunded: 3685,
+          refunded: true,
+        },
+      },
+    },
+    env,
+  });
+
+  assert.equal(result.action, "replayed_event");
+  assert.equal(calls.some((call) => call.type === "updateOrderRequest"), false);
+});
+
 test("replayed Stripe events do not update orders after an atomic claim miss", async () => {
   const { calls, deps } = baseDeps({
     completePaidOrderEvent(input) {

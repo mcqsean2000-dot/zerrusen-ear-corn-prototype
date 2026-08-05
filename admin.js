@@ -2,14 +2,20 @@ const adminStatusLabels = Object.freeze({
   needs_review: "Needs review",
   ready_to_pack: "Ready to pack",
   packed: "Packed",
+  canceled: "Canceled",
 });
 
-const adminAllowedStatuses = Object.freeze(Object.keys(adminStatusLabels));
+const adminAllowedStatuses = Object.freeze([
+  "needs_review",
+  "ready_to_pack",
+  "packed",
+]);
 
 const adminPaymentStatusLabels = Object.freeze({
   paid: "Paid",
   unpaid: "Payment pending",
   failed: "Payment failed",
+  refunded: "Refunded",
 });
 
 const adminShippingStatusLabels = Object.freeze({
@@ -22,6 +28,7 @@ const adminStatusTransitions = Object.freeze({
   needs_review: Object.freeze(["ready_to_pack"]),
   ready_to_pack: Object.freeze(["needs_review", "packed"]),
   packed: Object.freeze(["ready_to_pack"]),
+  canceled: Object.freeze([]),
 });
 
 const adminBagSkus = Object.freeze({
@@ -224,7 +231,7 @@ function normalizeAdminOrder(order) {
     internalNotes: normalizeAdminInternalNotes(order?.internalNotes),
     paymentStatus: normalizeAdminPaymentStatus(order?.paymentStatus),
     shipping: normalizeAdminShipping(order),
-    status: normalizeAdminStatus(order?.status),
+    status: normalizeAdminStatus(order?.fulfillmentStatus === "canceled" ? "canceled" : order?.status),
     subtotalCents,
     items,
   };
@@ -410,7 +417,9 @@ function buildAdminFulfillmentSummary(orders) {
 }
 
 function getAdminPackableOrders(orders) {
-  return normalizeAdminOrders(orders).filter((order) => order.status !== "needs_review");
+  return normalizeAdminOrders(orders).filter((order) => (
+    order.status === "ready_to_pack" || order.status === "packed"
+  ));
 }
 
 function printPackingList(printImpl) {

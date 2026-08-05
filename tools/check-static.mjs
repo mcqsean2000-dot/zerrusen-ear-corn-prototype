@@ -572,7 +572,7 @@ function flushAdminActions() {
   assert(helpers.canTransitionStatus("ready_to_pack", "packed"), "Admin status transition should allow ready_to_pack to packed.");
   assert(helpers.canTransitionStatus("packed", "ready_to_pack"), "Admin status transition should allow packed correction back to ready_to_pack.");
   assert(!helpers.canTransitionStatus("needs_review", "packed"), "Admin status transition should block skipping from needs_review to packed.");
-  assert(!helpers.canTransitionStatus("ready_to_pack", "refunded"), "Admin status transition should block statuses outside the current boundary.");
+  assert(!helpers.canTransitionStatus("ready_to_pack", "canceled"), "Admin status transition should block webhook-owned canceled status.");
   assert(Object.isFrozen(helpers.allowedStatuses), "Admin allowed status list should be immutable from the exported helper surface.");
   assert(Object.isFrozen(helpers.statusLabels), "Admin status labels should be immutable from the exported helper surface.");
   assert(Object.isFrozen(helpers.paymentStatusLabels), "Admin payment status labels should be immutable from the exported helper surface.");
@@ -697,6 +697,21 @@ function flushAdminActions() {
   const unpaidLabelAction = helpers.buildLabelActionViewModel({ paymentStatus: "unpaid", shippingRateId: "rate_unpaid" });
   assert(unpaidLabelAction.state === "blocked", "Admin label action should block unpaid orders.");
   assert(unpaidLabelAction.label === "Payment required", "Admin label action should explain unpaid order blocking.");
+
+  const refunded = helpers.normalizeOrder({
+    id: "REFUNDED-ORDER",
+    status: "ready_to_pack",
+    fulfillmentStatus: "canceled",
+    paymentStatus: "refunded",
+    shippingRateId: "rate_refunded",
+    items: [{ sku: "ear-corn-20lb", name: "20 lb Ear Corn Bag", quantity: 1, unitPriceCents: 1795 }],
+  });
+  const refundedViewModel = helpers.buildOrderViewModel(refunded);
+  assert(refunded.status === "canceled", "Webhook-canceled orders should not remain ready to pack.");
+  assert(refundedViewModel.statusLabel === "Canceled", "Canceled orders should have a clear fulfillment label.");
+  assert(refundedViewModel.paymentStatusLabel === "Refunded", "Refunded orders should have a clear payment label.");
+  assert(refundedViewModel.labelAction.state === "blocked", "Refunded orders must not allow label purchase.");
+  assert(helpers.getPackableOrders([refunded]).length === 0, "Refunded orders must not appear on packing lists.");
 
   const missingRateLabelAction = helpers.buildLabelActionViewModel({ paymentStatus: "paid" });
   assert(missingRateLabelAction.state === "blocked", "Admin label action should block orders without trusted rates.");
