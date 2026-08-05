@@ -826,7 +826,7 @@ test("prepares admin label purchase only for paid orders with owned rates", asyn
     orderRequest: {
       ...trustedOrderRequest,
       paymentStatus: "paid",
-      shippingRateId: JSON.stringify(["rate_20", "rate_40"]),
+      shippingRateId: "synthetic_combined_rate",
       shippingPackageRateIds: ["rate_20", "rate_40"],
     },
   });
@@ -843,6 +843,18 @@ test("prepares admin label purchase only for paid orders with owned rates", asyn
     paymentStatus: "paid",
     rateId: "rate_20",
   });
+
+  await assert.rejects(
+    adapter.prepareLabelPurchase({
+      admin: {
+        email: "admin@example.test",
+        uid: "admin-user-001",
+      },
+      orderRequestId: "orderRequests_1",
+      rateId: "synthetic_combined_rate",
+    }),
+    (error) => error.code === "shipping_label_rate_mismatch",
+  );
 
   await assert.rejects(
     adapter.prepareLabelPurchase({

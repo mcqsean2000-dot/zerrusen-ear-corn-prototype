@@ -307,10 +307,12 @@ function orderOwnsShippoRate(order, rateId) {
     return false;
   }
 
-  return [
-    cleanText(order && order.shippingRateId),
-    ...normalizeRateIdList(order && order.shippingPackageRateIds),
-  ].includes(selectedRateId);
+  const packageRateIds = normalizeRateIdList(order && order.shippingPackageRateIds);
+  if (packageRateIds.length) {
+    return packageRateIds.includes(selectedRateId);
+  }
+
+  return cleanText(order && order.shippingRateId) === selectedRateId;
 }
 
 async function setDoc(ref, data, options) {

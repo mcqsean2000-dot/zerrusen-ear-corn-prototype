@@ -721,12 +721,14 @@ function flushAdminActions() {
   const readyLabelAction = helpers.buildLabelActionViewModel({
     id: "REQ-2000",
     paymentStatus: "paid",
+    shippingRateId: "synthetic_combined_rate",
     shippingPackageRateIds: ["rate_a", "rate_b"],
   });
   assert(readyLabelAction.state === "auth_required", "Admin label action should gate ready label purchase behind auth wiring.");
   assert(readyLabelAction.endpoint === "/api/admin/shippo-labels", "Admin label action should point to the trusted label endpoint.");
   assert(readyLabelAction.requestBody.orderRequestId === "REQ-2000", "Admin label action should prepare the order id for trusted backend calls.");
   assert(readyLabelAction.requestBody.rateId === "rate_a", "Admin label action should prepare one owned rate id at a time.");
+  assert(readyLabelAction.requestBody.rateId !== "synthetic_combined_rate", "Admin label action must not submit a synthetic combined rate when package rates exist.");
 
   const counts = helpers.calculateBagCounts([
     normalized,

@@ -238,13 +238,15 @@ function normalizeAdminOrder(order) {
 }
 
 function getAdminLabelRateIds(shipping) {
-  const rateIds = [];
-  const rateId = asText(shipping?.rateId);
-  if (rateId) rateIds.push(rateId);
+  const packageRateIds = [];
   if (Array.isArray(shipping?.packageRateIds)) {
-    shipping.packageRateIds.map(asText).filter(Boolean).forEach((packageRateId) => rateIds.push(packageRateId));
+    shipping.packageRateIds.map(asText).filter(Boolean).forEach((packageRateId) => packageRateIds.push(packageRateId));
   }
-  return Array.from(new Set(rateIds));
+  if (packageRateIds.length) {
+    return Array.from(new Set(packageRateIds));
+  }
+  const rateId = asText(shipping?.rateId);
+  return rateId ? [rateId] : [];
 }
 
 function normalizeAdminOrders(orders) {
