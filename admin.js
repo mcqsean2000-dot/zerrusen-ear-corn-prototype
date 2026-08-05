@@ -405,7 +405,7 @@ function calculateAdminBagCounts(orders) {
 
 function buildAdminFulfillmentSummary(orders) {
   const normalizedOrders = normalizeAdminOrders(orders);
-  const counts = calculateAdminBagCounts(normalizedOrders);
+  const counts = calculateAdminBagCounts(getAdminPackableOrders(normalizedOrders));
 
   return {
     orderCount: normalizedOrders.length,

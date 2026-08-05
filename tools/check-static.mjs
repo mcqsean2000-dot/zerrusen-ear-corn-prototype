@@ -712,6 +712,7 @@ function flushAdminActions() {
   assert(refundedViewModel.paymentStatusLabel === "Refunded", "Refunded orders should have a clear payment label.");
   assert(refundedViewModel.labelAction.state === "blocked", "Refunded orders must not allow label purchase.");
   assert(helpers.getPackableOrders([refunded]).length === 0, "Refunded orders must not appear on packing lists.");
+  assert(helpers.buildFulfillmentSummary([refunded]).bagCounts.total === 0, "Refunded orders must not count toward bags today.");
 
   const missingRateLabelAction = helpers.buildLabelActionViewModel({ paymentStatus: "paid" });
   assert(missingRateLabelAction.state === "blocked", "Admin label action should block orders without trusted rates.");
