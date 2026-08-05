@@ -164,7 +164,7 @@ async function claimEvent({ deps, event }) {
   return claimed !== false;
 }
 
-async function handleCheckoutSessionEvent({ deps, collection, event, timestamp }) {
+async function handleCheckoutSessionEvent({ deps, collection, env, event, timestamp }) {
   const session = eventObject(event);
   const checkoutSessionId = String(session.id || "").trim();
 
@@ -192,6 +192,8 @@ async function handleCheckoutSessionEvent({ deps, collection, event, timestamp }
   if (event.type === "checkout.session.completed") {
     const result = { action: "updated_order", orderRequestId };
     const jobs = buildPaidOrderNotifications({
+      adminCc: env.NOTIFICATION_ADMIN_CC,
+      adminEmail: env.NOTIFICATION_ADMIN_EMAIL,
       order: { ...order, ...fields },
       orderRequestId,
       paidEventId: event.id,
@@ -325,7 +327,7 @@ function createStripeWebhookEventAdapter(deps = {}) {
     const timestamp = serverTimestamp || "FIRESTORE_SERVER_TIMESTAMP_REQUIRED";
     let result;
     if (event.type === "checkout.session.completed" || event.type === "checkout.session.expired") {
-      result = await handleCheckoutSessionEvent({ deps, collection, event, timestamp });
+      result = await handleCheckoutSessionEvent({ deps, collection, env, event, timestamp });
     } else if (event.type === "payment_intent.payment_failed") {
       result = await handlePaymentIntentFailed({ deps, collection, event, timestamp });
     } else if (event.type === "charge.refunded") {

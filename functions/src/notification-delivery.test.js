@@ -13,10 +13,11 @@ function claimedJob(attempt = 1) {
   return {
     attempt,
     job: {
+      cc: "theosfeedfarm@gmail.com",
       idempotencyKey,
       subject: "Paid order",
       text: "Trusted paid order summary",
-      to: "theosfeedfarm@gmail.com",
+      to: "zerrusen.farm@gmail.com",
     },
   };
 }
@@ -67,10 +68,11 @@ test("claims, sends, and records one notification", async () => {
   assert.deepEqual(calls.map((call) => call.type), ["claim", "send", "success"]);
   assert.deepEqual(calls[1], {
     type: "send",
+    cc: "theosfeedfarm@gmail.com",
     idempotencyKey,
     subject: "Paid order",
     text: "Trusted paid order summary",
-    to: "theosfeedfarm@gmail.com",
+    to: "zerrusen.farm@gmail.com",
   });
 });
 

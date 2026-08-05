@@ -111,7 +111,11 @@ test("maps checkout.session.completed to trusted paid and complete fields", asyn
 
   const result = await adapter({
     event: checkoutSessionEvent("checkout.session.completed"),
-    env,
+    env: {
+      ...env,
+      NOTIFICATION_ADMIN_CC: "theosfeedfarm@gmail.com",
+      NOTIFICATION_ADMIN_EMAIL: "zerrusen.farm@gmail.com",
+    },
     serverTimestamp: "SERVER_TIMESTAMP",
   });
 
@@ -149,6 +153,8 @@ test("maps checkout.session.completed to trusted paid and complete fields", asyn
   });
   assert.deepEqual(calls[1].jobs.map((job) => job.recipientCategory), ["customer", "admin"]);
   assert.equal(calls[1].jobs.every((job) => job.paidEventId === "evt_checkout_session_completed"), true);
+  assert.equal(calls[1].jobs[1].to, "zerrusen.farm@gmail.com");
+  assert.equal(calls[1].jobs[1].cc, "theosfeedfarm@gmail.com");
 });
 
 test("maps checkout.session.expired to trusted expired and unpaid fields", async () => {

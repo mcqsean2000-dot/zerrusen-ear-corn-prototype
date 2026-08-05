@@ -40,6 +40,7 @@ function normalizeClaim(claim, idempotencyKey, maxAttempts) {
   if (!claim) return null;
   const attempt = Number(claim.attempt);
   const job = claim.job && typeof claim.job === "object" ? claim.job : {};
+  const cc = cleanText(job.cc, 254).toLowerCase();
   if (
     !Number.isInteger(attempt) ||
     attempt < 1 ||
@@ -61,6 +62,7 @@ function normalizeClaim(claim, idempotencyKey, maxAttempts) {
       subject: cleanText(job.subject, 200),
       text: cleanText(job.text, 10000),
       to: cleanText(job.to, 254).toLowerCase(),
+      ...(cc ? { cc } : {}),
     },
   };
 }

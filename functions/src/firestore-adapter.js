@@ -9,6 +9,7 @@ const DEFAULT_NOTIFICATION_OUTBOX_COLLECTION = "notificationOutbox";
 const DEFAULT_SOCIAL_POST_QUEUE_COLLECTION = "socialPostQueue";
 const SERVER_TIMESTAMP_SENTINEL = "FIRESTORE_SERVER_TIMESTAMP_REQUIRED";
 const NOTIFICATION_JOB_FIELDS = Object.freeze([
+  "cc",
   "eventName",
   "idempotencyKey",
   "orderRequestId",
@@ -110,6 +111,7 @@ function trustedNotificationJob(job) {
   const subject = cleanText(cleaned.subject);
   const text = cleanText(cleaned.text);
   const to = cleanText(cleaned.to).toLowerCase();
+  const cc = cleanText(cleaned.cc).toLowerCase();
   const summaryDate = cleanText(cleaned.summaryDate);
   const isDailySummary = cleaned.eventName === "admin.daily_fulfillment_summary";
   const expectedRecipient = cleaned.eventName === "customer.order_confirmation" ? "customer" : "admin";
@@ -140,6 +142,7 @@ function trustedNotificationJob(job) {
     idempotencyKey !== expectedIdempotencyKey ||
     to.length > 254 ||
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to) ||
+    (cc && (cc.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cc))) ||
     !subject ||
     subject.length > 200 ||
     !text ||
@@ -158,6 +161,7 @@ function trustedNotificationJob(job) {
     subject,
     text,
     to,
+    ...(cc ? { cc } : {}),
   };
 }
 
