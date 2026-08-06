@@ -73,7 +73,7 @@ Implemented:
 - `POST /api/shipping-rates` calculates live Shippo rates from server-owned package specs.
 - Storefront collects full shipping address and lets customers choose a returned shipping option.
 - Checkout handoff now carries the selected shipping rate and backend code re-rates it server-side before Stripe Checkout.
-- Stripe payment remains disabled in public config until the client's Stripe account and production endpoint are ready.
+- Stripe Checkout has processed live payments. While issue #69 remains open, the deployed safety guard rejects checkout, rates, and label purchase whenever Stripe is live but Shippo is configured with a test token.
 
 Checkout shipping flow:
 
@@ -179,8 +179,8 @@ Implemented foundation:
 - Transactional Firestore delivery adapters now enforce one active attempt, stale-worker rejection, retry state, and terminal sent/failed states.
 - A Resend-compatible HTTP adapter now sends plain-text jobs with stable provider idempotency keys and sanitized error classification.
 - Delivery runtime composition fails closed behind an explicit enable flag and complete server-side configuration.
-- The Firebase runtime exports a retrying Firestore outbox-created trigger with function-scoped Resend secret access. Its SDK-free adapter rejects mismatched event IDs and logs only safe delivery outcomes; it has not been deployed or enabled.
-- A separately enabled ten-minute reconciliation schedule queries bounded pending/retryable outbox IDs, transactionally recovers processing leases older than 15 minutes, terminates exhausted jobs, and reuses transactional claims without concurrent duplicate sends.
+- The Firebase runtime exports a retrying Firestore outbox-created trigger with function-scoped Resend secret access. Its SDK-free adapter rejects mismatched event IDs and logs only safe delivery outcomes. The production delivery function has been deployed, and paid-order admin alert routing is reported active with the approved primary and CC inboxes.
+- A separately enabled ten-minute reconciliation schedule queries bounded pending/retryable outbox IDs, transactionally recovers processing leases older than 15 minutes, terminates exhausted jobs, and reuses transactional claims without concurrent duplicate sends. The reconciliation function has been deployed; its production enablement and controlled delivery evidence remain tracked in issue #71.
 - A provider-neutral daily fulfillment summary builder now counts the three supported fulfillment states and 20 lb/40 lb bags while omitting private notes, contact details, and Stripe fields.
 - Trusted Firestore composition now queries paid orders across supported fulfillment states and idempotently enqueues one daily summary job. The required payment/status compound index is included.
 - A scheduler-ready dispatcher derives the farm business date in Central Time, calls only the trusted daily enqueue path, and fails closed without an explicit enable flag and valid configuration.
@@ -188,12 +188,12 @@ Implemented foundation:
 
 Remaining:
 
-- Create and inject a restricted Resend sending key, verify the sender domain, and approve the sender/reply-to addresses.
-- Create the Firebase Secret Manager `RESEND_API_KEY`, then review and deploy the guarded outbox trigger while `NOTIFICATION_DELIVERY_ENABLED=false`.
-- Review the ten-minute reconciliation interval, then explicitly enable reconciliation only after the sender and delivery trigger have passed production verification.
+- Verify the restricted Resend key, sender domain, and approved sender/reply-to addresses in the production project without exposing secret values.
+- Verify the deployed Resend secret, sender domain, sender/reply-to values, and `NOTIFICATION_DELIVERY_ENABLED` state against the production project without exposing secret values.
+- Record one controlled customer confirmation and one admin alert delivery, then confirm reconciliation behavior and close issue #71 only after the evidence is complete.
 - Review the 8:00 AM Central operating time, deploy the scheduled function and compound index, then explicitly enable the summary after production verification.
 
-Use `docs/notification-boundary-plan.md` for the first notification event and payload boundary before choosing a provider or adding live email sends.
+Use `docs/notification-boundary-plan.md` as the payload-boundary reference and `docs/notification-production-activation.md` for controlled Resend production verification.
 
 Later:
 
@@ -219,11 +219,11 @@ Build order:
 
 1. Confirm domain. Done: `theosfarm.com`.
 2. Keep the current static storefront while it remains maintainable; no framework migration is required for launch.
-3. Build product catalog and checkout flow. Implemented; production activation and one end-to-end test remain.
+3. Build product catalog and checkout flow. Implemented and live; incident closure and a controlled end-to-end verification remain.
 4. Add Shippo rate quoting from server-owned package specs. Done.
-5. Add Stripe Checkout with selected shipping. Backend handoff implemented; production credentials/config still pending.
-6. Add order persistence. Implemented in trusted Firebase composition; production verification remains.
-7. Add Stripe webhooks. Implemented; production secret/configuration and delivery verification remain.
+5. Add Stripe Checkout with selected shipping. Implemented and used in production; the Stripe-live/Shippo-test incident remains open under issue #69.
+6. Add order persistence. Implemented in trusted Firebase composition; refund retry safety and production verification remain.
+7. Add Stripe webhooks. Implemented and receiving production events; subscription documentation, terminal-state protection, and traced delivery verification remain.
 8. Build admin fulfillment dashboard. Implemented; production Auth setup and claimed-admin smoke testing remain.
    - Static admin planning shell now exists at `admin.html`.
    - Backend admin label/status routes now require Firebase Auth admin custom-claim verification.
@@ -231,11 +231,20 @@ Build order:
    - The admin bridge uses Firebase Hosting public auto config and hides fulfillment data until a refreshed ID token contains `admin: true`.
    - Next step is enabling the Google provider, authorizing `theosfarm.com`, creating the approved admin account, granting its custom claim, and verifying rules and sign-in in a Firebase preview.
 9. Add Shippo label purchase and tracking updates in admin. Implemented; controlled production verification remains.
-10. Add email notifications. Paid-order outbox queueing and guarded Firebase delivery wiring are implemented; provider account setup, deployment, and explicit enablement remain.
+10. Add email notifications. Paid-order outbox queueing, delivery, reconciliation, and admin alert routing are deployed; controlled acceptance evidence and daily-summary verification remain.
 11. Deploy the public storefront to Firebase Hosting. Live; establish repeatable coordinator deploy access.
 12. Point production domain. Done: `theosfarm.com`.
 13. Run test orders.
 14. Launch.
+
+## Current Production Incident And Follow-Ups
+
+- Issue #69 is the incident source of truth. The commerce/fulfillment change freeze remains active until the incident owner explicitly closes it.
+- Replace the Shippo test token with the approved live token, create a new live shipment/rate for the affected paid order, and buy its label only through the controlled recovery procedure.
+- [Issue #75](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/75): model labels per package so multi-package orders cannot become label-complete after only one successful label purchase.
+- [Issue #76](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/76): make refund event claiming and order mutation atomic or recoverable after transient Firestore failure.
+- [Issue #77](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/77): preserve terminal refunded/canceled state when delayed Checkout completion events arrive.
+- [Issue #78](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/78): align the Stripe webhook runbook with the production `charge.refunded` subscription and retain sanitized traced evidence.
 
 ## Maintenance Plan
 
