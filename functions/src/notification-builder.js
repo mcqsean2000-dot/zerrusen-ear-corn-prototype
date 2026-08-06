@@ -114,8 +114,9 @@ function buildCustomerJob({ customer, itemSummary, orderRequestId, paidEventId, 
   };
 }
 
-function buildAdminJob({ adminEmail, customer, itemSummary, notePresent, orderRequestId, paidEventId, shippingZip, subtotalCents }) {
+function buildAdminJob({ adminCc, adminEmail, customer, itemSummary, notePresent, orderRequestId, paidEventId, shippingZip, subtotalCents }) {
   const to = normalizeEmail(adminEmail);
+  const cc = normalizeEmail(adminCc);
   if (!to) {
     const error = new Error("Paid order notifications require a valid admin email.");
     error.code = "notification_admin_email_invalid";
@@ -146,10 +147,12 @@ function buildAdminJob({ adminEmail, customer, itemSummary, notePresent, orderRe
       "Fulfillment status: needs review",
     ].join("\n"),
     to,
+    ...(cc && cc !== to ? { cc } : {}),
   };
 }
 
 function buildPaidOrderNotifications({
+  adminCc = "",
   adminEmail = DEFAULT_ADMIN_EMAIL,
   order,
   orderRequestId: requestedOrderId,
@@ -201,7 +204,7 @@ function buildPaidOrderNotifications({
     subtotalCents,
   };
   const customerJob = buildCustomerJob(common);
-  const adminJob = buildAdminJob({ ...common, adminEmail });
+  const adminJob = buildAdminJob({ ...common, adminCc, adminEmail });
 
   return [customerJob, adminJob].filter(Boolean);
 }

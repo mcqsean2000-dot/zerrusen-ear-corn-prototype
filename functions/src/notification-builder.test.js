@@ -38,7 +38,11 @@ function paidOrder(overrides = {}) {
 }
 
 test("builds customer and admin jobs from trusted paid order fields", () => {
-  const jobs = buildPaidOrderNotifications({ order: paidOrder() });
+  const jobs = buildPaidOrderNotifications({
+    adminCc: "theosfeedfarm@gmail.com",
+    adminEmail: "zerrusen.farm@gmail.com",
+    order: paidOrder(),
+  });
 
   assert.equal(jobs.length, 2);
   assert.deepEqual(jobs.map((job) => job.eventName), [
@@ -46,7 +50,8 @@ test("builds customer and admin jobs from trusted paid order fields", () => {
     "admin.paid_order_created",
   ]);
   assert.equal(jobs[0].to, "customer@example.com");
-  assert.equal(jobs[1].to, "theosfeedfarm@gmail.com");
+  assert.equal(jobs[1].to, "zerrusen.farm@gmail.com");
+  assert.equal(jobs[1].cc, "theosfeedfarm@gmail.com");
   assert.match(jobs[0].text, /2 x 20 lb Ear Corn Bag - \$35\.90/);
   assert.match(jobs[0].text, /Subtotal: \$65\.85/);
   assert.match(jobs[1].text, /Customer note present: yes/);

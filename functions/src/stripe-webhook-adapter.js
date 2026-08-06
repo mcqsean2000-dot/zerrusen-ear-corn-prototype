@@ -121,6 +121,20 @@ function paymentFailedFields({ event, paymentIntent, timestamp }) {
   });
 }
 
+function chargeRefundedFields({ event, charge, timestamp }) {
+  return withoutUndefinedFields({
+    stripePaymentIntentId: normalizeStripeId(charge.payment_intent) || undefined,
+    paymentStatus: "refunded",
+    stripePaymentStatus: "refunded",
+    checkoutStatus: "refunded",
+    fulfillmentStatus: "canceled",
+    refundedAt: timestamp,
+    lastStripeEventId: event.id,
+    lastStripeEventAt: timestamp,
+    trustedUpdatedAt: timestamp,
+  });
+}
+
 function orderMatchesStripeReference(order, stripeObject) {
   const orderRequestId = normalizeOrderId(order);
   const metadataId = metadataOrderId(stripeObject);
@@ -150,7 +164,7 @@ async function claimEvent({ deps, event }) {
   return claimed !== false;
 }
 
-async function handleCheckoutSessionEvent({ deps, collection, event, timestamp }) {
+async function handleCheckoutSessionEvent({ deps, collection, env, event, timestamp }) {
   const session = eventObject(event);
   const checkoutSessionId = String(session.id || "").trim();
 
@@ -178,6 +192,8 @@ async function handleCheckoutSessionEvent({ deps, collection, event, timestamp }
   if (event.type === "checkout.session.completed") {
     const result = { action: "updated_order", orderRequestId };
     const jobs = buildPaidOrderNotifications({
+      adminCc: env.NOTIFICATION_ADMIN_CC,
+      adminEmail: env.NOTIFICATION_ADMIN_EMAIL,
       order: { ...order, ...fields },
       orderRequestId,
       paidEventId: event.id,
@@ -252,6 +268,51 @@ async function handlePaymentIntentFailed({ deps, collection, event, timestamp })
   return { action: "updated_order", orderRequestId };
 }
 
+async function handleChargeRefunded({ deps, collection, event, timestamp }) {
+  const charge = eventObject(event);
+  const paymentIntentId = normalizeStripeId(charge.payment_intent);
+  const fullyRefunded = charge.refunded === true
+    && Number.isInteger(charge.amount)
+    && Number.isInteger(charge.amount_refunded)
+    && charge.amount > 0
+    && charge.amount_refunded >= charge.amount;
+
+  if (!paymentIntentId) {
+    return { action: "no_op", reason: "payment_intent_id_missing" };
+  }
+  if (!fullyRefunded) {
+    return { action: "no_op", reason: "partial_refund_not_terminal" };
+  }
+
+  const order = await deps.findOrderByPaymentIntentId({
+    collection,
+    stripePaymentIntentId: paymentIntentId,
+  });
+  if (!order) {
+    return { action: "retry_later", reason: "order_not_found" };
+  }
+
+  const orderRequestId = normalizeOrderId(order);
+  if (!orderRequestId) {
+    return { action: "retry_later", reason: "order_request_id_missing" };
+  }
+
+  const claimed = await claimEvent({ deps, event });
+  if (!claimed) {
+    return { action: "replayed_event", eventId: event.id };
+  }
+
+  const fields = chargeRefundedFields({ event, charge, timestamp });
+  assertTrustedFields(fields);
+  await deps.updateOrderRequest({
+    collection,
+    orderRequestId,
+    fields,
+  });
+
+  return { action: "updated_order", orderRequestId };
+}
+
 function createStripeWebhookEventAdapter(deps = {}) {
   return async function handleVerifiedStripeEvent({ event, env = {}, serverTimestamp } = {}) {
     assertAdapterDependencies(deps);
@@ -266,9 +327,11 @@ function createStripeWebhookEventAdapter(deps = {}) {
     const timestamp = serverTimestamp || "FIRESTORE_SERVER_TIMESTAMP_REQUIRED";
     let result;
     if (event.type === "checkout.session.completed" || event.type === "checkout.session.expired") {
-      result = await handleCheckoutSessionEvent({ deps, collection, event, timestamp });
+      result = await handleCheckoutSessionEvent({ deps, collection, env, event, timestamp });
     } else if (event.type === "payment_intent.payment_failed") {
       result = await handlePaymentIntentFailed({ deps, collection, event, timestamp });
+    } else if (event.type === "charge.refunded") {
+      result = await handleChargeRefunded({ deps, collection, event, timestamp });
     } else {
       const claimed = await claimEvent({ deps, event });
       if (!claimed) {

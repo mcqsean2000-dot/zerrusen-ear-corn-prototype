@@ -65,6 +65,11 @@ function getMissingEnv(env, keys) {
   return keys.filter((key) => isPlaceholder(env[key]));
 }
 
+function hasLiveStripeWithTestShippo(env = {}) {
+  return /^sk_live_/i.test(String(env.STRIPE_SECRET_KEY || "").trim())
+    && /^shippo_test_/i.test(String(env.SHIPPO_API_TOKEN || "").trim());
+}
+
 function getHeader(req, name) {
   const target = name.toLowerCase();
   const headers = req.headers || {};
@@ -537,6 +542,15 @@ async function checkoutSessionsHandler(req, res, options = {}) {
     }, corsHeaders);
   }
 
+  if (hasLiveStripeWithTestShippo(env)) {
+    return sendJson(res, 503, {
+      error: {
+        code: "shipping_configuration_mode_mismatch",
+        message: "Checkout is temporarily unavailable while live shipping is being configured. Please contact Theo's Farm.",
+      },
+    }, corsHeaders);
+  }
+
   if (options.checkoutAdapterDependencies) {
     const missingAdapterDependencies = getMissingCheckoutAdapterDependencies(options.checkoutAdapterDependencies);
     if (missingAdapterDependencies.length) {
@@ -663,6 +677,15 @@ async function shippingRatesHandler(req, res, options = {}) {
         message: "Use POST to request shipping rates.",
       },
     }, { allow: "POST, OPTIONS", ...corsHeaders });
+  }
+
+  if (hasLiveStripeWithTestShippo(env)) {
+    return sendJson(res, 503, {
+      error: {
+        code: "shipping_configuration_mode_mismatch",
+        message: "Live shipping rates are temporarily unavailable. Please contact Theo's Farm.",
+      },
+    }, corsHeaders);
   }
 
   let body;
@@ -795,6 +818,15 @@ async function adminShippingLabelsHandler(req, res, options = {}) {
         ...safeSetupDetails(env, missingEnv),
       }, corsHeaders);
     }
+  }
+
+  if (hasLiveStripeWithTestShippo(env)) {
+    return sendJson(res, 503, {
+      error: {
+        code: "shipping_configuration_mode_mismatch",
+        message: "A live Shippo API token is required before purchasing production labels.",
+      },
+    }, corsHeaders);
   }
 
   const dependencies = buildDefaultShippingLabelDependencies(env, options);

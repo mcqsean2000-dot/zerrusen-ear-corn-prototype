@@ -8,10 +8,11 @@ const {
 } = require("./resend-email-adapter");
 
 const notification = {
+  cc: "theosfeedfarm@gmail.com",
   idempotencyKey: "admin.paid_order_created:order_123:evt_123",
   subject: "Paid order ready for review",
   text: "Trusted paid order summary",
-  to: "theosfeedfarm@gmail.com",
+  to: "zerrusen.farm@gmail.com",
 };
 
 test("sends a trusted notification with Resend idempotency", async () => {
@@ -40,7 +41,8 @@ test("sends a trusted notification with Resend idempotency", async () => {
   assert.equal(request.options.headers["idempotency-key"], notification.idempotencyKey);
   assert.deepEqual(JSON.parse(request.options.body), {
     from: "Theo's Farm <orders@example.test>",
-    to: ["theosfeedfarm@gmail.com"],
+    to: ["zerrusen.farm@gmail.com"],
+    cc: ["theosfeedfarm@gmail.com"],
     subject: notification.subject,
     text: notification.text,
     reply_to: "theosfeedfarm@gmail.com",

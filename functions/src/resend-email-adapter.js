@@ -31,13 +31,15 @@ function trustedNotification(notification = {}) {
   const subject = cleanText(notification.subject, 200);
   const text = cleanText(notification.text, 10000);
   const to = cleanText(notification.to, 254).toLowerCase();
+  const cc = cleanText(notification.cc, 254).toLowerCase();
 
   if (
     !idempotencyKey ||
     rawIdempotencyKey.length > 256 ||
     !subject ||
     !text ||
-    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to) ||
+    (cc && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cc))
   ) {
     const error = new Error("Resend requires a trusted notification payload.");
     error.code = "resend_notification_invalid";
@@ -45,7 +47,7 @@ function trustedNotification(notification = {}) {
     throw error;
   }
 
-  return { idempotencyKey, subject, text, to };
+  return { idempotencyKey, subject, text, to, ...(cc ? { cc } : {}) };
 }
 
 async function parseJsonResponse(response) {
@@ -89,6 +91,7 @@ function createResendEmailSender(options = {}) {
         body: JSON.stringify({
           from,
           to: [notification.to],
+          ...(notification.cc ? { cc: [notification.cc] } : {}),
           subject: notification.subject,
           text: notification.text,
           ...(replyTo ? { reply_to: replyTo } : {}),

@@ -146,6 +146,27 @@ test("checkout handler returns disabled mock response when env is missing", asyn
   assert.equal(parseJson(res).mock, true);
 });
 
+test("checkout handler blocks live Stripe payments when Shippo is in test mode", async () => {
+  const req = mockReq({
+    body: {
+      orderRequest: validOrderRequest,
+      ...validShippingCheckoutFields(),
+    },
+  });
+  const res = mockRes();
+
+  await checkoutSessionsHandler(req, res, {
+    env: {
+      ...configuredEnv,
+      ...configuredShippingEnv,
+      STRIPE_SECRET_KEY: "sk_live_configured_for_unit_tests",
+    },
+  });
+
+  assert.equal(res.statusCode, 503);
+  assert.equal(parseJson(res).error.code, "shipping_configuration_mode_mismatch");
+});
+
 test("checkout handler supports CORS preflight for configured storefront origin", async () => {
   const req = mockReq({
     method: "OPTIONS",
@@ -393,6 +414,27 @@ test("shipping rates handler returns disabled response when Shippo token is miss
   assert.equal(parseJson(res).error.code, "shipping_rates_disabled");
 });
 
+test("shipping rates handler blocks test rates for live Stripe checkout", async () => {
+  const req = mockReq({
+    body: {
+      orderRequest: validOrderRequest,
+      shippingAddress: validShippingCheckoutFields().shippingAddress,
+    },
+  });
+  const res = mockRes();
+
+  await shippingRatesHandler(req, res, {
+    env: {
+      ...configuredEnv,
+      ...configuredShippingEnv,
+      STRIPE_SECRET_KEY: "sk_live_configured_for_unit_tests",
+    },
+  });
+
+  assert.equal(res.statusCode, 503);
+  assert.equal(parseJson(res).error.code, "shipping_configuration_mode_mismatch");
+});
+
 test("shipping rates handler requires sender address before live Shippo lookup", async () => {
   const req = mockReq({
     body: {
@@ -529,6 +571,28 @@ test("admin shipping label handler returns disabled response when Shippo token i
 
   assert.equal(res.statusCode, 503);
   assert.equal(parseJson(res).error.code, "shipping_label_purchase_disabled");
+});
+
+test("admin shipping label handler explains live Stripe and test Shippo mismatch", async () => {
+  const req = mockReq({
+    body: {
+      orderRequestId: "order_123",
+      rateId: "rate_123",
+    },
+  });
+  const res = mockRes();
+
+  await adminShippingLabelsHandler(req, res, {
+    authenticateAdminRequest,
+    env: {
+      SHIPPO_API_TOKEN: "shippo_test_configured_for_unit_tests",
+      STRIPE_SECRET_KEY: "sk_live_configured_for_unit_tests",
+    },
+  });
+
+  assert.equal(res.statusCode, 503);
+  assert.equal(parseJson(res).error.code, "shipping_configuration_mode_mismatch");
+  assert.match(parseJson(res).error.message, /live Shippo API token/i);
 });
 
 test("admin order status handler reports missing trusted persistence dependency", async () => {
