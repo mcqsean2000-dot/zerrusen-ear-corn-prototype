@@ -26,10 +26,10 @@ This repo contains the Theo's Farm direct-to-consumer ear corn storefront and it
 - Fulfillment: shipping only. No local pickup.
 - Shipping direction: Shippo for live rates, address validation, labels, and tracking.
 - Payments direction: Stripe Checkout with Google Pay enabled through Stripe.
-- Farm/admin email account: `theosfeedfarm@gmail.com` for business account setup and future order notifications.
+- Farm account email: `theosfeedfarm@gmail.com` for business account setup and the approved CC on paid-order admin alerts.
 - Facebook profile: `Theos Farm` for the farm's new Facebook presence tied to the email account.
 - Instagram account: `theosfeedfarm` for the farm's new Instagram presence tied to the email account.
-- Storefront flow: cart selections feed a shipping address form, live Shippo rate lookup, and customer-selected shipping option before the future Stripe Checkout handoff.
+- Storefront flow: cart selections feed a shipping address form, live Shippo rate lookup, customer-selected shipping, and Stripe Checkout.
 - Public hosting direction: Firebase Hosting.
 - Firebase/Firestore/Functions are the selected production foundation because the same Firebase ecosystem is already used for EasiTask and Debris Locator.
 - Old Zerrusen Farms informational site should remain separate from Theo's Farm as a separate business/site.
@@ -39,10 +39,19 @@ This repo contains the Theo's Farm direct-to-consumer ear corn storefront and it
 - [#58](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/58) - trace one approved GA4 test purchase.
 - [#67](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/67) - restore Firebase deploy access and verify the release flow.
 - [#68](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/68) - approve product facts and remove the prototype disclaimer.
-- [#69](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/69) - activate and test Stripe, Shippo, webhook, and trusted order persistence.
+- [#69](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/69) - close the Stripe/Shippo production incident and finish controlled webhook, fulfillment, and trusted-order verification.
 - [#70](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/70) - complete production Google admin sign-in.
 - [#71](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/71) - activate Resend notifications with controlled tests.
 - [#72](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/72) - configure Meta credentials and run controlled Facebook/Instagram tests.
+
+## Production Safety Follow-Ups
+
+- The commerce/fulfillment change freeze remains in effect until issue #69 is explicitly closed. Do not change or deploy Stripe, Shippo, checkout, webhook, label, or fulfillment runtime behavior without incident-owner approval.
+- The deployed API rejects checkout, rates, and label purchase when Stripe is live but Shippo is configured with a test token. The affected paid order still requires a new live Shippo shipment/rate and controlled label purchase after a live token is available.
+- Multi-package fulfillment still needs per-package label persistence, idempotency, and completion tracking; buying one label must not make the whole order appear complete.
+- Refund webhook processing still needs a retry-safe claim/update boundary so a transient Firestore failure cannot permanently consume an event.
+- A delayed `checkout.session.completed` event must not reopen an order already in a terminal refunded/canceled state or enqueue duplicate alerts.
+- Production Stripe event subscriptions and the traced evidence for `charge.refunded` should be reconciled with the deployment runbook even where dashboard configuration has already been corrected.
 
 ## Client-Provided Business Notes
 
@@ -145,8 +154,8 @@ Natural search phrases to keep in mind:
 ## Important Notes
 
 - Current prices are placeholders and should be confirmed before launch.
-- The customer flow is connected to relative Firebase API routes for Shippo rates and Stripe Checkout. Trusted order persistence, webhook handling, admin label purchase, and notification delivery are implemented; production secrets, enable flags, and end-to-end activation still require Firebase project access and controlled tests.
-- Completed Stripe Checkout events atomically mark the order paid, create deterministic customer/admin Firestore outbox jobs, and mark the Stripe event processed. Trusted composition can also query the bounded paid fulfillment queue and enqueue one idempotent daily summary. The Firebase runtime exports an 8:00 AM Central summary schedule, an outbox-created delivery trigger, and a bounded ten-minute reconciliation schedule. All remain inert unless their explicit enable flags and required server-side configuration are present. This work does not deploy or enable them.
+- The customer flow is connected to relative Firebase API routes for Shippo rates and Stripe Checkout. Trusted order persistence, webhook handling, admin label purchase, and notification delivery are implemented. Production is operating behind incident guardrails while issue #69 remains open; additional activation and verification work still requires Firebase project access and controlled tests.
+- Completed Stripe Checkout events mark orders paid and create deterministic customer/admin Firestore outbox jobs. The production API, notification outbox delivery function, and reconciliation function have been deployed, and paid-order admin alerts are routed to the approved primary inbox with the farm inbox copied. Existing already-sent notifications are unchanged. The separate 8:00 AM Central daily-summary schedule still requires explicit production verification before the roadmap can mark it active.
 - The Firebase-hosted admin shell supports Google sign-in plus an email/password fallback. Fulfillment content and actions remain hidden until Firebase Auth returns an `admin: true` custom claim; signing in with an ordinary Google account does not grant access.
 - Authenticated admin API routes and visible admin controls can list social posts in `needs_reconciliation` and record an audited publish, retry-confirmed-safe, or skip resolution. The admin page automatically generates the next Monday-through-Sunday seven-post batch in Central Time, displays every caption/image/schedule for review, and queues the full week through one explicit confirmation. Each queue write remains individually validated and idempotent.
 - Production admin config is loaded from Firebase Hosting's public `/__/firebase/init.json` endpoint. Enable the Google provider, authorize the production domain, create the approved admin account, and grant its custom claim before launch.
