@@ -241,10 +241,10 @@ Build order:
 
 - Issue #69 is the incident source of truth. The commerce/fulfillment change freeze remains active until the incident owner explicitly closes it.
 - Replace the Shippo test token with the approved live token, create a new live shipment/rate for the affected paid order, and buy its label only through the controlled recovery procedure.
-- Model labels per package so multi-package orders cannot become label-complete after only one successful label purchase.
-- Make refund event claiming and order mutation atomic or recoverable after transient Firestore failure.
-- Preserve terminal refunded/canceled state when delayed Checkout completion events arrive.
-- Align the Stripe webhook runbook with the production `charge.refunded` subscription and retain sanitized traced evidence.
+- [Issue #75](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/75): model labels per package so multi-package orders cannot become label-complete after only one successful label purchase.
+- [Issue #76](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/76): make refund event claiming and order mutation atomic or recoverable after transient Firestore failure.
+- [Issue #77](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/77): preserve terminal refunded/canceled state when delayed Checkout completion events arrive.
+- [Issue #78](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/78): align the Stripe webhook runbook with the production `charge.refunded` subscription and retain sanitized traced evidence.
 
 ## Maintenance Plan
 

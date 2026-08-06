@@ -48,10 +48,10 @@ This repo contains the Theo's Farm direct-to-consumer ear corn storefront and it
 
 - The commerce/fulfillment change freeze remains in effect until issue #69 is explicitly closed. Do not change or deploy Stripe, Shippo, checkout, webhook, label, or fulfillment runtime behavior without incident-owner approval.
 - The deployed API rejects checkout, rates, and label purchase when Stripe is live but Shippo is configured with a test token. The affected paid order still requires a new live Shippo shipment/rate and controlled label purchase after a live token is available.
-- Multi-package fulfillment still needs per-package label persistence, idempotency, and completion tracking; buying one label must not make the whole order appear complete.
-- Refund webhook processing still needs a retry-safe claim/update boundary so a transient Firestore failure cannot permanently consume an event.
-- A delayed `checkout.session.completed` event must not reopen an order already in a terminal refunded/canceled state or enqueue duplicate alerts.
-- Production Stripe event subscriptions and the traced evidence for `charge.refunded` should be reconciled with the deployment runbook even where dashboard configuration has already been corrected.
+- [#75](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/75) - add per-package label persistence, idempotency, and completion tracking so buying one label cannot make a multi-package order appear complete.
+- [#76](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/76) - make refund webhook event claims retry-safe after transient Firestore failures.
+- [#77](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/77) - prevent delayed `checkout.session.completed` events from reopening terminal refunded/canceled orders or enqueueing duplicate alerts.
+- [#78](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/78) - reconcile the production `charge.refunded` subscription and sanitized traced evidence with the deployment runbook.
 
 ## Client-Provided Business Notes
 
