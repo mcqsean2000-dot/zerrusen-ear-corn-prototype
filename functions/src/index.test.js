@@ -1233,6 +1233,7 @@ test("webhook handler reports incomplete injected webhook adapter setup", async 
     "findOrderByPaymentIntentId",
     "updateOrderRequest",
     "completePaidOrderEvent",
+    "completeRefundedOrderEvent",
   ]);
 });
 
@@ -1323,6 +1324,9 @@ test("webhook handler can use injected webhook adapter dependencies", async () =
       completePaidOrderEvent({ fields }) {
         updateFields = fields;
         return true;
+      },
+      completeRefundedOrderEvent() {
+        throw new Error("refund completion should not be used");
       },
     },
   });

@@ -282,6 +282,7 @@ test("composition exposes the handler dependency shapes expected by index.js", (
   assert.deepEqual(Object.keys(composition.stripeWebhookAdapterDependencies).sort(), [
     "claimStripeEventProcessing",
     "completePaidOrderEvent",
+    "completeRefundedOrderEvent",
     "findOrderByCheckoutSessionId",
     "findOrderByPaymentIntentId",
     "markStripeEventProcessed",

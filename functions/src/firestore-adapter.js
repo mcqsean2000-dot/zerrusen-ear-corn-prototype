@@ -1037,12 +1037,34 @@ function createFirestoreAdapter(options = {}) {
     const notificationRefs = notificationJobs.map((job) => outbox.doc(job.idempotencyKey));
 
     return firestore.runTransaction(async (transaction) => {
-      const [eventSnapshot, ...notificationSnapshots] = await Promise.all([
+      const [eventSnapshot, orderSnapshot, ...notificationSnapshots] = await Promise.all([
         transaction.get(eventRef),
+        transaction.get(orderRef),
         ...notificationRefs.map((ref) => transaction.get(ref)),
       ]);
       if (eventSnapshot && eventSnapshot.exists) {
         return false;
+      }
+      const existingOrder = normalizeSnapshot(orderSnapshot);
+      if (
+        existingOrder &&
+        (
+          existingOrder.paymentStatus === "refunded" ||
+          existingOrder.fulfillmentStatus === "canceled" ||
+          existingOrder.status === "canceled"
+        )
+      ) {
+        transaction.set(eventRef, {
+          eventId: id,
+          eventType,
+          status: "processed",
+          processedAt: timestamp(),
+          result: {
+            action: "ignored_terminal_order",
+            orderRequestId: orderId,
+          },
+        });
+        return "terminal_order";
       }
 
       transaction.update(orderRef, updateFields);
@@ -1054,6 +1076,66 @@ function createFirestoreAdapter(options = {}) {
           });
         }
       });
+      transaction.set(eventRef, {
+        eventId: id,
+        eventType,
+        status: "processed",
+        processedAt: timestamp(),
+        result,
+      });
+      return true;
+    });
+  }
+
+  async function completeRefundedOrderEvent({
+    collection,
+    eventId,
+    eventType,
+    fields,
+    orderRequestId,
+    result,
+  }) {
+    const id = cleanText(eventId);
+    const orderId = cleanText(orderRequestId);
+    if (!/^[A-Za-z0-9_-]{1,160}$/.test(id) || !/^[A-Za-z0-9_-]{1,160}$/.test(orderId)) {
+      const error = new Error("Refunded Stripe event completion requires bounded event and order IDs.");
+      error.code = "refunded_order_event_identifier_invalid";
+      throw error;
+    }
+    if (eventType !== "charge.refunded") {
+      const error = new Error("Refunded order completion requires a charge.refunded event.");
+      error.code = "refunded_order_event_type_invalid";
+      throw error;
+    }
+    if (!isFunction(firestore.runTransaction)) {
+      const error = new Error("Firestore-like backend must provide runTransaction() for refund completion.");
+      error.code = "firestore_transaction_missing";
+      throw error;
+    }
+
+    const updateFields = trustedUpdateFields(fields);
+    if (
+      updateFields.paymentStatus !== "refunded" ||
+      updateFields.checkoutStatus !== "refunded" ||
+      updateFields.fulfillmentStatus !== "canceled" ||
+      updateFields.lastStripeEventId !== id ||
+      !result ||
+      result.action !== "updated_order" ||
+      result.orderRequestId !== orderId
+    ) {
+      const error = new Error("Refunded order completion inputs do not describe the same trusted refund event.");
+      error.code = "refunded_order_event_mismatch";
+      throw error;
+    }
+
+    const orderRef = collectionRef(firestore, orderCollectionName(options, collection)).doc(orderId);
+    const eventRef = collectionRef(firestore, eventCollectionName(options)).doc(id);
+    return firestore.runTransaction(async (transaction) => {
+      const eventSnapshot = await transaction.get(eventRef);
+      if (eventSnapshot && eventSnapshot.exists) {
+        return false;
+      }
+      transaction.update(orderRef, updateFields);
       transaction.set(eventRef, {
         eventId: id,
         eventType,
@@ -1250,6 +1332,7 @@ function createFirestoreAdapter(options = {}) {
     claimStripeEventProcessing,
     claimNotificationJob,
     completePaidOrderEvent,
+    completeRefundedOrderEvent,
     createOrderRequest,
     enqueueNotificationJobs,
     findOrderByCheckoutSessionId,

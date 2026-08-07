@@ -57,6 +57,10 @@ function baseDeps(overrides = {}) {
         calls.push({ type: "completePaidOrderEvent", ...input });
         return true;
       },
+      completeRefundedOrderEvent(input) {
+        calls.push({ type: "completeRefundedOrderEvent", ...input });
+        return true;
+      },
       ...overrides,
     },
   };
@@ -99,6 +103,7 @@ test("webhook adapter is disabled without injected trusted dependencies", async 
         "findOrderByPaymentIntentId",
         "updateOrderRequest",
         "completePaidOrderEvent",
+        "completeRefundedOrderEvent",
       ]);
       return true;
     },
@@ -253,9 +258,11 @@ test("maps a full charge.refunded event to trusted refunded and canceled fields"
     action: "updated_order",
     orderRequestId: "order_123",
   });
-  assert.deepEqual(calls[2], {
-    type: "updateOrderRequest",
+  assert.deepEqual(calls[1], {
+    type: "completeRefundedOrderEvent",
     collection: "orderRequests",
+    eventId: "evt_charge_refunded",
+    eventType: "charge.refunded",
     orderRequestId: "order_123",
     fields: {
       stripePaymentIntentId: "pi_test_123",
@@ -268,8 +275,12 @@ test("maps a full charge.refunded event to trusted refunded and canceled fields"
       lastStripeEventAt: "SERVER_TIMESTAMP",
       trustedUpdatedAt: "SERVER_TIMESTAMP",
     },
+    result: {
+      action: "updated_order",
+      orderRequestId: "order_123",
+    },
   });
-  assert.equal(calls.at(-1).type, "markStripeEventProcessed");
+  assert.equal(calls.some((call) => call.type === "markStripeEventProcessed"), false);
 });
 
 test("does not cancel fulfillment for a partial charge refund", async () => {
@@ -305,8 +316,8 @@ test("does not cancel fulfillment for a partial charge refund", async () => {
 
 test("replayed charge.refunded events do not update an order twice", async () => {
   const { calls, deps } = baseDeps({
-    claimStripeEventProcessing({ eventId, eventType }) {
-      calls.push({ type: "claimStripeEventProcessing", eventId, eventType });
+    completeRefundedOrderEvent(input) {
+      calls.push({ type: "completeRefundedOrderEvent", ...input });
       return false;
     },
   });
@@ -329,7 +340,30 @@ test("replayed charge.refunded events do not update an order twice", async () =>
   });
 
   assert.equal(result.action, "replayed_event");
-  assert.equal(calls.some((call) => call.type === "updateOrderRequest"), false);
+  assert.equal(calls.some((call) => call.type === "markStripeEventProcessed"), false);
+});
+
+test("ignores delayed checkout completion for a terminal order without notifications", async () => {
+  const { calls, deps } = baseDeps({
+    completePaidOrderEvent(input) {
+      calls.push({ type: "completePaidOrderEvent", ...input });
+      return "terminal_order";
+    },
+  });
+  const adapter = createStripeWebhookEventAdapter(deps);
+
+  const result = await adapter({
+    event: checkoutSessionEvent("checkout.session.completed"),
+    env,
+  });
+
+  assert.deepEqual(result, {
+    action: "ignored_terminal_order",
+    eventId: "evt_checkout_session_completed",
+    eventType: "checkout.session.completed",
+    orderRequestId: "order_123",
+  });
+  assert.equal(calls.some((call) => call.type === "markStripeEventProcessed"), false);
 });
 
 test("replayed Stripe events do not update orders after an atomic claim miss", async () => {

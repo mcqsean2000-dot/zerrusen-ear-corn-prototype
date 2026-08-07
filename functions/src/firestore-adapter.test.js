@@ -1067,6 +1067,98 @@ test("atomically completes paid orders with notification jobs and event processi
   });
 });
 
+test("does not reopen a terminal refunded order for delayed paid completion", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({
+    firestore,
+    serverTimestamp() {
+      return "SERVER_TIMESTAMP";
+    },
+  });
+  await adapter.createOrderRequest({
+    orderRequest: {
+      ...trustedOrderRequest,
+      paymentStatus: "refunded",
+      checkoutStatus: "refunded",
+      fulfillmentStatus: "canceled",
+    },
+  });
+  const jobs = [{
+    eventName: "admin.paid_order_created",
+    idempotencyKey: "admin.paid_order_created:orderRequests_1:evt_delayed",
+    orderRequestId: "orderRequests_1",
+    paidEventId: "evt_delayed",
+    recipientCategory: "admin",
+    status: "pending",
+    subject: "Paid order",
+    text: "Trusted order summary",
+    to: "theosfeedfarm@gmail.com",
+  }];
+
+  assert.equal(await adapter.completePaidOrderEvent({
+    eventId: "evt_delayed",
+    eventType: "checkout.session.completed",
+    fields: {
+      paymentStatus: "paid",
+      checkoutStatus: "complete",
+      lastStripeEventId: "evt_delayed",
+    },
+    jobs,
+    orderRequestId: "orderRequests_1",
+    result: {
+      action: "updated_order",
+      orderRequestId: "orderRequests_1",
+    },
+  }), "terminal_order");
+  const order = collectionDocs(firestore, "orderRequests").get("orderRequests_1");
+  assert.equal(order.paymentStatus, "refunded");
+  assert.equal(order.fulfillmentStatus, "canceled");
+  assert.equal(collectionDocs(firestore, "notificationOutbox").size, 0);
+  assert.equal(
+    collectionDocs(firestore, "stripeEvents").get("evt_delayed").result.action,
+    "ignored_terminal_order",
+  );
+});
+
+test("atomically completes a refund and safely treats retries as replays", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({
+    firestore,
+    serverTimestamp() {
+      return "SERVER_TIMESTAMP";
+    },
+  });
+  await adapter.createOrderRequest({
+    orderRequest: {
+      ...trustedOrderRequest,
+      paymentStatus: "paid",
+      checkoutStatus: "complete",
+    },
+  });
+  const input = {
+    eventId: "evt_refund_atomic",
+    eventType: "charge.refunded",
+    fields: {
+      paymentStatus: "refunded",
+      checkoutStatus: "refunded",
+      fulfillmentStatus: "canceled",
+      lastStripeEventId: "evt_refund_atomic",
+    },
+    orderRequestId: "orderRequests_1",
+    result: {
+      action: "updated_order",
+      orderRequestId: "orderRequests_1",
+    },
+  };
+
+  assert.equal(await adapter.completeRefundedOrderEvent(input), true);
+  assert.equal(await adapter.completeRefundedOrderEvent(input), false);
+  const order = collectionDocs(firestore, "orderRequests").get("orderRequests_1");
+  assert.equal(order.paymentStatus, "refunded");
+  assert.equal(order.fulfillmentStatus, "canceled");
+  assert.equal(collectionDocs(firestore, "stripeEvents").get("evt_refund_atomic").status, "processed");
+});
+
 test("rejects mismatched paid event jobs before changing Firestore", async () => {
   const firestore = new MemoryFirestore();
   const adapter = createFirestoreAdapter({ firestore });
