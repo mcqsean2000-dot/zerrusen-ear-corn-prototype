@@ -866,6 +866,7 @@ test("admin shipping label handler reports missing trusted persistence dependenc
   assert.deepEqual(parseJson(res).setupRequired, [
     "prepareLabelPurchase",
     "recordLabelPurchase",
+    "recordLabelPurchaseFailure",
   ]);
 });
 
@@ -906,6 +907,7 @@ test("admin shipping label handler buys label through trusted dependencies", asy
       prepareLabelPurchase({ orderRequestId, rateId }) {
         assert.equal(orderRequestId, "order_123");
         assert.equal(rateId, "rate_123");
+        return { packageId: "package-1" };
       },
       recordLabelPurchase({ admin, fields, orderRequestId }) {
         recordedFields = fields;
@@ -916,6 +918,7 @@ test("admin shipping label handler buys label through trusted dependencies", asy
           ...fields,
         };
       },
+      recordLabelPurchaseFailure() {},
     },
   });
 

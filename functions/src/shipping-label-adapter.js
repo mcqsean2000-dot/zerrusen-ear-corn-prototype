@@ -1,5 +1,7 @@
 "use strict";
 
+const { randomUUID } = require("node:crypto");
+
 function isFunction(value) {
   return typeof value === "function";
 }
@@ -34,6 +36,7 @@ function getMissingShippingLabelDependencies(dependencies = {}) {
   if (!isFunction(dependencies.createShippoTransaction)) missing.push("createShippoTransaction");
   if (!isFunction(dependencies.prepareLabelPurchase)) missing.push("prepareLabelPurchase");
   if (!isFunction(dependencies.recordLabelPurchase)) missing.push("recordLabelPurchase");
+  if (!isFunction(dependencies.recordLabelPurchaseFailure)) missing.push("recordLabelPurchaseFailure");
 
   return missing;
 }
@@ -69,12 +72,14 @@ async function purchaseShippingLabel({
   createShippoTransaction,
   prepareLabelPurchase,
   recordLabelPurchase,
+  recordLabelPurchaseFailure,
   serverTimestamp = "FIRESTORE_SERVER_TIMESTAMP_REQUIRED",
 }) {
   const missingDependencies = getMissingShippingLabelDependencies({
     createShippoTransaction,
     prepareLabelPurchase,
     recordLabelPurchase,
+    recordLabelPurchaseFailure,
   });
 
   if (missingDependencies.length) {
@@ -99,14 +104,30 @@ async function purchaseShippingLabel({
   }
 
   const actor = validateAdminActor(admin);
-  await prepareLabelPurchase({
+  const purchaseAttemptId = randomUUID();
+  const prepared = await prepareLabelPurchase({
     admin: actor,
     orderRequestId: id,
+    purchaseAttemptId,
     rateId: selectedRateId,
   });
-  const transaction = await createShippoTransaction({
-    rateId: selectedRateId,
-  });
+  let transaction;
+  try {
+    transaction = await createShippoTransaction({
+      metadata: `theos:${id}:${prepared.packageId}`.slice(0, 100),
+      rateId: selectedRateId,
+    });
+  } catch (error) {
+    await recordLabelPurchaseFailure({
+      admin: actor,
+      ambiguous: !Number.isInteger(error && error.status),
+      orderRequestId: id,
+      packageId: prepared.packageId,
+      purchaseAttemptId,
+      rateId: selectedRateId,
+    });
+    throw error;
+  }
   const labelFields = normalizeShippoLabelFields({
     serverTimestamp,
     transaction,
@@ -114,7 +135,12 @@ async function purchaseShippingLabel({
 
   return recordLabelPurchase({
     admin: actor,
-    fields: labelFields,
+    fields: {
+      ...labelFields,
+      packageId: prepared.packageId,
+      purchaseAttemptId,
+      rateId: selectedRateId,
+    },
     orderRequestId: id,
   });
 }

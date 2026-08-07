@@ -291,6 +291,7 @@ test("composition exposes the handler dependency shapes expected by index.js", (
   assert.deepEqual(Object.keys(composition.shippingLabelDependencies).sort(), [
     "prepareLabelPurchase",
     "recordLabelPurchase",
+    "recordLabelPurchaseFailure",
   ].sort());
 });
 

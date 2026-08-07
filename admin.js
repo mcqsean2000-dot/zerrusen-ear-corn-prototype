@@ -203,6 +203,18 @@ function normalizeAdminShipping(order) {
   const packageRateIds = Array.isArray(source?.packageRateIds || source?.shippingPackageRateIds)
     ? (source.packageRateIds || source.shippingPackageRateIds).map(asText).filter(Boolean)
     : [];
+  const labels = Array.isArray(source?.labels || source?.shippingLabels)
+    ? (source.labels || source.shippingLabels).slice(0, 50).map((label) => ({
+      packageId: asText(label?.packageId),
+      rateId: asText(label?.rateId),
+      status: asText(label?.status),
+      labelPurchasedAt: asText(label?.labelPurchasedAt),
+      labelUrl: safeUrl(label?.labelUrl),
+      shippoTransactionId: asText(label?.shippoTransactionId),
+      trackingNumber: asText(label?.trackingNumber),
+      trackingUrl: safeUrl(label?.trackingUrl),
+    })).filter((label) => label.packageId && label.rateId && label.status)
+    : [];
 
   return {
     carrier: asText(source?.carrier || source?.shippingCarrier),
@@ -211,6 +223,7 @@ function normalizeAdminShipping(order) {
     currency: asText(source?.currency || source?.shippingCurrency) || "USD",
     packageCount: asWholeNumber(source?.packageCount || source?.shippingPackageCount),
     packageRateIds,
+    labels,
     rateId: asText(source?.rateId || source?.shippingRateId),
     shippoTransactionId: asText(source?.shippoTransactionId),
     labelPurchasedAt: asText(source?.labelPurchasedAt),
@@ -283,7 +296,19 @@ function buildAdminLabelActionViewModel(order) {
   const normalizedOrder = normalizeAdminOrder(order);
   const rateIds = getAdminLabelRateIds(normalizedOrder.shipping);
   const paid = normalizedOrder.paymentStatus === "paid";
-  const hasLabel = Boolean(normalizedOrder.shipping.labelUrl || normalizedOrder.shipping.shippoTransactionId);
+  const purchasedRateIds = new Set(normalizedOrder.shipping.labels
+    .filter((label) => label.status === "purchased")
+    .map((label) => label.rateId));
+  if (!normalizedOrder.shipping.labels.length && (normalizedOrder.shipping.labelUrl || normalizedOrder.shipping.shippoTransactionId)) {
+    const legacyRateId = rateIds[0];
+    if (legacyRateId) purchasedRateIds.add(legacyRateId);
+  }
+  const pendingRateIds = rateIds.filter((rateId) => !purchasedRateIds.has(rateId));
+  const hasConflict = normalizedOrder.shipping.labels.some((label) => ["processing", "ambiguous"].includes(label.status));
+  const legacyHasLabel = !normalizedOrder.shipping.labels.length && Boolean(
+    normalizedOrder.shipping.labelUrl || normalizedOrder.shipping.shippoTransactionId,
+  );
+  const hasLabel = (legacyHasLabel && rateIds.length <= 1) || (rateIds.length > 0 && pendingRateIds.length === 0);
   const labelCount = rateIds.length || asWholeNumber(normalizedOrder.shipping.packageCount) || 1;
   const labelNoun = labelCount === 1 ? "label" : "labels";
 
@@ -295,6 +320,17 @@ function buildAdminLabelActionViewModel(order) {
       reason: "Tracking stored",
       requestBody: null,
       state: "complete",
+    };
+  }
+
+  if (hasConflict) {
+    return {
+      disabled: true,
+      endpoint: "",
+      label: "Label review required",
+      reason: "Purchase outcome needs review",
+      requestBody: null,
+      state: "blocked",
     };
   }
 
@@ -323,11 +359,13 @@ function buildAdminLabelActionViewModel(order) {
   return {
     disabled: true,
     endpoint: "/api/admin/shippo-labels",
-    label: "Queue " + labelCount + " " + labelNoun,
+    label: purchasedRateIds.size
+      ? "Buy next label (" + purchasedRateIds.size + "/" + labelCount + ")"
+      : "Buy " + labelCount + " " + labelNoun,
     reason: "Auth required",
     requestBody: {
       orderRequestId: normalizedOrder.id,
-      rateId: rateIds[0],
+      rateId: pendingRateIds[0],
     },
     state: "auth_required",
   };
@@ -341,17 +379,25 @@ function buildAdminShippingViewModel(shipping) {
   const trackingNumber = asText(shipping?.trackingNumber);
   const trackingUrl = safeUrl(shipping?.trackingUrl);
   const labelUrl = safeUrl(shipping?.labelUrl);
-  const hasPurchasedLabel = Boolean(labelUrl || asText(shipping?.shippoTransactionId) || trackingNumber);
-  const hasSelectedRate = getAdminLabelRateIds(shipping).length > 0;
-  const status = hasPurchasedLabel ? "label_ready" : hasSelectedRate ? "rate_selected" : "needs_rate";
+  const rateIds = getAdminLabelRateIds(shipping);
+  const purchasedLabels = Array.isArray(shipping?.labels)
+    ? shipping.labels.filter((label) => label.status === "purchased")
+    : [];
+  const legacyPurchased = purchasedLabels.length === 0 && Boolean(labelUrl || asText(shipping?.shippoTransactionId) || trackingNumber);
+  const purchasedCount = purchasedLabels.length || (legacyPurchased ? 1 : 0);
+  const hasPurchasedLabel = purchasedCount > 0;
+  const hasSelectedRate = rateIds.length > 0;
+  const allLabelsReady = (legacyPurchased && rateIds.length <= 1) || (hasSelectedRate && purchasedCount >= rateIds.length);
+  const status = allLabelsReady ? "label_ready" : hasPurchasedLabel ? "rate_selected" : hasSelectedRate ? "rate_selected" : "needs_rate";
 
   return {
     amountLabel,
     carrierService: carrierService || "Carrier pending",
     hasLabel: Boolean(labelUrl),
+    labels: Array.isArray(shipping?.labels) ? shipping.labels : [],
     labelPurchasedAt: asText(shipping?.labelPurchasedAt),
     labelUrl,
-    packageLabel,
+    packageLabel: hasSelectedRate ? packageLabel + " · " + purchasedCount + "/" + rateIds.length + " labels" : packageLabel,
     trackingLabel: trackingNumber || "Tracking pending",
     trackingNumber,
     trackingUrl,
@@ -1112,6 +1158,7 @@ async function handleLabelAction(target) {
         shippoTransactionId: result.shippoTransactionId,
         trackingNumber: result.trackingNumber,
         trackingUrl: result.trackingUrl,
+        labels: result.shippingLabels,
       },
     });
     setAdminActionStatus("Shipping label saved.");

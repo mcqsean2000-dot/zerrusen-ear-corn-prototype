@@ -429,7 +429,8 @@ function buildDefaultShippingLabelDependencies(env, options = {}) {
     ...(options.shippingLabelDependencies || {}),
     createShippoTransaction: options.shippingLabelDependencies && options.shippingLabelDependencies.createShippoTransaction
       ? options.shippingLabelDependencies.createShippoTransaction
-      : ({ rateId }) => createShippoTransactionWithFetch({
+      : ({ metadata, rateId }) => createShippoTransactionWithFetch({
+        metadata,
         rateId,
         token: env.SHIPPO_API_TOKEN,
         fetchImpl: options.fetchImpl || fetch,
@@ -861,12 +862,14 @@ async function adminShippingLabelsHandler(req, res, options = {}) {
     return sendJson(res, 200, {
       labelUrl: result.labelUrl,
       orderRequestId: result.id,
+      packageId: result.packageId,
+      shippingLabels: result.shippingLabels,
       shippoTransactionId: result.shippoTransactionId,
       trackingNumber: result.trackingNumber,
       trackingUrl: result.trackingUrl,
     }, corsHeaders);
   } catch (error) {
-    if (error.code === "admin_actor_invalid" || error.code === "order_request_id_missing" || error.code === "shippo_rate_id_missing") {
+    if (error.code === "admin_actor_invalid" || error.code === "order_request_id_missing" || error.code === "shippo_rate_id_missing" || error.code === "shipping_label_attempt_invalid") {
       return sendJson(res, 400, {
         error: {
           code: error.code,
@@ -898,6 +901,17 @@ async function adminShippingLabelsHandler(req, res, options = {}) {
         error: {
           code: "shipping_label_rate_mismatch",
           message: "Selected Shippo rate does not belong to this order.",
+        },
+      }, corsHeaders);
+    }
+
+    if (error.code === "shipping_label_already_purchased" || error.code === "shipping_label_purchase_conflict") {
+      return sendJson(res, 409, {
+        error: {
+          code: error.code,
+          message: error.code === "shipping_label_already_purchased"
+            ? "This package already has a purchased label."
+            : "This package has an active or ambiguous label purchase that requires review.",
         },
       }, corsHeaders);
     }

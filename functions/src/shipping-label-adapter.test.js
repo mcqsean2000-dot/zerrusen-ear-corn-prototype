@@ -13,6 +13,7 @@ test("reports missing trusted label purchase dependencies", () => {
     "createShippoTransaction",
     "prepareLabelPurchase",
     "recordLabelPurchase",
+    "recordLabelPurchaseFailure",
   ]);
 });
 
@@ -66,8 +67,10 @@ test("purchases label and records trusted label fields", async () => {
         tracking_number: "9400100000000000000000",
       };
     },
-    prepareLabelPurchase({ rateId }) {
+    prepareLabelPurchase({ purchaseAttemptId, rateId }) {
       assert.equal(rateId, "rate_123");
+      assert.match(purchaseAttemptId, /^[a-f0-9-]{36}$/);
+      return { packageId: "package-1" };
     },
     recordLabelPurchase(args) {
       recorded = args;
@@ -76,6 +79,7 @@ test("purchases label and records trusted label fields", async () => {
         ...args.fields,
       };
     },
+    recordLabelPurchaseFailure() {},
   });
 
   assert.equal(requestedRateId, "rate_123");
@@ -98,6 +102,7 @@ test("validates admin, order id, and rate id before creating a transaction", asy
       },
       prepareLabelPurchase() {},
       recordLabelPurchase() {},
+      recordLabelPurchaseFailure() {},
     }),
     (error) => error.code === "shippo_rate_id_missing",
   );
@@ -123,9 +128,36 @@ test("does not create Shippo transaction when preflight rejects the order", asyn
         throw error;
       },
       recordLabelPurchase() {},
+      recordLabelPurchaseFailure() {},
     }),
     (error) => error.code === "shipping_label_order_not_paid",
   );
 
   assert.equal(transactionCreated, false);
+});
+
+test("records confirmed and ambiguous provider failures against the claimed package", async () => {
+  for (const providerError of [
+    Object.assign(new Error("provider rejected"), { status: 400 }),
+    new Error("network outcome unknown"),
+  ]) {
+    let failure = null;
+    await assert.rejects(() => purchaseShippingLabel({
+      admin: { email: "admin@example.test", uid: "admin-user-001" },
+      orderRequestId: "order_123",
+      rateId: "rate_123",
+      createShippoTransaction() {
+        throw providerError;
+      },
+      prepareLabelPurchase() {
+        return { packageId: "package-1" };
+      },
+      recordLabelPurchase() {},
+      recordLabelPurchaseFailure(input) {
+        failure = input;
+      },
+    }), providerError);
+    assert.equal(failure.packageId, "package-1");
+    assert.equal(failure.ambiguous, !Number.isInteger(providerError.status));
+  }
 });

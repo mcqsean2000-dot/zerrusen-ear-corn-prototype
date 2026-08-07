@@ -730,6 +730,35 @@ function flushAdminActions() {
   assert(readyLabelAction.requestBody.rateId === "rate_a", "Admin label action should prepare one owned rate id at a time.");
   assert(readyLabelAction.requestBody.rateId !== "synthetic_combined_rate", "Admin label action must not submit a synthetic combined rate when package rates exist.");
 
+  const partialLabelAction = helpers.buildLabelActionViewModel({
+    id: "REQ-2001",
+    paymentStatus: "paid",
+    shippingPackageRateIds: ["rate_a", "rate_b"],
+    shippingLabels: [{ packageId: "package-1", rateId: "rate_a", status: "purchased" }],
+  });
+  assert(partialLabelAction.state === "auth_required", "A partially labeled order should remain actionable.");
+  assert(partialLabelAction.requestBody.rateId === "rate_b", "A partially labeled order should select the next unlabeled package.");
+  assert(partialLabelAction.label.includes("1/2"), "A partially labeled order should show package progress.");
+
+  const completeLabelAction = helpers.buildLabelActionViewModel({
+    id: "REQ-2002",
+    paymentStatus: "paid",
+    shippingPackageRateIds: ["rate_a", "rate_b"],
+    shippingLabels: [
+      { packageId: "package-1", rateId: "rate_a", status: "purchased" },
+      { packageId: "package-2", rateId: "rate_b", status: "purchased" },
+    ],
+  });
+  assert(completeLabelAction.state === "complete", "A multi-package order should complete only after every label is purchased.");
+
+  const ambiguousLabelAction = helpers.buildLabelActionViewModel({
+    id: "REQ-2003",
+    paymentStatus: "paid",
+    shippingPackageRateIds: ["rate_a", "rate_b"],
+    shippingLabels: [{ packageId: "package-1", rateId: "rate_a", status: "ambiguous" }],
+  });
+  assert(ambiguousLabelAction.state === "blocked", "An ambiguous provider outcome must block automatic label retry.");
+
   const counts = helpers.calculateBagCounts([
     normalized,
     {
