@@ -54,6 +54,7 @@ async function createShippoShipmentWithFetch({ payload, token, fetchImpl = fetch
 
 async function createShippoTransactionWithFetch({
   rateId,
+  metadata,
   token,
   labelFileType = "PDF",
   asyncLabel = false,
@@ -77,6 +78,7 @@ async function createShippoTransactionWithFetch({
     body: JSON.stringify({
       async: asyncLabel,
       label_file_type: labelFileType,
+      ...(metadata ? { metadata: String(metadata).slice(0, 100) } : {}),
       rate: rateId,
     }),
   });

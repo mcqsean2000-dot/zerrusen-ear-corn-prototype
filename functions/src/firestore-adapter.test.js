@@ -778,7 +778,14 @@ test("records admin label purchase with tracking fields and audit metadata", asy
     orderRequest: {
       ...trustedOrderRequest,
       paymentStatus: "paid",
+      shippingRateId: "rate_123",
     },
+  });
+  await adapter.prepareLabelPurchase({
+    admin: { email: "admin@example.test", uid: "admin-user-001" },
+    orderRequestId: "orderRequests_1",
+    purchaseAttemptId: "attempt-0000000000000001",
+    rateId: "rate_123",
   });
   const result = await adapter.recordLabelPurchase({
     admin: {
@@ -793,29 +800,20 @@ test("records admin label purchase with tracking fields and audit metadata", asy
       trackingNumber: "9400100000000000000000",
       trackingUrl: "https://carrier.example/track/9400",
       trustedUpdatedAt: "SERVER_TIMESTAMP",
+      packageId: "package-1",
+      purchaseAttemptId: "attempt-0000000000000001",
+      rateId: "rate_123",
     },
   });
 
-  assert.deepEqual(result, {
-    audit: {
-      lastAction: "label_purchased",
-      updatedAt: "SERVER_TIMESTAMP",
-      updatedByEmail: "admin@example.test",
-      updatedByUid: "admin-user-001",
-    },
-    id: "orderRequests_1",
-    labelPurchasedAt: "SERVER_TIMESTAMP",
-    labelUrl: "https://shippo.example/label.pdf",
-    shippoTransactionId: "transaction_123",
-    trackingNumber: "9400100000000000000000",
-    trackingUrl: "https://carrier.example/track/9400",
-    trustedUpdatedAt: "SERVER_TIMESTAMP",
-  });
+  assert.equal(result.id, "orderRequests_1");
+  assert.equal(result.packageId, "package-1");
+  assert.equal(result.shippingLabels[0].status, "purchased");
   assert.equal(
     collectionDocs(firestore, "orderRequests").get("orderRequests_1").shippoTransactionId,
     "transaction_123",
   );
-  assert.deepEqual(collectionDocs(firestore, "orderRequests").get("orderRequests_1").audit, result.audit);
+  assert.equal(collectionDocs(firestore, "orderRequests").get("orderRequests_1").audit.lastAction, "label_purchased");
 });
 
 test("prepares admin label purchase only for paid orders with owned rates", async () => {
@@ -837,9 +835,11 @@ test("prepares admin label purchase only for paid orders with owned rates", asyn
       uid: "admin-user-001",
     },
     orderRequestId: "orderRequests_1",
+    purchaseAttemptId: "attempt-0000000000000001",
     rateId: "rate_20",
   }), {
     id: "orderRequests_1",
+    packageId: "package-1",
     paymentStatus: "paid",
     rateId: "rate_20",
   });
@@ -851,6 +851,7 @@ test("prepares admin label purchase only for paid orders with owned rates", asyn
         uid: "admin-user-001",
       },
       orderRequestId: "orderRequests_1",
+      purchaseAttemptId: "attempt-0000000000000002",
       rateId: "synthetic_combined_rate",
     }),
     (error) => error.code === "shipping_label_rate_mismatch",
@@ -863,9 +864,132 @@ test("prepares admin label purchase only for paid orders with owned rates", asyn
         uid: "admin-user-001",
       },
       orderRequestId: "orderRequests_1",
+      purchaseAttemptId: "attempt-0000000000000003",
       rateId: "rate_other",
     }),
     (error) => error.code === "shipping_label_rate_mismatch",
+  );
+});
+
+test("tracks two-package completion and permits retry after confirmed failure", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({
+    firestore,
+    serverTimestamp: () => "SERVER_TIMESTAMP",
+  });
+  const admin = { email: "admin@example.test", uid: "admin-user-001" };
+  await adapter.createOrderRequest({
+    orderRequest: {
+      ...trustedOrderRequest,
+      paymentStatus: "paid",
+      shippingPackageRateIds: ["rate_a", "rate_b"],
+      shippingRateId: "synthetic_combined_rate",
+    },
+  });
+
+  await adapter.prepareLabelPurchase({
+    admin,
+    orderRequestId: "orderRequests_1",
+    purchaseAttemptId: "attempt-package-a-0001",
+    rateId: "rate_a",
+  });
+  await adapter.recordLabelPurchase({
+    admin,
+    orderRequestId: "orderRequests_1",
+    fields: {
+      labelPurchasedAt: "SERVER_TIMESTAMP",
+      labelUrl: "https://shippo.example/a.pdf",
+      packageId: "package-1",
+      purchaseAttemptId: "attempt-package-a-0001",
+      rateId: "rate_a",
+      shippoTransactionId: "transaction_a",
+      trustedUpdatedAt: "SERVER_TIMESTAMP",
+    },
+  });
+  await assert.rejects(
+    adapter.prepareLabelPurchase({
+      admin,
+      orderRequestId: "orderRequests_1",
+      purchaseAttemptId: "attempt-package-a-0002",
+      rateId: "rate_a",
+    }),
+    (error) => error.code === "shipping_label_already_purchased",
+  );
+
+  await adapter.prepareLabelPurchase({
+    admin,
+    orderRequestId: "orderRequests_1",
+    purchaseAttemptId: "attempt-package-b-0001",
+    rateId: "rate_b",
+  });
+  await adapter.recordLabelPurchaseFailure({
+    admin,
+    ambiguous: false,
+    orderRequestId: "orderRequests_1",
+    packageId: "package-2",
+    purchaseAttemptId: "attempt-package-b-0001",
+    rateId: "rate_b",
+  });
+  await adapter.prepareLabelPurchase({
+    admin,
+    orderRequestId: "orderRequests_1",
+    purchaseAttemptId: "attempt-package-b-0002",
+    rateId: "rate_b",
+  });
+  await adapter.recordLabelPurchase({
+    admin,
+    orderRequestId: "orderRequests_1",
+    fields: {
+      labelPurchasedAt: "SERVER_TIMESTAMP",
+      labelUrl: "https://shippo.example/b.pdf",
+      packageId: "package-2",
+      purchaseAttemptId: "attempt-package-b-0002",
+      rateId: "rate_b",
+      shippoTransactionId: "transaction_b",
+      trustedUpdatedAt: "SERVER_TIMESTAMP",
+    },
+  });
+  const labels = collectionDocs(firestore, "orderRequests").get("orderRequests_1").shippingLabels;
+  assert.deepEqual(labels.map((label) => label.status), ["purchased", "purchased"]);
+});
+
+test("blocks automatic retry after an ambiguous package-label outcome", async () => {
+  const firestore = new MemoryFirestore();
+  const adapter = createFirestoreAdapter({ firestore, serverTimestamp: () => "SERVER_TIMESTAMP" });
+  const admin = { email: "admin@example.test", uid: "admin-user-001" };
+  await adapter.createOrderRequest({
+    orderRequest: {
+      ...trustedOrderRequest,
+      paymentStatus: "paid",
+      shippingPackageRateIds: ["rate_a", "rate_b"],
+    },
+  });
+  await adapter.prepareLabelPurchase({
+    admin,
+    orderRequestId: "orderRequests_1",
+    purchaseAttemptId: "attempt-package-a-0001",
+    rateId: "rate_a",
+  });
+  await adapter.recordLabelPurchaseFailure({
+    admin,
+    ambiguous: true,
+    orderRequestId: "orderRequests_1",
+    packageId: "package-1",
+    purchaseAttemptId: "attempt-package-a-0001",
+    rateId: "rate_a",
+  });
+  await assert.rejects(
+    adapter.prepareLabelPurchase({
+      admin,
+      orderRequestId: "orderRequests_1",
+      purchaseAttemptId: "attempt-package-a-0002",
+      rateId: "rate_a",
+    }),
+    (error) => error.code === "shipping_label_purchase_conflict",
+  );
+  assert.equal(
+    collectionDocs(firestore, "orderRequests").get("orderRequests_1").shippingLabels[0].status,
+    "ambiguous",
   );
 });
 
@@ -882,6 +1006,7 @@ test("admin label purchase requires a paid order and trusted fields", async () =
         uid: "admin-user-001",
       },
       orderRequestId: "orderRequests_1",
+      purchaseAttemptId: "attempt-0000000000000001",
       rateId: "rate_123",
     }),
     (error) => error.code === "shipping_label_order_not_paid",

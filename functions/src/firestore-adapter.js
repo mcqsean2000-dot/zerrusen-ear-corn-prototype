@@ -315,6 +315,30 @@ function orderOwnsShippoRate(order, rateId) {
   return cleanText(order && order.shippingRateId) === selectedRateId;
 }
 
+function packageIdForRate(order, rateId) {
+  const selectedRateId = cleanText(rateId);
+  const packageRateIds = normalizeRateIdList(order && order.shippingPackageRateIds);
+  const index = packageRateIds.indexOf(selectedRateId);
+  if (index >= 0) return `package-${index + 1}`;
+  return cleanText(order && order.shippingRateId) === selectedRateId ? "package-1" : "";
+}
+
+function normalizeShippingLabels(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 50).map((label) => withoutUndefinedFields({
+    packageId: cleanText(label && label.packageId),
+    rateId: cleanText(label && label.rateId),
+    status: cleanText(label && label.status),
+    purchaseAttemptId: cleanText(label && label.purchaseAttemptId),
+    labelPurchasedAt: label && label.labelPurchasedAt,
+    labelUrl: cleanText(label && label.labelUrl) || undefined,
+    shippoTransactionId: cleanText(label && label.shippoTransactionId) || undefined,
+    trackingNumber: cleanText(label && label.trackingNumber) || undefined,
+    trackingUrl: cleanText(label && label.trackingUrl) || undefined,
+    updatedAt: label && label.updatedAt,
+  })).filter((label) => label.packageId && label.rateId && label.status);
+}
+
 async function setDoc(ref, data, options) {
   if (!isFunction(ref.set)) {
     const error = new Error("Firestore-like document reference must provide set(data).");
@@ -640,7 +664,7 @@ function createFirestoreAdapter(options = {}) {
     return { audit, id, note };
   }
 
-  async function prepareAdminLabelPurchase({ admin, collection, orderRequestId, rateId }) {
+  async function prepareAdminLabelPurchase({ admin, collection, orderRequestId, purchaseAttemptId, rateId }) {
     const id = cleanText(orderRequestId);
     if (!id) {
       const error = new Error("orderRequestId is required to prepare a shipping label purchase.");
@@ -648,35 +672,94 @@ function createFirestoreAdapter(options = {}) {
       throw error;
     }
 
-    validateAdminActor(admin);
+    const actor = validateAdminActor(admin);
+    const attemptId = cleanText(purchaseAttemptId);
+    if (!/^[A-Za-z0-9-]{16,80}$/.test(attemptId)) {
+      const error = new Error("Shipping label purchase requires a bounded attempt ID.");
+      error.code = "shipping_label_attempt_invalid";
+      throw error;
+    }
+    if (!isFunction(firestore.runTransaction)) {
+      const error = new Error("Firestore-like backend must provide runTransaction() for label claims.");
+      error.code = "firestore_transaction_missing";
+      throw error;
+    }
     const orders = collectionRef(firestore, orderCollectionName(options, collection));
     const ref = orders.doc(id);
-    const existingOrder = normalizeSnapshot(await getDoc(ref));
-
-    if (!existingOrder) {
-      const error = new Error("Order request was not found for shipping label purchase.");
-      error.code = "order_request_not_found";
-      throw error;
-    }
-
-    if (existingOrder.paymentStatus !== "paid") {
-      const error = new Error("Shipping labels can only be purchased for paid orders.");
-      error.code = "shipping_label_order_not_paid";
-      error.paymentStatus = existingOrder.paymentStatus || "";
-      throw error;
-    }
-
-    if (!orderOwnsShippoRate(existingOrder, rateId)) {
-      const error = new Error("Shipping label purchase used a rate that does not belong to the order.");
-      error.code = "shipping_label_rate_mismatch";
-      throw error;
-    }
-
-    return {
-      id,
-      paymentStatus: existingOrder.paymentStatus,
-      rateId: cleanText(rateId),
-    };
+    return firestore.runTransaction(async (transaction) => {
+      const existingOrder = normalizeSnapshot(await transaction.get(ref));
+      if (!existingOrder) {
+        const error = new Error("Order request was not found for shipping label purchase.");
+        error.code = "order_request_not_found";
+        throw error;
+      }
+      if (existingOrder.paymentStatus !== "paid") {
+        const error = new Error("Shipping labels can only be purchased for paid orders.");
+        error.code = "shipping_label_order_not_paid";
+        error.paymentStatus = existingOrder.paymentStatus || "";
+        throw error;
+      }
+      if (!orderOwnsShippoRate(existingOrder, rateId)) {
+        const error = new Error("Shipping label purchase used a rate that does not belong to the order.");
+        error.code = "shipping_label_rate_mismatch";
+        throw error;
+      }
+      const packageId = packageIdForRate(existingOrder, rateId);
+      const labels = normalizeShippingLabels(existingOrder.shippingLabels);
+      if (
+        !labels.length &&
+        (cleanText(existingOrder.shippoTransactionId) || cleanText(existingOrder.labelUrl))
+      ) {
+        const legacyRateId = normalizeRateIdList(existingOrder.shippingPackageRateIds)[0]
+          || cleanText(existingOrder.shippingRateId);
+        if (legacyRateId) {
+          labels.push(withoutUndefinedFields({
+            packageId: "package-1",
+            rateId: legacyRateId,
+            status: "purchased",
+            purchaseAttemptId: "legacy-label",
+            labelPurchasedAt: existingOrder.labelPurchasedAt,
+            labelUrl: cleanText(existingOrder.labelUrl) || undefined,
+            shippoTransactionId: cleanText(existingOrder.shippoTransactionId) || undefined,
+            trackingNumber: cleanText(existingOrder.trackingNumber) || undefined,
+            trackingUrl: cleanText(existingOrder.trackingUrl) || undefined,
+            updatedAt: existingOrder.trustedUpdatedAt,
+          }));
+        }
+      }
+      const existingIndex = labels.findIndex((label) => label.packageId === packageId);
+      const existingLabel = existingIndex >= 0 ? labels[existingIndex] : null;
+      if (existingLabel && existingLabel.status === "purchased") {
+        const error = new Error("This package already has a purchased label.");
+        error.code = "shipping_label_already_purchased";
+        throw error;
+      }
+      if (existingLabel && ["processing", "ambiguous"].includes(existingLabel.status)) {
+        const error = new Error("This package has an active or ambiguous label purchase.");
+        error.code = "shipping_label_purchase_conflict";
+        throw error;
+      }
+      const claim = {
+        packageId,
+        purchaseAttemptId: attemptId,
+        rateId: cleanText(rateId),
+        status: "processing",
+        updatedAt: timestamp(),
+      };
+      if (existingIndex >= 0) labels[existingIndex] = claim;
+      else labels.push(claim);
+      transaction.update(ref, {
+        shippingLabels: labels,
+        trustedUpdatedAt: timestamp(),
+        audit: {
+          lastAction: "label_purchase_started",
+          updatedAt: timestamp(),
+          updatedByEmail: actor.email,
+          updatedByUid: actor.uid,
+        },
+      });
+      return { id, packageId, paymentStatus: existingOrder.paymentStatus, rateId: cleanText(rateId) };
+    });
   }
 
   async function recordAdminLabelPurchase({ admin, collection, orderRequestId, fields }) {
@@ -690,40 +773,97 @@ function createFirestoreAdapter(options = {}) {
     const actor = validateAdminActor(admin);
     const orders = collectionRef(firestore, orderCollectionName(options, collection));
     const ref = orders.doc(id);
-    const existingOrder = normalizeSnapshot(await getDoc(ref));
-
-    if (!existingOrder) {
-      const error = new Error("Order request was not found for shipping label purchase.");
-      error.code = "order_request_not_found";
-      throw error;
-    }
-
-    if (existingOrder.paymentStatus !== "paid") {
-      const error = new Error("Shipping labels can only be purchased for paid orders.");
-      error.code = "shipping_label_order_not_paid";
-      error.paymentStatus = existingOrder.paymentStatus || "";
-      throw error;
-    }
-
-    const labelFields = trustedUpdateFields(fields);
+    const packageId = cleanText(fields && fields.packageId);
+    const rateId = cleanText(fields && fields.rateId);
+    const attemptId = cleanText(fields && fields.purchaseAttemptId);
+    const labelFields = trustedUpdateFields(Object.fromEntries(
+      Object.entries(fields || {}).filter(([key]) => !["packageId", "rateId", "purchaseAttemptId"].includes(key)),
+    ));
     const updatedAt = labelFields.trustedUpdatedAt || timestamp();
-    const updateFields = {
-      ...labelFields,
-      audit: {
-        lastAction: "label_purchased",
+    let savedLabels = [];
+    await firestore.runTransaction(async (transaction) => {
+      const existingOrder = normalizeSnapshot(await transaction.get(ref));
+      if (!existingOrder) {
+        const error = new Error("Order request was not found for shipping label purchase.");
+        error.code = "order_request_not_found";
+        throw error;
+      }
+      if (existingOrder.paymentStatus !== "paid") {
+        const error = new Error("Shipping labels can only be purchased for paid orders.");
+        error.code = "shipping_label_order_not_paid";
+        throw error;
+      }
+      const labels = normalizeShippingLabels(existingOrder.shippingLabels);
+      const index = labels.findIndex((label) => label.packageId === packageId);
+      if (index < 0 || labels[index].purchaseAttemptId !== attemptId || labels[index].status !== "processing") {
+        const error = new Error("Shipping label result does not match the active package attempt.");
+        error.code = "shipping_label_purchase_conflict";
+        throw error;
+      }
+      labels[index] = withoutUndefinedFields({
+        packageId,
+        rateId,
+        purchaseAttemptId: attemptId,
+        status: "purchased",
+        labelPurchasedAt: labelFields.labelPurchasedAt,
+        labelUrl: labelFields.labelUrl,
+        shippoTransactionId: labelFields.shippoTransactionId,
+        trackingNumber: labelFields.trackingNumber,
+        trackingUrl: labelFields.trackingUrl,
         updatedAt,
-        updatedByEmail: actor.email,
-        updatedByUid: actor.uid,
-      },
-    };
-
-    await updateDoc(ref, updateFields);
+      });
+      savedLabels = labels;
+      transaction.update(ref, {
+        ...labelFields,
+        shippingLabels: labels,
+        audit: {
+          lastAction: "label_purchased",
+          updatedAt,
+          updatedByEmail: actor.email,
+          updatedByUid: actor.uid,
+        },
+      });
+    });
 
     return {
-      audit: updateFields.audit,
       id,
       ...labelFields,
+      packageId,
+      shippingLabels: savedLabels,
     };
+  }
+
+  async function recordAdminLabelPurchaseFailure({ admin, ambiguous, collection, orderRequestId, packageId, purchaseAttemptId, rateId }) {
+    const id = cleanText(orderRequestId);
+    const actor = validateAdminActor(admin);
+    const ref = collectionRef(firestore, orderCollectionName(options, collection)).doc(id);
+    return firestore.runTransaction(async (transaction) => {
+      const existingOrder = normalizeSnapshot(await transaction.get(ref));
+      if (!existingOrder) return { id, status: "missing" };
+      const labels = normalizeShippingLabels(existingOrder.shippingLabels);
+      const index = labels.findIndex((label) => label.packageId === cleanText(packageId));
+      if (index < 0 || labels[index].purchaseAttemptId !== cleanText(purchaseAttemptId)) {
+        return { id, status: "stale" };
+      }
+      labels[index] = {
+        packageId: cleanText(packageId),
+        purchaseAttemptId: cleanText(purchaseAttemptId),
+        rateId: cleanText(rateId),
+        status: ambiguous ? "ambiguous" : "failed",
+        updatedAt: timestamp(),
+      };
+      transaction.update(ref, {
+        shippingLabels: labels,
+        trustedUpdatedAt: timestamp(),
+        audit: {
+          lastAction: ambiguous ? "label_purchase_ambiguous" : "label_purchase_failed",
+          updatedAt: timestamp(),
+          updatedByEmail: actor.email,
+          updatedByUid: actor.uid,
+        },
+      });
+      return { id, status: labels[index].status };
+    });
   }
 
   async function claimStripeEventProcessing({ eventId, eventType }) {
@@ -1346,6 +1486,8 @@ function createFirestoreAdapter(options = {}) {
     prepareAdminLabelPurchase,
     recordLabelPurchase: recordAdminLabelPurchase,
     recordAdminLabelPurchase,
+    recordLabelPurchaseFailure: recordAdminLabelPurchaseFailure,
+    recordAdminLabelPurchaseFailure,
     recordNotificationFailure,
     recordNotificationSuccess,
     requeueAdminNotificationJob,

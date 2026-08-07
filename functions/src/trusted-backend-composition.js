@@ -100,6 +100,7 @@ function createTrustedBackendComposition(options = {}) {
     shippingLabelDependencies: {
       prepareLabelPurchase: firestoreAdapter.prepareLabelPurchase,
       recordLabelPurchase: firestoreAdapter.recordLabelPurchase,
+      recordLabelPurchaseFailure: firestoreAdapter.recordLabelPurchaseFailure,
     },
   };
 }

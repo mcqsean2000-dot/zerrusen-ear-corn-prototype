@@ -208,6 +208,7 @@ function runtimeOptions(env = runtimeEnv()) {
     shippingLabelDependencies: {
       prepareLabelPurchase: firestoreAdapter.prepareLabelPurchase,
       recordLabelPurchase: firestoreAdapter.recordLabelPurchase,
+      recordLabelPurchaseFailure: firestoreAdapter.recordLabelPurchaseFailure,
     },
   };
 }

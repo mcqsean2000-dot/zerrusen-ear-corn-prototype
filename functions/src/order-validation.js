@@ -76,6 +76,7 @@ const TRUSTED_ORDER_FIELDS = Object.freeze([
   "shippingDurationTerms",
   "shippingEstimatedDays",
   "shippingPackageCount",
+  "shippingLabels",
   "shippingPackageRateIds",
   "shippingRateId",
   "shippingService",
