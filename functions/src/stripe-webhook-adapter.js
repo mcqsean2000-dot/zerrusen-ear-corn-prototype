@@ -45,6 +45,7 @@ function getMissingStripeWebhookAdapterDependencies(deps = {}) {
   if (!isFunction(deps.findOrderByPaymentIntentId)) missing.push("findOrderByPaymentIntentId");
   if (!isFunction(deps.updateOrderRequest)) missing.push("updateOrderRequest");
   if (!isFunction(deps.completePaidOrderEvent)) missing.push("completePaidOrderEvent");
+  if (!isFunction(deps.completeRefundedOrderEvent)) missing.push("completeRefundedOrderEvent");
 
   return missing;
 }
@@ -211,6 +212,13 @@ async function handleCheckoutSessionEvent({ deps, collection, env, event, timest
     if (completed === false) {
       return { action: "replayed_event", eventId: event.id, processedAtomically: true };
     }
+    if (completed === "terminal_order") {
+      return {
+        action: "ignored_terminal_order",
+        orderRequestId,
+        processedAtomically: true,
+      };
+    }
 
     return { ...result, processedAtomically: true };
   }
@@ -297,20 +305,22 @@ async function handleChargeRefunded({ deps, collection, event, timestamp }) {
     return { action: "retry_later", reason: "order_request_id_missing" };
   }
 
-  const claimed = await claimEvent({ deps, event });
-  if (!claimed) {
-    return { action: "replayed_event", eventId: event.id };
-  }
-
   const fields = chargeRefundedFields({ event, charge, timestamp });
   assertTrustedFields(fields);
-  await deps.updateOrderRequest({
+  const result = { action: "updated_order", orderRequestId };
+  const completed = await deps.completeRefundedOrderEvent({
     collection,
+    eventId: event.id,
+    eventType: event.type,
+    result,
     orderRequestId,
     fields,
   });
+  if (completed === false) {
+    return { action: "replayed_event", eventId: event.id, processedAtomically: true };
+  }
 
-  return { action: "updated_order", orderRequestId };
+  return { ...result, processedAtomically: true };
 }
 
 function createStripeWebhookEventAdapter(deps = {}) {

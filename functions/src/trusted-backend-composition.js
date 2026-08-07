@@ -91,6 +91,7 @@ function createTrustedBackendComposition(options = {}) {
     stripeWebhookAdapterDependencies: {
       claimStripeEventProcessing: firestoreAdapter.claimStripeEventProcessing,
       completePaidOrderEvent: firestoreAdapter.completePaidOrderEvent,
+      completeRefundedOrderEvent: firestoreAdapter.completeRefundedOrderEvent,
       markStripeEventProcessed: firestoreAdapter.markStripeEventProcessed,
       findOrderByCheckoutSessionId: firestoreAdapter.findOrderByCheckoutSessionId,
       findOrderByPaymentIntentId: firestoreAdapter.findOrderByPaymentIntentId,
