@@ -81,6 +81,15 @@ function createMetaGraphPublisher(options = {}) {
   const facebookPageId = cleanText(options.facebookPageId, 80);
   const instagramAccountId = cleanText(options.instagramAccountId, 80);
   const graphRoot = `https://graph.facebook.com/${cleanText(options.graphApiVersion, 16)}`;
+  const sleepImpl = typeof options.sleepImpl === "function"
+    ? options.sleepImpl
+    : (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+  const mediaStatusDelayMs = Number.isInteger(options.mediaStatusDelayMs)
+    ? Math.max(0, Math.min(options.mediaStatusDelayMs, 10000))
+    : 2000;
+  const mediaStatusMaxAttempts = Number.isInteger(options.mediaStatusMaxAttempts)
+    ? Math.max(1, Math.min(options.mediaStatusMaxAttempts, 20))
+    : 10;
 
   async function request(path, fields) {
     let response;
@@ -107,6 +116,42 @@ function createMetaGraphPublisher(options = {}) {
     return id;
   }
 
+  async function read(path, fields) {
+    const query = new URLSearchParams({ ...fields, access_token: token }).toString();
+    let response;
+    try {
+      response = await fetchImpl(`${graphRoot}/${path}?${query}`, { method: "GET" });
+    } catch {
+      const error = new Error("Meta Graph publishing request could not be completed.");
+      error.code = "meta_graph_network_error";
+      throw error;
+    }
+
+    const body = await parseJson(response);
+    if (!response.ok) throw metaRequestError(response, body);
+    return body && typeof body === "object" ? body : {};
+  }
+
+  async function waitForInstagramMedia(creationId) {
+    for (let attempt = 1; attempt <= mediaStatusMaxAttempts; attempt += 1) {
+      const status = cleanText(
+        (await read(creationId, { fields: "status_code" })).status_code,
+        32,
+      ).toUpperCase();
+      if (status === "FINISHED") return;
+      if (["ERROR", "EXPIRED"].includes(status)) {
+        const error = new Error("Instagram media processing failed.");
+        error.code = `meta_graph_media_${status.toLowerCase()}`;
+        error.permanent = true;
+        throw error;
+      }
+      if (attempt < mediaStatusMaxAttempts) await sleepImpl(mediaStatusDelayMs);
+    }
+    const error = new Error("Instagram media processing did not finish in time.");
+    error.code = "meta_graph_media_processing_timeout";
+    throw error;
+  }
+
   return async function publishSocialPlatform(input) {
     const post = trustedPublishInput(input);
     if (post.platform === "facebook") {
@@ -120,6 +165,7 @@ function createMetaGraphPublisher(options = {}) {
       caption: post.caption,
       image_url: post.imageUrl,
     });
+    await waitForInstagramMedia(creationId);
     const id = await request(`${instagramAccountId}/media_publish`, { creation_id: creationId });
     return { platform: "instagram", providerPostId: id };
   };

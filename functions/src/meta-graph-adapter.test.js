@@ -52,12 +52,23 @@ test("publishes a Facebook photo with injected version and credentials", async (
   assert.equal(body.get("caption"), "Packed to order. https://theosfarm.com\n\n#TheosFarm");
 });
 
-test("publishes Instagram media using create then publish requests", async () => {
+test("waits for Instagram media processing before publishing", async () => {
   const urls = [];
+  const sleeps = [];
   const publish = createMetaGraphPublisher(configuration({
     async fetchImpl(url) {
       urls.push(url);
-      return response({ id: urls.length === 1 ? "container_123" : "ig_post_123" });
+      if (url.endsWith("/ig_123/media")) return response({ id: "container_123" });
+      if (url.includes("/container_123?")) {
+        return response({ status_code: urls.filter((value) => value.includes("/container_123?")).length === 1
+          ? "IN_PROGRESS"
+          : "FINISHED" });
+      }
+      return response({ id: "ig_post_123" });
+    },
+    mediaStatusDelayMs: 25,
+    async sleepImpl(milliseconds) {
+      sleeps.push(milliseconds);
     },
   }));
 
@@ -67,8 +78,28 @@ test("publishes Instagram media using create then publish requests", async () =>
   });
   assert.deepEqual(urls, [
     "https://graph.facebook.com/v99.0/ig_123/media",
+    "https://graph.facebook.com/v99.0/container_123?fields=status_code&access_token=test-token",
+    "https://graph.facebook.com/v99.0/container_123?fields=status_code&access_token=test-token",
     "https://graph.facebook.com/v99.0/ig_123/media_publish",
   ]);
+  assert.deepEqual(sleeps, [25]);
+});
+
+test("fails safely when Instagram media processing does not finish", async () => {
+  const publish = createMetaGraphPublisher(configuration({
+    async fetchImpl(url) {
+      if (url.endsWith("/ig_123/media")) return response({ id: "container_123" });
+      return response({ status_code: "IN_PROGRESS" });
+    },
+    mediaStatusDelayMs: 0,
+    mediaStatusMaxAttempts: 2,
+    async sleepImpl() {},
+  }));
+
+  await assert.rejects(
+    publish({ platform: "instagram", post: post() }),
+    (error) => error.code === "meta_graph_media_processing_timeout" && error.permanent !== true,
+  );
 });
 
 test("fails closed for missing configuration and sanitizes provider errors", async () => {
