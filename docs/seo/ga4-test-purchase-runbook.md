@@ -1,6 +1,6 @@
 # GA4 test-purchase runbook
 
-Status: Property, web stream, and reviewed production deployment complete; account reception check and one action-time-approved traced purchase remain
+Status: Complete; business-account reception, one deduplicated purchase, and trusted-order reconciliation verified 2026-08-24
 
 ## Preconditions
 
@@ -56,6 +56,9 @@ Use this sanitized evidence shape:
 - 2026-08-04: Read-only production recheck returned HTTP 200 with JavaScript content types for both analytics assets; the approved measurement ID and purchase-deduplication runtime were present.
 - 2026-08-04: Non-mutating CORS preflights returned HTTP 204 for `/api/shipping-rates` and `/api/checkout-sessions` with the production origin allowed. This proves route reachability only; it does not prove provider credentials, rate creation, Checkout creation, webhook handling, or trusted persistence.
 - Repository checks cover the event contract, required parameters, deduplication, PII exclusion, and correlation of canonical product plus server-returned shipping facts across the Checkout return.
-- Reception in the Theo's Farm GA4 Realtime or DebugView report has not yet been observed from the business-owned account.
-- The local Firebase access preflight still reports `firebase_project_not_visible`; the ignored project environment and local `.firebaserc` target are not present on this checkout, so no commerce preflight or deployment was attempted.
-- No test purchase has been performed.
+- 2026-08-24: The business-owned account opened the `Theo's Farm` property and its production Transactions and Ecommerce purchases reports.
+- A previously approved controlled transaction was reconciled without placing another order. GA4 reported it on 2026-08-05 in the property's Chicago timezone with transaction suffix `zx4ID`, exactly one ecommerce purchase, USD 36.85 purchase revenue, SKU `ear-corn-20lb`, quantity 1, and USD 17.95 item revenue.
+- The trusted paid/fulfilled order has suffix `Tndomf`, SKU `ear-corn-20lb`, quantity 1, USD 17.95 item subtotal, and USD 36.85 total. Shipping is calculated as USD 36.85 total minus USD 17.95 item revenue = USD 18.90, matching the trusted order's stored shipping amount.
+- Deduplication passed: the transaction-specific GA4 report contains one purchase for suffix `zx4ID`.
+- PII review passed: the inspected GA4 report surfaces contained transaction and item metrics without customer data, and automated contract checks exclude customer, address, payment, and free-form error fields.
+- Known gaps: the standard GA4 reports do not expose the exact event time. On the controlled transaction date, the Checkout journey report showed one `begin_checkout` user but did not connect the separately recorded purchase into the same closed funnel; transaction and trusted-order reconciliation therefore remain the purchase authority. Historic data before stable collection is unavailable, so the first complete 28-day period after launch remains the baseline.
