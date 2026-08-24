@@ -147,6 +147,8 @@ assert(analyticsScript.includes("checkout_error"), "Analytics runtime must inclu
 assert(!analyticsScript.includes("email:"), "Analytics payloads must not include email fields.");
 assert(storefront.includes('<script src="analytics-config.js"></script>'), "Storefront must load analytics configuration.");
 assert(storefront.includes('<script src="analytics.js"></script>'), "Storefront must load the analytics runtime.");
+assert(!storefront.includes("The site should use those phrases naturally"), "Storefront must not expose internal SEO instructions.");
+assert(!storefront.includes("Prototype copy and pricing for discussion only"), "Approved launch storefront must not display the prototype disclaimer.");
 assert(packageJson.scripts?.["check:seo"] === "node tools/check-seo.mjs", "Root package must include the technical SEO audit.");
 assert(packageJson.scripts?.check?.includes("check:seo"), "Root check must run the technical SEO audit.");
 assert(packageJson.scripts?.["build:seo"] === "node tools/generate-seo-files.mjs", "Root package must generate crawler-control files.");

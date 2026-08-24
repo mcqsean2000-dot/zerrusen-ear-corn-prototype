@@ -1,9 +1,9 @@
 # Theo's Farm SEO Fact Register
 
-Status: Initial review required  
+Status: Launch facts approved
 Owner: Sean McQueen  
 Backup reviewer: Calvin Hagerstrom, limited to facts already approved in this register  
-Last structural update: 2026-07-29
+Last factual review: 2026-08-24
 
 ## Purpose
 
@@ -12,6 +12,7 @@ This file is the only approved factual input for AI-generated SEO briefs, pages,
 ## Status definitions
 
 - `approved-existing`: already public on `theosfarm.com`; may be reused without changing its meaning.
+- `approved-dynamic`: approved for launch but must still be checked against the live storefront or production system immediately before publication.
 - `approved-governance`: approved in GitHub issue #45.
 - `pending-sean`: do not publish or repeat in new content until Sean approves.
 - `dynamic-verify`: must be checked against the live storefront or production system immediately before publication.
@@ -35,9 +36,9 @@ This file is the only approved factual input for AI-generated SEO briefs, pages,
 | BRAND-004 | approved-existing | Supporting phrases are `Whole & Natural` and `Farm to Feeder`. | repository | `docs/theos-farm-brand-guidelines.md` | Brand support only; not evidence of a regulated or nutritional claim. | Sean |
 | PRODUCT-001 | approved-existing | Theo's Farm offers a 20 lb bag of whole ear corn. | public-site | `index.html` | Product selection and factual comparison. | Sean |
 | PRODUCT-002 | approved-existing | Theo's Farm offers a 40 lb bag of whole ear corn. | public-site | `index.html` | Product selection and factual comparison. | Sean |
-| PRODUCT-003 | dynamic-verify | The 20 lb bag is listed at `$17.95 plus shipping`. | production | Live storefront and checkout | Price copy and Product/Offer schema only after immediate verification. | Calvin technical; Sean material change |
-| PRODUCT-004 | dynamic-verify | The 40 lb bag is listed at `$29.95 plus shipping`. | production | Live storefront and checkout | Price copy and Product/Offer schema only after immediate verification. | Calvin technical; Sean material change |
-| PRODUCT-005 | dynamic-verify | Product availability is shown as in stock in current structured data. | production | Live storefront, inventory behavior, and checkout | Availability copy and schema only after immediate verification. | Calvin |
+| PRODUCT-003 | approved-dynamic | The 20 lb bag is listed at `$17.95 plus shipping`. | first-party-record | GitHub issue #68; live storefront and checkout verification | Price copy and Product/Offer schema after immediate production verification. | Sean factual; Calvin technical |
+| PRODUCT-004 | approved-dynamic | The 40 lb bag is listed at `$29.95 plus shipping`. | first-party-record | GitHub issue #68; live storefront and checkout verification | Price copy and Product/Offer schema after immediate production verification. | Sean factual; Calvin technical |
+| PRODUCT-005 | approved-dynamic | Both products may be publicly marked in stock. | first-party-record | GitHub issue #68; live storefront, inventory behavior, and checkout verification | Availability copy and schema after immediate production verification. | Sean factual; Calvin technical |
 | PRODUCT-006 | approved-existing | The purchasable product is whole ears of corn on the cob, not loose kernels. | public-site | `index.html`; real product photos | Product descriptions, comparisons, and image selection. | Sean |
 | PHOTO-001 | approved-existing | Product visuals must show actual white 20 lb and 40 lb bags when packaging is represented. | repository | `docs/theos-farm-brand-guidelines.md` | All product photography and social/SEO imagery. | Sean |
 | PHOTO-002 | prohibited | A fictional brown retail bag may not be presented as the real product. | repository | `docs/theos-farm-brand-guidelines.md` | Never use as product evidence or purchasable packaging. | Sean |
@@ -73,8 +74,7 @@ The following require Sean's explicit approval and a source before use:
 
 1. Use only facts whose status permits the intended use.
 2. Quote or paraphrase without broadening the claim.
-3. Check every `dynamic-verify` fact against production in the same work session.
+3. Check every `approved-dynamic` or `dynamic-verify` fact against production in the same work session.
 4. Stop and open a blocking issue when a required fact is missing or conflicting.
 5. Cite the fact IDs used in every content brief and SEO pull request.
 6. Never use a pending or prohibited item to make a draft sound more persuasive.
-
