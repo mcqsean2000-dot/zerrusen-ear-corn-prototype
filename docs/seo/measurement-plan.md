@@ -1,6 +1,6 @@
 # Theo's Farm SEO Measurement Plan
 
-Status: Search Console baseline recorded; GA4 property, web stream, and reviewed production deployment complete; traced test purchase pending SEO-004
+Status: Search Console baseline recorded; GA4 property, web stream, production deployment, and traced purchase reconciliation complete
 Business authorizer: Sean McQueen  
 Technical owner: Calvin Hagerstrom  
 Initial external data budget: $0 per month
@@ -18,8 +18,8 @@ Initial external data budget: $0 per month
 | Source | Purpose | Owner | Status |
 | --- | --- | --- | --- |
 | Google Search Console | Queries, pages, impressions, clicks, average position, indexation | `theosfeedfarm@gmail.com`; Sean McQueen retained as verified owner | Connected; ownership aligned 2026-08-01 |
-| GA4 | Sessions, engagement, ecommerce funnel, purchases, revenue | `theosfeedfarm@gmail.com` | Property and web stream created 2026-08-01; measurement ID verified live 2026-08-02; traced test purchase pending |
-| Storefront order system | Authoritative orders and revenue reconciliation | Calvin | Existing; integration scope pending |
+| GA4 | Sessions, engagement, ecommerce funnel, purchases, revenue | `theosfeedfarm@gmail.com` | Property and web stream created 2026-08-01; measurement ID verified live 2026-08-02; controlled purchase reconciled 2026-08-24 |
+| Storefront order system | Authoritative orders and revenue reconciliation | Calvin | Controlled paid/fulfilled order reconciled to GA4 2026-08-24; broader integration scope pending |
 | Repository crawl | Status, canonical, metadata, schema, links, indexability | Calvin | Pending SEO-006 |
 | Google Merchant Center | Product visibility and feed diagnostics | `theosfeedfarm@gmail.com` | Deferred to SEO-005 |
 | External ranking/backlink API | Competitor and SERP enrichment | Unassigned | Deferred; budget is $0 |
@@ -47,15 +47,15 @@ Do not send names, email addresses, street addresses, phone numbers, payment dat
 - `checkout_error` accepts only a bounded error class and funnel step. Raw exceptions and free-form messages are never transmitted.
 - Automated contract coverage runs through `npm run check:analytics` and the repository's required `npm run check`.
 
-### Remaining activation evidence
+### Activation evidence
 
-SEO-004 remains open until all of the following are observed:
+SEO-004 activation evidence was completed on 2026-08-24:
 
-1. Confirm `theosfeedfarm@gmail.com` has ongoing administrator access to the GA4 property and web stream.
-2. Deploy the reviewed public measurement ID to production. Completed and verified 2026-08-02.
-3. DebugView or Realtime shows `page_view`, `view_item`, `add_to_cart`, `begin_checkout`, and one deduplicated `purchase`.
-4. The same test transaction is reconciled to the trusted order record.
-5. The test date, transaction reference, observed events, gaps, and reviewer are recorded without customer PII.
+1. The business-owned account can access the `Theo's Farm` property and production reports.
+2. The reviewed public measurement ID was deployed and verified 2026-08-02.
+3. Production reports show item views, add-to-cart activity, one checkout start, and one transaction-specific purchase for the controlled order; the closed Checkout journey does not connect that purchase and is recorded as a known gap.
+4. GA4 transaction suffix `zx4ID` reconciles to paid/fulfilled trusted order suffix `Tndomf`.
+5. The sanitized evidence, calculated shipping, deduplication result, PII review, and known gaps are recorded in the [GA4 test-purchase runbook](ga4-test-purchase-runbook.md).
 
 ### GA4 property and web stream
 
@@ -88,6 +88,19 @@ Record at least:
 - Known tracking gaps and launch dates.
 
 If historic data is unavailable, record the first complete 28-day period as the baseline and label earlier comparisons unavailable.
+
+### GA4 activation baseline and known gaps
+
+Observed on 2026-08-24 for the GA4 reporting date 2026-08-05 in the property's Chicago timezone:
+
+- Transaction suffix `zx4ID` appears once with one ecommerce purchase and USD 36.85 purchase revenue.
+- SKU `ear-corn-20lb` has one item purchased and USD 17.95 item revenue.
+- The trusted paid/fulfilled order suffix `Tndomf` has the same SKU and quantity, USD 17.95 item subtotal, USD 18.90 shipping, and USD 36.85 total.
+- Shipping is calculated in GA4 reconciliation as USD 36.85 purchase revenue minus USD 17.95 item revenue = USD 18.90.
+- The inspected report surfaces contained no customer PII; the analytics contract also excludes customer, address, payment, and free-form error data.
+- Exact event time is not exposed in the standard Transactions report. On the controlled transaction date, the Checkout journey report showed one `begin_checkout` user but zero purchases in the same closed funnel even though Transactions recorded the reconciled purchase. Transaction and trusted-order reports therefore remain authoritative while cross-session funnel continuity is a known gap.
+- Historic data before stable collection is unavailable, so the first complete 28-day period after launch remains the formal GA4 baseline.
+- A second GA4 transaction in the inspected launch-period report corresponds to a refunded/canceled trusted order. The trusted order system remains authoritative, and that transaction must not be treated as retained revenue without refund reconciliation.
 
 ## Search Console baseline
 
