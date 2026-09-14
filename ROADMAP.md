@@ -34,14 +34,14 @@ Customer experience should stay very simple:
 5. Pay product plus shipping through Stripe Checkout.
 6. Receive confirmation.
 
-Current product assumptions:
+Product facts approved on 2026-08-24 (see docs/product-facts-approval.md):
 
 - 20 lb Ear Corn Bag: $17.95 plus shipping
 - 40 lb Ear Corn Bag: $29.95 plus shipping
 - Shipping only
 - No local pickup
 
-Shipping package assumptions:
+Approved shipping package facts:
 
 - 20 lb bag ships as 29 in x 17 in x 5 in, 22 lb packed weight.
 - 40 lb bag ships as 32 in x 18 in x 8 in, 42 lb packed weight.
@@ -73,7 +73,7 @@ Implemented:
 - `POST /api/shipping-rates` calculates live Shippo rates from server-owned package specs.
 - Storefront collects full shipping address and lets customers choose a returned shipping option.
 - Checkout handoff now carries the selected shipping rate and backend code re-rates it server-side before Stripe Checkout.
-- Stripe Checkout has processed live payments. While issue #69 remains open, the deployed safety guard rejects checkout, rates, and label purchase whenever Stripe is live but Shippo is configured with a test token.
+- Stripe Checkout has processed live payments. Issue #69 is closed; the deployed safety guard continues to reject checkout, rates, and label purchase whenever Stripe is live but Shippo is configured with a test token.
 
 Checkout shipping flow:
 
@@ -221,7 +221,7 @@ Build order:
 2. Keep the current static storefront while it remains maintainable; no framework migration is required for launch.
 3. Build product catalog and checkout flow. Implemented and live; incident closure and a controlled end-to-end verification remain.
 4. Add Shippo rate quoting from server-owned package specs. Done.
-5. Add Stripe Checkout with selected shipping. Implemented and used in production; the Stripe-live/Shippo-test incident remains open under issue #69.
+5. Add Stripe Checkout with selected shipping. Implemented and used in production; the Stripe-live/Shippo-test incident tracked in issue #69 is closed.
 6. Add order persistence. Implemented in trusted Firebase composition; refund retry safety and production verification remain.
 7. Add Stripe webhooks. Implemented and receiving production events; subscription documentation, terminal-state protection, and traced delivery verification remain.
 8. Build admin fulfillment dashboard. Implemented; production Auth setup and claimed-admin smoke testing remain.
@@ -237,14 +237,11 @@ Build order:
 13. Run test orders.
 14. Launch.
 
-## Current Production Incident And Follow-Ups
+## Completed Production Incident Follow-Ups
 
-- Issue #69 is the incident source of truth. The commerce/fulfillment change freeze remains active until the incident owner explicitly closes it.
-- Replace the Shippo test token with the approved live token, create a new live shipment/rate for the affected paid order, and buy its label only through the controlled recovery procedure.
-- [Issue #75](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/75): model labels per package so multi-package orders cannot become label-complete after only one successful label purchase.
-- [Issue #76](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/76): make refund event claiming and order mutation atomic or recoverable after transient Firestore failure.
-- [Issue #77](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/77): preserve terminal refunded/canceled state when delayed Checkout completion events arrive.
-- [Issue #78](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/78): align the Stripe webhook runbook with the production `charge.refunded` subscription and retain sanitized traced evidence.
+- Issue #69 is closed, and its temporary commerce/fulfillment change freeze is no longer active.
+- Issues [#75](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/75) through [#78](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/78) are closed after adding per-package label tracking, recoverable refund processing, terminal-order-state protection, and production webhook/runbook reconciliation.
+- The Stripe-live/Shippo-test configuration guard remains in place as a permanent safety control.
 
 ## Maintenance Plan
 

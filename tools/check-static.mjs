@@ -128,6 +128,9 @@ assert(
 );
 assert(firebaseConfig.hosting?.ignore?.includes("**/*.zip"), "Firebase Hosting should not publish local ZIP artifacts.");
 assert(firebaseConfig.hosting?.ignore?.includes("dist/**"), "Firebase Hosting should not publish generated package artifacts.");
+for (const privatePath of ["package-lock.json", "tests/**", "output/**", "**/*.log", "_config.yml", "seo-config.json"]) {
+  assert(firebaseConfig.hosting?.ignore?.includes(privatePath), `Firebase Hosting should not publish ${privatePath}.`);
+}
 assert(firebaseConfig.firestore?.rules === "firestore.rules", "Firebase config must point at firestore.rules.");
 assert(firebaseConfig.firestore?.indexes === "firestore.indexes.json", "Firebase config must point at firestore.indexes.json.");
 assert(

@@ -36,22 +36,17 @@ This repo contains the Theo's Farm direct-to-consumer ear corn storefront and it
 
 ## Active Production Gates
 
-- [#58](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/58) - trace one approved GA4 test purchase.
 - [#67](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/67) - restore Firebase deploy access and verify the release flow.
-- [#68](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/68) - approve product facts and remove the prototype disclaimer.
-- [#69](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/69) - close the Stripe/Shippo production incident and finish controlled webhook, fulfillment, and trusted-order verification.
-- [#70](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/70) - complete production Google admin sign-in.
-- [#71](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/71) - activate Resend notifications with controlled tests.
 - [#72](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/72) - configure Meta credentials and run controlled Facebook/Instagram tests.
 
-## Production Safety Follow-Ups
+## Completed Production Safety Follow-Ups
 
-- The commerce/fulfillment change freeze remains in effect until issue #69 is explicitly closed. Do not change or deploy Stripe, Shippo, checkout, webhook, label, or fulfillment runtime behavior without incident-owner approval.
-- The deployed API rejects checkout, rates, and label purchase when Stripe is live but Shippo is configured with a test token. The affected paid order still requires a new live Shippo shipment/rate and controlled label purchase after a live token is available.
-- [#75](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/75) - add per-package label persistence, idempotency, and completion tracking so buying one label cannot make a multi-package order appear complete.
-- [#76](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/76) - make refund webhook event claims retry-safe after transient Firestore failures.
-- [#77](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/77) - prevent delayed `checkout.session.completed` events from reopening terminal refunded/canceled orders or enqueueing duplicate alerts.
-- [#78](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/78) - reconcile the production `charge.refunded` subscription and sanitized traced evidence with the deployment runbook.
+- Product facts were approved on 2026-08-24 and prototype copy was removed; see docs/product-facts-approval.md.
+- The approved GA4 purchase was reconciled against its trusted order on 2026-08-24; evidence and remaining reporting limitations are in docs/seo/ga4-test-purchase-runbook.md.
+
+- The incident tracked in [#69](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/69) is closed, and its temporary commerce/fulfillment change freeze is no longer active.
+- The deployed API continues to reject checkout, rates, and label purchase when Stripe is live but Shippo is configured with a test token.
+- Issues [#75](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/75) through [#78](https://github.com/mcqsean2000-dot/zerrusen-ear-corn-prototype/issues/78) are closed after adding per-package label tracking, recoverable refund processing, terminal-order-state protection, and production webhook/runbook reconciliation.
 
 ## Client-Provided Business Notes
 
@@ -153,8 +148,8 @@ Natural search phrases to keep in mind:
 
 ## Important Notes
 
-- Current prices are placeholders and should be confirmed before launch.
-- The customer flow is connected to relative Firebase API routes for Shippo rates and Stripe Checkout. Trusted order persistence, webhook handling, admin label purchase, and notification delivery are implemented. Production is operating behind incident guardrails while issue #69 remains open; additional activation and verification work still requires Firebase project access and controlled tests.
+- Product prices and shipping package facts were approved on 2026-08-24; see docs/product-facts-approval.md.
+- The customer flow is connected to relative Firebase API routes for Shippo rates and Stripe Checkout. Trusted order persistence, webhook handling, admin label purchase, and notification delivery are implemented. The production incident in issue #69 is closed; remaining activation and verification work is tracked in the active production gates above.
 - Completed Stripe Checkout events mark orders paid and create deterministic customer/admin Firestore outbox jobs. The production API, notification outbox delivery function, and reconciliation function have been deployed, and paid-order admin alerts are routed to the approved primary inbox with the farm inbox copied. Existing already-sent notifications are unchanged. The separate 8:00 AM Central daily-summary schedule still requires explicit production verification before the roadmap can mark it active.
 - The Firebase-hosted admin shell supports Google sign-in plus an email/password fallback. Fulfillment content and actions remain hidden until Firebase Auth returns an `admin: true` custom claim; signing in with an ordinary Google account does not grant access.
 - Authenticated admin API routes and visible admin controls can list social posts in `needs_reconciliation` and record an audited publish, retry-confirmed-safe, or skip resolution. The admin page automatically generates the next Monday-through-Sunday seven-post batch in Central Time, displays every caption/image/schedule for review, and queues the full week through one explicit confirmation. Each queue write remains individually validated and idempotent.
@@ -181,7 +176,7 @@ npm.cmd run package:static
 npm.cmd run preview
 ```
 
-The root `check` command includes the complete Firebase Functions suite and executable Firestore emulator tests. Install Firebase CLI `15.23.0` and Java 21 or newer before running it. Use `npm --prefix functions run check:social` only when you need the smaller social-publishing check during focused development.
+The root `check` command includes the complete Firebase Functions suite, executable Firestore rules tests, and local Auth/Firestore SDK integration tests. Use Node.js 22, Firebase CLI `15.23.0`, and Java 21 or newer. Run `npm run test:sdk` for the focused SDK integration suite; its emulator endpoints must be local. Use `npm --prefix functions run check:social` only when you need the smaller social-publishing check during focused development.
 
 The static package scripts remain useful for smoke checks and emergency static export, but Firebase Hosting is now the production target.
 
