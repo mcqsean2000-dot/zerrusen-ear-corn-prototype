@@ -23,13 +23,13 @@
       </a>
       <nav aria-label="Admin navigation">
         <a href="index.html">Storefront</a>
-        <a href="#orders">Orders</a>
-        <a href="#packing">Packing</a>
+        <a href="#orders" data-admin-content hidden>Orders</a>
+        <a href="#packing" data-admin-content hidden>Packing</a>
       </nav>
     </header>
 
     <main class="admin-main">
-      <section class="admin-title" aria-labelledby="admin-title">
+      <section class="admin-title" aria-labelledby="admin-title" data-admin-content hidden>
         <p class="eyebrow">Fulfillment</p>
         <h1 id="admin-title">Order requests, packing counts, and follow-up cues.</h1>
         <p>Sign in with the approved Theo's Farm Google account to access live fulfillment tools.</p>
@@ -54,7 +54,7 @@
           <button type="button" data-admin-sign-out hidden>Sign out</button>
         </form>
       </section>
-      <p class="admin-action-status" role="status" aria-live="polite" data-admin-action-status></p>
+      <p class="admin-action-status" role="status" aria-live="polite" data-admin-action-status data-admin-content hidden></p>
 
       <section class="admin-metrics" aria-label="Fulfillment summary" data-admin-summary data-admin-content hidden></section>
 
@@ -167,7 +167,7 @@
         </aside>
       </section>
 
-      <dialog class="admin-order-dialog" data-order-detail-dialog aria-labelledby="order-detail-title">
+      <dialog class="admin-order-dialog" data-order-detail-dialog data-admin-content hidden aria-labelledby="order-detail-title">
         <div class="admin-order-dialog-shell">
           <div class="admin-order-dialog-head">
             <div>

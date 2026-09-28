@@ -146,6 +146,10 @@
       help.textContent = "Sign in with Google or a Firebase admin account to load live order requests.";
     }
     document.documentElement.toggleAttribute("data-admin-signed-in", Boolean(authorized));
+    const orderDialog = document.querySelector("[data-order-detail-dialog]");
+    if (!authorized && orderDialog && orderDialog.open && typeof orderDialog.close === "function") {
+      orderDialog.close();
+    }
     const signOutButton = document.querySelector("[data-admin-sign-out]");
     if (signOutButton) signOutButton.hidden = !authenticated;
     if (typeof document.querySelectorAll === "function") {

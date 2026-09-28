@@ -386,6 +386,12 @@ assert(admin.includes("data-admin-sign-in-email"), "Admin shell must render the 
 assert(admin.includes("data-admin-sign-in-password"), "Admin shell must render the admin sign-in password field.");
 assert(admin.includes("data-admin-sign-out"), "Admin shell must render a sign-out control for configured live mode.");
 assert(admin.includes("data-admin-content hidden"), "Admin shell must hide fulfillment content before admin authorization.");
+assert(admin.includes('href="#orders" data-admin-content hidden'), "Admin shell must hide order navigation before admin authorization.");
+assert(admin.includes('href="#packing" data-admin-content hidden'), "Admin shell must hide packing navigation before admin authorization.");
+assert(admin.includes('class="admin-title" aria-labelledby="admin-title" data-admin-content hidden'), "Admin shell must hide the fulfillment heading before admin authorization.");
+assert(admin.includes("data-admin-action-status data-admin-content hidden"), "Admin shell must hide admin action feedback before authorization.");
+assert(admin.includes("data-order-detail-dialog data-admin-content hidden"), "Admin shell must hide order details before authorization.");
+assert(adminStyles.includes("[data-admin-content][hidden]"), "Admin stylesheet must enforce the authorization visibility gate.");
 assert(admin.includes("data-social-drafts"), "Admin shell must render the social draft review surface.");
 assert(admin.includes("data-social-reconciliation-rows"), "Admin shell must render the social reconciliation queue.");
 assert(admin.includes("data-packing-print"), "Admin shell must render the aggregate packing print control.");
