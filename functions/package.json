@@ -10,9 +10,14 @@
     "check:social": "node tools/check-source.mjs --social"
   },
   "dependencies": {
-    "firebase-admin": "^14.4.0",
-    "firebase-functions": "7.3.2",
-    "stripe": "^22.3.0"
+    "firebase-admin": "^14.5.0",
+    "firebase-functions": "7.4.0",
+    "stripe": "^22.6.2"
+  },
+  "overrides": {
+    "gaxios@6.7.1": {
+      "uuid": "11.1.1"
+    }
   },
   "engines": {
     "node": "22"
