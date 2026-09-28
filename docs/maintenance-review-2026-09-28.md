@@ -22,8 +22,8 @@ The local validation host used Node.js 24.18.0. Production Functions remain decl
 
 ## Audit remediation
 
-The initial Functions audit reported two moderate transitive findings in `gaxios@6.7.1` and `uuid@9.0.1`. They were under `@google-cloud/storage@8.1.0`, an optional Firebase Admin dependency that this application does not import. The advisory affects UUID v3, v5, and v6 buffer writes; gaxios uses only `uuid.v4()` to create a multipart boundary.
+The initial Functions audit reported two moderate transitive findings in `gaxios@6.7.1` and `uuid@9.0.1`. They were under `@google-cloud/storage`, an optional Firebase Admin dependency that this application does not import. The advisory affects UUID v3, v5, and v6 buffer writes; gaxios uses only `uuid.v4()` to create a multipart boundary.
 
-Because gaxios 6 is archived and cannot receive a patched dependency release, `functions/package.json` now scopes an override to `gaxios@6.7.1`, replacing UUID 9.0.1 with patched UUID 11.1.1. UUID 11.1.1 retains the CommonJS `v4` export used by gaxios and supports the declared Node.js 22 runtime. The installed gaxios and UUID exports load successfully, the complete repository suite passes, and both root and Functions audits now report zero vulnerabilities.
+Because gaxios 6 is archived and cannot receive a patched dependency release, `functions/package.json` now overrides gaxios's UUID dependency with patched UUID 11.1.1. The unqualified gaxios key is required for lockfile compatibility with npm 10.9.8 in CI. UUID 11.1.1 retains the CommonJS `v4` export used by gaxios and supports the declared Node.js 22 runtime. The installed gaxios and UUID exports load successfully, the complete repository suite passes, and both root and Functions audits now report zero vulnerabilities.
 
 Recheck the Firebase Admin Storage dependency chain during the next maintenance pass and remove the override when upstream no longer resolves through gaxios 6.
